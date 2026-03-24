@@ -76,12 +76,14 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     setPreviewSlide: async (id, presentationId) => {
-        const { activePresentationId, activePresentation, selectedPresentationId, presentationStack } = get();
+        const { activePresentationId, activePresentation, selectedPresentationId, selectedPresentation, presentationStack } = get();
         let targetPresId = presentationId || activePresentationId;
 
         const currentPres = (targetPresId === activePresentationId && activePresentation)
             ? activePresentation
-            : await db.presentationFiles.get(targetPresId || '');
+            : (targetPresId === selectedPresentationId && selectedPresentation)
+                ? selectedPresentation
+                : await db.presentationFiles.get(targetPresId || '');
 
         // SPECIAL: Auto-enter nested presentation if we selected a nested Slide from the timeline
         if (currentPres && id) {

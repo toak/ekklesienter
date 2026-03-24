@@ -13,6 +13,7 @@ import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { useMediaUrl, getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
 import { toast } from '@/core/utils/toast';
+import { IpcService } from '@/core/services/IpcService';
 
 // ─── Context menu state types ───
 interface IMediaContextMenu {
@@ -99,9 +100,9 @@ export const MediaPoolPanel: React.FC = () => {
 
     // ─── Handlers ───
     const handleImportMedia = async () => {
-        if (!window.electron?.ipcRenderer?.selectFile) return;
+        if (!IpcService.isElectron()) return;
         try {
-            const files = await window.electron.ipcRenderer.selectFile({
+            const files = await IpcService.selectFile({
                 properties: ['openFile', 'multiSelections'],
                 filters: [
                     { name: 'Media Files', extensions: ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'webm', 'mov', 'mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] }

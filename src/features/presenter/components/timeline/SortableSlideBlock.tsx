@@ -2,7 +2,7 @@ import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { cn } from '@/core/utils/cn';
-import { ISlide, ICanvasSlide, INestedSlide, IPresentationFile } from '@/core/types';
+import { ISlide, ICanvasSlide, INestedSlide, IPresentationFile, IBlock, ITemplate } from '@/core/types';
 import { SlideTile } from './SlideTile';
 import { TransitionSeparator } from './TransitionSeparator';
 import NestedPresentationTile from './NestedPresentationTile';
@@ -14,8 +14,8 @@ export interface SortableSlideBlockProps {
     previewSlideId: string | null;
     selectedPresentationId: string | null;
     liveSlideId: string | null;
-    blocksMap: Map<string, any>;
-    templatesMap: Map<string, any>;
+    blocksMap: Map<string, IBlock>;
+    templatesMap: Map<string, ITemplate>;
     presentationsMap: Map<string, IPresentationFile>;
     navigationParentSlideId: string | null;
     lang: string;
@@ -27,7 +27,7 @@ export interface SortableSlideBlockProps {
     isMultiSelect?: boolean;
     isSubItemSelected?: boolean;
     isMultiDragHidden?: boolean;
-    setContextMenu: (menu: any) => void;
+    setContextMenu: (menu: { x: number; y: number; slideId: string; presentationId: string } | null) => void;
 }
 
 /**

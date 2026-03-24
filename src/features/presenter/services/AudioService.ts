@@ -2,6 +2,7 @@ import { IAudioScope, ISlide, ICanvasSlide } from '@/core/types';
 import { generateWaveformPoints } from '@/core/utils/audioUtils';
 import { db } from '@/core/db';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
+import { IpcService } from '@/core/services/IpcService';
 
 class AudioService {
     private static instance: AudioService;
@@ -22,6 +23,7 @@ class AudioService {
     private durationPromises: Map<string, Promise<number>> = new Map();
     private durationCache: Map<string, number> = new Map();
     private waveformCache: Map<string, number[]> = new Map();
+    private blobUrlCache: Map<string, string> = new Map();
 
     private constructor() { }
 
@@ -48,11 +50,17 @@ class AudioService {
 
     private async resolveEffectiveUrl(fileId: string): Promise<string> {
         if (!fileId) return '';
+
+        // Reuse cached blob URL if we already created one for this fileId
+        const cached = this.blobUrlCache.get(fileId);
+        if (cached) return cached;
         
         // Check if we already have this in DB (e.g. imported media)
         const dbItem = await db.mediaPool.get(fileId) || await db.backgrounds.get(fileId);
         if (dbItem?.data) {
-            return URL.createObjectURL(dbItem.data);
+            const blobUrl = URL.createObjectURL(dbItem.data);
+            this.blobUrlCache.set(fileId, blobUrl);
+            return blobUrl;
         }
         
         return this.resolveUrl(fileId);
@@ -137,7 +145,7 @@ class AudioService {
 
     private async getFileStats(path: string): Promise<{ size: number } | null> {
         try {
-            return await window.electron.ipcRenderer.invoke('get-file-stats', path);
+            return await IpcService.invoke<{ size: number } | null>('get-file-stats', path);
         } catch (e) {
             return null;
         }
@@ -299,10 +307,12 @@ class AudioService {
         const fadeInTime = Math.max(0.01, scope.crossfadeSettings?.fadeInDuration ?? 1.0);
         const fadeOutTime = Math.max(0.01, scope.crossfadeSettings?.fadeOutDuration ?? 1.0);
 
-        // Fade and cleanup previous
-        const tracksToFadeOut = Array.from(this.activeTracks.entries()).filter(([id]) => id !== scope.id);
-        tracksToFadeOut.forEach(([id, track]) => {
-            this.activeTracks.delete(id);
+        // Fade and cleanup previous — collect first, delete, then iterate (no mutation during iteration)
+        const idsToFadeOut = Array.from(this.activeTracks.keys()).filter(id => id !== scope.id);
+        const tracksToFadeOut = idsToFadeOut.map(id => ({ id, track: this.activeTracks.get(id)! }));
+        idsToFadeOut.forEach(id => this.activeTracks.delete(id));
+
+        tracksToFadeOut.forEach(({ track }) => {
             try {
                 const trackFadeOut = Math.max(0.01, track.scope.crossfadeSettings?.fadeOutDuration ?? fadeOutTime);
                 track.gain.gain.cancelScheduledValues(now);
@@ -320,12 +330,12 @@ class AudioService {
                                 el.pause();
                                 el.src = ""; // Release resources
                                 el.load(); // Force browser to drop buffers
-                                el.remove(); // Remove from DOM if added (though we don't add it)
+                                el.remove();
                             }
-                        } catch (e) { }
+                        } catch (e) { /* intentional */ }
                     }, trackFadeOut * 1000);
                 }
-            } catch (e) { }
+            } catch (e) { /* intentional */ }
         });
 
         const offset = scope.trimStart || 0;

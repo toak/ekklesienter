@@ -136,11 +136,14 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
     const onLeftHandleDown = useCallback((e: React.PointerEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        e.currentTarget.setPointerCapture(e.pointerId);
+        const pointerId = e.pointerId;
+        e.currentTarget.setPointerCapture(pointerId);
 
         const initialX = left;
         const pointerStartX = e.clientX;
         let lastInformedStartIdx = propStartIdx;
+
+        const controller = new AbortController();
 
         const onMove = (ev: PointerEvent) => {
             const dx = ev.clientX - pointerStartX;
@@ -162,21 +165,25 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
         };
 
         const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup', onUp);
+            controller.abort();
+            if (e.currentTarget) e.currentTarget.releasePointerCapture(pointerId);
         };
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup', onUp);
+
+        document.addEventListener('pointermove', onMove, { signal: controller.signal });
+        document.addEventListener('pointerup', onUp, { signal: controller.signal });
     }, [left, propStartIdx, propEndIdx, visualTimeline, scope.id, resolveIdxAtX, updateAudioScopeBoundary]);
 
     const onRightHandleDown = useCallback((e: React.PointerEvent) => {
         e.preventDefault();
         e.stopPropagation();
-        e.currentTarget.setPointerCapture(e.pointerId);
+        const pointerId = e.pointerId;
+        e.currentTarget.setPointerCapture(pointerId);
 
         const initialEndX = left + width;
         const pointerStartX = e.clientX;
         let lastInformedEndIdx = propEndIdx;
+
+        const controller = new AbortController();
 
         const onMove = (ev: PointerEvent) => {
             const dx = ev.clientX - pointerStartX;
@@ -198,11 +205,12 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
         };
 
         const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup', onUp);
+            controller.abort();
+            if (e.currentTarget) e.currentTarget.releasePointerCapture(pointerId);
         };
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup', onUp);
+
+        document.addEventListener('pointermove', onMove, { signal: controller.signal });
+        document.addEventListener('pointerup', onUp, { signal: controller.signal });
     }, [left, width, propStartIdx, propEndIdx, visualTimeline, scope.id, resolveIdxAtX, updateAudioScopeBoundary]);
 
     const onFadeInHandleDown = useCallback((e: React.MouseEvent) => {
@@ -259,12 +267,15 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
         if (isEditingVolume) return;
         e.preventDefault();
         e.stopPropagation();
-        e.currentTarget.setPointerCapture(e.pointerId);
+        const pointerId = e.pointerId;
+        e.currentTarget.setPointerCapture(pointerId);
 
         const startX = e.clientX;
         const startGain = scope.volume || 1.0;
         const startDbStr = gainToDb(startGain);
         const startDb = startDbStr === '-∞' ? -60 : parseFloat(startDbStr);
+
+        const controller = new AbortController();
 
         const onMove = (ev: PointerEvent) => {
             const dx = ev.clientX - startX;
@@ -277,11 +288,12 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
         };
 
         const onUp = () => {
-            document.removeEventListener('pointermove', onMove);
-            document.removeEventListener('pointerup', onUp);
+            controller.abort();
+            if (e.currentTarget) e.currentTarget.releasePointerCapture(pointerId);
         };
-        document.addEventListener('pointermove', onMove);
-        document.addEventListener('pointerup', onUp);
+
+        document.addEventListener('pointermove', onMove, { signal: controller.signal });
+        document.addEventListener('pointerup', onUp, { signal: controller.signal });
     }, [scope.id, scope.volume, updateAudioScope, isEditingVolume]);
 
     const handleVolumeSubmit = () => {

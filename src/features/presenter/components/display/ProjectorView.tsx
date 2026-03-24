@@ -12,6 +12,7 @@ import { ILogo } from '@/core/types';
 import { useLogoUrl } from '@/core/hooks/useLogoUrl';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
 import { PresenterService } from '../../services/presenterService';
+import { IpcService } from '@/core/services/IpcService';
 
 const ProjectorView: React.FC = () => {
     const { t } = useTranslation();
@@ -47,14 +48,12 @@ const ProjectorView: React.FC = () => {
         document.body.classList.add('projector-mode');
 
         const reportRatio = () => {
-            if (window.electron?.ipcRenderer) {
-                const ratio = window.innerWidth / window.innerHeight;
-                window.electron.ipcRenderer.send('projector-ready', { ratio });
-            }
+            const ratio = window.innerWidth / window.innerHeight;
+            IpcService.send('projector-ready', { ratio });
         };
 
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (!window.electron?.ipcRenderer) return;
+            if (!IpcService.isElectron()) return;
 
             // List of codes to relay to the main window (layout independent)
             const codesToRelay = [
@@ -66,7 +65,7 @@ const ProjectorView: React.FC = () => {
             if (codesToRelay.includes(e.code) || e.ctrlKey || e.metaKey) {
                 e.preventDefault();
                 e.stopPropagation();
-                window.electron.ipcRenderer.send('relay-keydown', {
+                IpcService.send('relay-keydown', {
                     key: e.key,
                     code: e.code,
                     ctrlKey: e.ctrlKey,

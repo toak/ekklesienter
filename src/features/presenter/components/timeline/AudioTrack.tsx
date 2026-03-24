@@ -67,7 +67,8 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
             }
         });
         return scopes;
-    }, [visualTimeline, slideToIndexMap]);
+        // AI Fix: Only depend on the identity and count of items in visualTimeline, plus the slideToIndexMap
+    }, [visualTimeline.length, slideToIndexMap]);
 
     const [isDraggingOver, setIsDraggingOver] = React.useState(false);
 

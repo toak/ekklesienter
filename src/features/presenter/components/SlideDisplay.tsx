@@ -160,6 +160,7 @@ import {
   Presentation as PresentationIcon, CheckCircle2, Trash2
 } from 'lucide-react';
 import { LiveSyncService } from '@/core/services/liveSyncService';
+import { IpcService } from '@/core/services/IpcService';
 import { SlideBackground } from './display/SlideBackground';
 import SlideContentRenderer from './slide-editor/SlideContentRenderer';
 import SlideCanvas from './slide-editor/SlideCanvas';
@@ -403,9 +404,9 @@ const SlideDisplay: React.FC<SlideDisplayProps> = ({
 
   // ... projector-ready effect ...
   React.useEffect(() => {
-    if (isProjector || !window.electron?.ipcRenderer) return;
+    if (isProjector || !IpcService.isElectron()) return;
 
-    const unsub = window.electron.ipcRenderer.on('projector-ready', () => {
+    const unsub = IpcService.on('projector-ready', () => {
       const store = useBibleStore.getState();
       const { activeVerse, isMultiVerseMode: multiMode, selectedVerses, secondTranslationId: secId } = store;
 

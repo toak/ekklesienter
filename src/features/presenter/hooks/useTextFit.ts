@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, RefObject } from 'react';
+import { useLayoutEffect, useState, useRef, RefObject } from 'react';
 import { useAtomValue } from 'jotai';
 import { slideEditorDragActiveAtom } from '@/core/store/uiAtoms';
 
@@ -24,11 +24,13 @@ export function useTextFit({
     fontFamily = 'Inter',
 }: UseTextFitProps) {
     const [fittedFontSize, setFittedFontSize] = useState(originalFontSize);
+    const fittedRef = useRef(originalFontSize);
 
     // If the original size changes from outside, reset the fitted size.
     useLayoutEffect(() => {
         if (resizingMode !== 'shrink-to-fit') {
             setFittedFontSize(originalFontSize);
+            fittedRef.current = originalFontSize;
         }
     }, [originalFontSize, resizingMode]);
 
@@ -64,15 +66,15 @@ export function useTextFit({
             }
         }
 
-        // Apply best fit to state, but restore element to prevent layout thrashing
-        // React will re-render with the correct fittedFontSize
-        textElement.style.fontSize = `${fittedFontSize}px`;
+        // Restore element style from ref (not state) to prevent layout thrashing
+        textElement.style.fontSize = `${fittedRef.current}px`;
 
-        if (fittedFontSize !== bestFit) {
+        if (fittedRef.current !== bestFit) {
+            fittedRef.current = bestFit;
             setFittedFontSize(bestFit);
         }
 
-    }, [resizingMode, originalFontSize, content, fontFamily, containerRef, textRef, fittedFontSize]);
+    }, [resizingMode, originalFontSize, content, fontFamily, containerRef, textRef, dragActive]);
 
     return resizingMode === 'shrink-to-fit' ? fittedFontSize : originalFontSize;
 }

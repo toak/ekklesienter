@@ -5,6 +5,12 @@ import { GraceLibExportService } from './GraceLibExportService';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
 import { MediaType } from '@/core/types';
 import { toast } from 'sonner';
+import { IpcService } from '@/core/services/IpcService';
+
+interface ILibraryImportOptions {
+    t: any;
+    currentBinId: string | undefined;
+}
 
 /**
  * Service to handle importing of various file types into the presentation library.
@@ -48,7 +54,7 @@ export class LibraryImportService {
     private static async importFileObject(
         file: File, 
         currentBinId: string | undefined, 
-        t: (key: string, defaultValue?: string, options?: any) => string
+        t: any
     ): Promise<void> {
         const name = file.name.toLowerCase();
         
@@ -110,7 +116,7 @@ export class LibraryImportService {
     private static async importFilePath(
         path: string, 
         currentBinId: string | undefined, 
-        t: (key: string, defaultValue?: string, options?: any) => string
+        t: any
     ): Promise<void> {
         const nameStr = path.split(/[/\\]/).pop() || 'Untitled';
         const name = nameStr.toLowerCase();
@@ -168,6 +174,40 @@ export class LibraryImportService {
                 createdAt: Date.now()
             });
             toast.success(t('media_imported', 'Media imported: {{name}}', { name: nameStr }));
+        }
+    }
+
+    /**
+     * Triggers the file selection dialog (Electron or Browser fallback) and imports selected files.
+     */
+    static async selectAndImport(options: ILibraryImportOptions): Promise<void> {
+        const { t, currentBinId } = options;
+
+        if (!IpcService.isElectron()) {
+            // Web fallback
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.accept = '.ektp,.ektmp,.ektgl,.pptx,image/*,video/*,audio/*';
+            input.onchange = (e) => {
+                const files = Array.from((e.target as HTMLInputElement).files || []);
+                this.importFiles(files, currentBinId, t);
+            };
+            input.click();
+            return;
+        }
+
+        try {
+            const files = await IpcService.selectFile({
+                properties: ['openFile', 'multiSelections'],
+                filters: [
+                    { name: 'Supported Files', extensions: ['ektp', 'ektmp', 'ektgl', 'pptx', 'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'mp4', 'webm', 'ogg', 'mp3', 'wav', 'm4a', 'aac', 'flac'] }
+                ]
+            });
+            if (!files) return;
+            await this.importFiles(files, currentBinId, t);
+        } catch (error) {
+            console.error('[LibraryImportService] Failed to open file picker:', error);
         }
     }
 

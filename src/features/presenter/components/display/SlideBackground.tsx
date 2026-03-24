@@ -49,7 +49,7 @@ const LayerRenderer: React.FC<{ layer: IStyleLayer; zIndex: number }> = ({ layer
         return () => {
             // mediaCache handles lifecycle, we don't revoke here to allow reuse
         };
-    }, [layer]);
+    }, [layer.type, layer.image?.id, layer.image?.isFromDb, layer.video?.id, layer.video?.isFromDb]);
 
     if (!layer.visible) return null;
 

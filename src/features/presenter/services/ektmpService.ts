@@ -6,6 +6,7 @@ import {
 } from '@/core/types';
 import { ThumbnailService } from './ThumbnailService';
 import { APP_VERSION, EKT_SCHEMA_VERSION } from '@/core/constants';
+import { IpcService } from '@/core/services/IpcService';
 import { 
     sha256, collectMediaRefs, patchMediaIds, 
     getMediaBlob, mimeToExt, MediaManifest 
@@ -208,11 +209,11 @@ export const EktmpService = {
     },
 
     async syncFileSystemTemplates() {
-        if (!window.electron?.templates) return;
+        if (!IpcService.isElectron()) return;
         try {
-            const files = await window.electron.templates.list();
+            const files = await IpcService.templates.list();
             for (const filename of files) {
-                const buffer = await window.electron.templates.read(filename);
+                const buffer = await IpcService.templates.read(filename);
                 if (!buffer) continue;
                 const blob = new Blob([buffer as any]);
                 const templateData = await this.unpack(blob, { preserveId: true, isUserCreated: false });
@@ -226,21 +227,21 @@ export const EktmpService = {
     },
 
     async saveAsEktmpFile(templateId: string) {
-        if (!window.electron?.templates) return;
+        if (!IpcService.isElectron()) return;
         try {
             const template = await db.templates.get(templateId);
             if (!template) return;
             const blob = await this.pack(templateId);
-            await window.electron.templates.write(`${template.id}.ektmp`, new Uint8Array(await blob.arrayBuffer()));
+            await IpcService.templates.write(`${template.id}.ektmp`, new Uint8Array(await blob.arrayBuffer()));
         } catch (error) {
             console.error('Save failed:', error);
         }
     },
 
     async deleteFromFilesystem(templateId: string) {
-        if (!window.electron?.templates) return;
+        if (!IpcService.isElectron()) return;
         try {
-            await window.electron.templates.delete(`${templateId}.ektmp`);
+            await IpcService.templates.delete(`${templateId}.ektmp`);
         } catch (error) {
             console.error('Delete failed:', error);
         }

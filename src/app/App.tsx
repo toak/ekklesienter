@@ -41,6 +41,7 @@ import PresentationImportModal from '@/features/presenter/components/modals/Pres
 import PresentationPickerModal from '../features/presenter/components/modals/PresentationPickerModal';
 import { LiveSyncService } from '@/core/services/liveSyncService';
 import { EktmpService } from '@/features/presenter/services/ektmpService';
+import { IpcService } from '@/core/services/IpcService';
 
 import { audioService } from '@/features/presenter/services/AudioService';
 import { Toaster } from 'sonner';
@@ -194,9 +195,9 @@ const ControllerLayout: React.FC = () => {
   );
 
   useEffect(() => {
-    if (window.electron?.ipcRenderer) {
-      window.electron.ipcRenderer.on('projector-opened', () => setProjectorOpen(true));
-      window.electron.ipcRenderer.on('projector-closed', () => {
+    if (IpcService.isElectron()) {
+      IpcService.on('projector-opened', () => setProjectorOpen(true));
+      IpcService.on('projector-closed', () => {
         setProjectorOpen(false);
         // Clear live states in both stores to ensure UI consistency
         useBibleStore.setState({ projectorIsLive: false });
@@ -209,7 +210,9 @@ const ControllerLayout: React.FC = () => {
     const initTemplates = async () => {
       try {
         // 1. Seed bundled .ektmp files from app resources to user templates dir
-        await window.electron?.templates?.seedBundled();
+        if (IpcService.isElectron()) {
+          await IpcService.templates.seedBundled();
+        }
         // 2. Sync all filesystem templates into IndexedDB (also auto-creates blocks)
         await EktmpService.syncFileSystemTemplates();
       } catch (err) {
@@ -269,8 +272,8 @@ const ControllerLayout: React.FC = () => {
 
   const openProjector = async () => {
     const displaySettings = usePresenterStore.getState().settings.display;
-    if (window.electron && window.electron.ipcRenderer) {
-      await window.electron.ipcRenderer.invoke('open-projector', displaySettings);
+    if (IpcService.isElectron()) {
+      await IpcService.invoke('open-projector', displaySettings);
       setProjectorOpen(true);
       // Handshake listener in useEffect will trigger sendVerseToProjector() when window is ready
     } else {
@@ -306,8 +309,8 @@ const ControllerLayout: React.FC = () => {
     useBibleStore.setState({ projectorIsLive: false });
     usePresentationStore.getState().setLiveSlide(null);
 
-    if (window.electron?.ipcRenderer) {
-      window.electron.ipcRenderer.invoke('close-projector');
+    if (IpcService.isElectron()) {
+      IpcService.invoke('close-projector');
     }
   }, []);
 
@@ -540,8 +543,8 @@ const ControllerLayout: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown, true); // capture phase: fires before stopPropagation in children
 
     let unsubscribeRelay: (() => void) | undefined;
-    if (window.electron?.ipcRenderer) {
-      unsubscribeRelay = window.electron.ipcRenderer.on('relay-keydown', (payload: any) => {
+    if (IpcService.isElectron()) {
+      unsubscribeRelay = IpcService.on('relay-keydown', (payload: any) => {
         executeHotkey(payload);
       });
     }
@@ -555,19 +558,16 @@ const ControllerLayout: React.FC = () => {
 
   // Listen for projector-ready event (Handshake for release builds)
   useEffect(() => {
-    if (!window.electron?.ipcRenderer) return;
+    if (!IpcService.isElectron()) return;
 
-    const unsubscribe = window.electron.ipcRenderer.on('projector-ready', (payload?: { ratio: number }) => {
+    const unsubscribe = IpcService.on('projector-ready', (payload?: { ratio: number }) => {
       if (payload?.ratio) {
         usePresenterStore.getState().updateDisplay({ aspectRatio: payload.ratio });
       }
       // Send initial theme
-      window.electron?.ipcRenderer.send('projector-command', 'update-theme', themeAccent);
+      IpcService.send('projector-command', 'update-theme', themeAccent);
 
       // Send current override state
-      const uiState = {
-        activeOverride: (activeOverrideAtom as any).init, // This might not be right
-      };
       // Better: just call the setOverride with current state
       LiveSyncService.setOverride(activeOverride as OverrideType | null, activeOverride === 'logo' ? activeLogo : null);
 
@@ -581,18 +581,18 @@ const ControllerLayout: React.FC = () => {
 
   // Detect external display aspect ratio at startup
   useEffect(() => {
-    if (!window.electron?.ipcRenderer) return;
+    if (!IpcService.isElectron()) return;
 
     const detectDisplayRatio = async () => {
       try {
-        const data = await window.electron.ipcRenderer.invoke('get-displays');
+        const data = await IpcService.invoke<Array<{ bounds: { x: number; y: number }; size: { width: number; height: number } }>>('get-displays');
         if (!data || data.length === 0) return;
 
         const { settings } = usePresenterStore.getState();
         if (!settings.display.autoDefine) return;
 
         // Prefer external display, fall back to primary
-        const external = data.find((d: { bounds: { x: number; y: number } }) => d.bounds.x !== 0 || d.bounds.y !== 0);
+        const external = data.find(d => d.bounds.x !== 0 || d.bounds.y !== 0);
         const display = external || data[0];
         const ratio = display.size.width / display.size.height;
 

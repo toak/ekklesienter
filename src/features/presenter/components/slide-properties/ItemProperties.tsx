@@ -16,6 +16,7 @@ import { AlignmentTools, PropertySection } from './PropertySection';
 import { CornerTL, CornerTR, CornerBL, CornerBR } from './helpers';
 import { RotationDial } from '@/features/presenter/components/slide-editor/RotationDial';
 import { TypographySection } from './TypographySection';
+import { isEqual } from '@/core/utils/isEqual';
 
 interface IItemPropertiesProps {
     selectedIds: string[];
@@ -43,7 +44,7 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
         const firstValue = getter(firstItem);
         const allSame = selectedIds.every(id => {
             const item = canvasItems.find(i => i.id === id);
-            return item && JSON.stringify(getter(item)) === JSON.stringify(firstValue);
+            return item && isEqual(getter(item), firstValue);
         });
         return allSame ? firstValue : 'mixed';
     };

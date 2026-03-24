@@ -18,6 +18,7 @@ import { FloatingPopover } from '@/components/FloatingPopover';
 import { ScrubbableInput } from '../slide-properties/ScrubbableInput';
 import { PropertySection } from '../slide-properties/PropertySection';
 import { AdvancedTextSettings } from '../slide-properties/AdvancedTextSettings';
+import { isEqual } from '@/core/utils/isEqual';
 
 interface ITypographySectionProps {
     selectedIds: string[];
@@ -44,7 +45,7 @@ export const TypographySection: React.FC<ITypographySectionProps> = ({
         const firstValue = getter(canvasItems.find(i => i.id === selectedIds[0])!);
         const allSame = selectedIds.every(id => {
             const item = canvasItems.find(i => i.id === id);
-            return item && JSON.stringify(getter(item)) === JSON.stringify(firstValue);
+            return item && isEqual(getter(item), firstValue);
         });
         return allSame ? firstValue : 'mixed';
     };

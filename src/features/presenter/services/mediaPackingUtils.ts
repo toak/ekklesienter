@@ -1,5 +1,6 @@
 import { db } from '@/core/db';
 import { IStyleLayer, ISlide, ICanvasSlide, ITimerSlide, SlideType, IAudioScope } from '@/core/types';
+import { IpcService } from '@/core/services/IpcService';
 
 export interface MediaManifest {
     [contentHash: string]: {
@@ -28,9 +29,9 @@ export async function sha256(blob: Blob): Promise<string> {
  */
 export async function readLocalFileSafe(path: string): Promise<Blob | null> {
     try {
-        if (window.electron?.ipcRenderer) {
-            const stats = await window.electron.ipcRenderer.invoke('read-file-data', path);
-            if (stats && stats.data) return new Blob([stats.data]);
+        if (IpcService.isElectron()) {
+            const stats = await IpcService.invoke<{ data: Uint8Array } | null>('read-file-data', path);
+            if (stats && stats.data) return new Blob([new Uint8Array(stats.data)]);
         }
     } catch (e) {
         console.warn(`Failed to read local media file: ${path}`, e);

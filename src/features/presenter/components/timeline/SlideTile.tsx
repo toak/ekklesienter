@@ -79,7 +79,6 @@ export const SlideTile: React.FC<SlideTileProps> = ({
 
     return (
         <div
-            {...listeners}
             data-slide-id={slide.id}
             onClick={(e) => {
                 e.stopPropagation();
@@ -125,7 +124,13 @@ export const SlideTile: React.FC<SlideTileProps> = ({
                     {slide.isExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
                 </button>
             )}
-            <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 backdrop-blur-md border border-white/5 text-[8px] font-black text-stone-400 z-20">{slide.order + 1}</div>
+            <div 
+                {...listeners}
+                className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 backdrop-blur-md border border-white/5 text-[8px] font-black text-stone-400 z-20 cursor-grab active:cursor-grabbing hover:bg-black/60 transition-colors"
+                title={t('drag_to_reorder', 'Drag to reorder')}
+            >
+                {slide.order + 1}
+            </div>
             
             {/* Nested Progress Badge */}
             {isNestedActive && nestedPres && (

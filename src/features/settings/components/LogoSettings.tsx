@@ -11,6 +11,7 @@ import { ILogo, ILogoGroup, ILogoEntry } from '@/core/types';
 import { db } from '@/core/db';
 import { useLogoUrl } from '@/core/hooks/useLogoUrl';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
+import { IpcService } from '@/core/services/IpcService';
 
 // ─── Create Group Dialog ────────────────────────────────────────────────────
 interface CreateGroupDialogProps {
@@ -231,28 +232,25 @@ const LogoSettings: React.FC = () => {
 
     // ── Handlers ───────────────────────────────────────────────────────────
     const handleSelectFile = async (groupId?: string) => {
-        if (!window.electron) {
-            console.error('LogoSettings: window.electron is missing');
+        if (!IpcService.isElectron()) {
+            console.error('LogoSettings: Electron is not available');
             return;
         }
         try {
-            let filePath = await (window.electron.ipcRenderer as any).selectFile({
+            const filePaths = await IpcService.selectFile({
                 title: t('select_logo_title', 'Select Church Logo'),
             });
 
-            if (filePath) {
-                // If it's an array, take the first one
-                if (Array.isArray(filePath)) {
-                    filePath = filePath[0];
-                }
+            if (filePaths && filePaths.length > 0) {
+                const filePath = filePaths[0];
                 if (!filePath) return;
 
                 const fileName = filePath.split(/[/\\]/).pop() || 'Logo';
                 const logoId = crypto.randomUUID();
 
-                const result = await (window.electron.ipcRenderer as any).readFileData(filePath);
+                const result = await IpcService.invoke<{ data: Uint8Array; mimeType: string } | null>('read-file-data', filePath);
                 if (!result) return;
-                const blob = new Blob([result.data], { type: result.mimeType });
+                const blob = new Blob([new Uint8Array(result.data)], { type: result.mimeType });
 
                 // Save to IndexedDB
                 await db.logos.put({
@@ -281,13 +279,13 @@ const LogoSettings: React.FC = () => {
     };
 
     const handleImportFolder = async (groupId?: string) => {
-        if (!window.electron) return;
+        if (!IpcService.isElectron()) return;
         setIsImporting(true);
         setImportTargetGroupId(groupId ?? null);
         try {
-            const folderPath = await (window.electron.ipcRenderer as any).selectFolder();
+            const folderPath = await IpcService.selectFolder();
             if (folderPath) {
-                const results: ILogo[] = await (window.electron.ipcRenderer as any).readDirectoryRecursive(folderPath);
+                const results: ILogo[] = await IpcService.invoke<ILogo[]>('read-directory-recursive', folderPath);
 
                 // For folder imports, we should probably also convert to Blobs for consistency 
                 // but if there are many files, it might be heavy. 
@@ -298,11 +296,11 @@ const LogoSettings: React.FC = () => {
                     try {
                         // Extract path from local-resource://[host]/path
                         const originalPath = l.url.replace(/^local-resource:\/\/(localhost)?/, '');
-                        const result = await (window.electron.ipcRenderer as any).readFileData(originalPath);
+                        const result = await IpcService.invoke<{ data: Uint8Array; mimeType: string } | null>('read-file-data', originalPath);
 
                         if (!result) throw new Error('Failed to read file data');
 
-                        const blob = new Blob([result.data], { type: result.mimeType });
+                        const blob = new Blob([new Uint8Array(result.data)], { type: result.mimeType });
                         await db.logos.put({
                             id: l.id,
                             name: l.name,
@@ -343,10 +341,10 @@ const LogoSettings: React.FC = () => {
     };
 
     const handleRefreshFolder = async (group: ILogoGroup) => {
-        if (!group.folderPath || !window.electron) return;
+        if (!group.folderPath || !IpcService.isElectron()) return;
         setIsImporting(true);
         try {
-            const results: ILogo[] = await (window.electron.ipcRenderer as any).readDirectoryRecursive(group.folderPath);
+            const results: ILogo[] = await IpcService.invoke<ILogo[]>('read-directory-recursive', group.folderPath);
             // Filter out already-existing URLs
             const existingUrls = new Set(group.logos.map(l => l.url));
             const newLogos = results.filter(l => !existingUrls.has(l.url));
@@ -416,7 +414,7 @@ const LogoSettings: React.FC = () => {
     // ── Render ──────────────────────────────────────────────────────────────
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {!window.electron && (
+            {!IpcService.isElectron() && (
                 <div className="flex items-center gap-3 px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-3xl text-red-400 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
                     <span>{t('electron_required_warning', 'System features (Image/Folder Import) require the Desktop application.')}</span>

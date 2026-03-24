@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Monitor, Cpu, ScreenShare } from 'lucide-react';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
 import { cn } from '@/core/utils/cn';
+import { IpcService } from '@/core/services/IpcService';
 
 interface IDisplayInfo {
     id: number;
@@ -20,9 +21,9 @@ const DisplaySettings: React.FC = () => {
 
     useEffect(() => {
         const fetchDisplays = async () => {
-            if (window.electron?.ipcRenderer) {
+            if (IpcService.isElectron()) {
                 try {
-                    const data = await window.electron.ipcRenderer.invoke('get-displays');
+                    const data = await IpcService.invoke<IDisplayInfo[]>('get-displays');
                     setDisplays(data);
 
                     // If auto-defining, calculate current aspect ratio

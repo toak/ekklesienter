@@ -23,6 +23,7 @@ import {
 // Hooks and Services
 import { useContainFit } from '@/core/hooks/useContainFit';
 import { LiveSyncService } from '@/core/services/liveSyncService';
+import { IpcService } from '@/core/services/IpcService';
 import { db } from '@/core/db';
 
 // Utils and Types
@@ -411,9 +412,9 @@ const SlideDisplay: React.FC<SlideDisplayProps> = ({
 
   // ... projector-ready effect ...
   React.useEffect(() => {
-    if (isProjector || !window.electron?.ipcRenderer) return;
+    if (isProjector || !IpcService.isElectron()) return;
 
-    const unsub = window.electron.ipcRenderer.on('projector-ready', () => {
+    const unsub = IpcService.on('projector-ready', () => {
       const store = useBibleStore.getState();
       const { activeVerse, isMultiVerseMode: multiMode, selectedVerses, secondTranslationId: secId } = store;
 

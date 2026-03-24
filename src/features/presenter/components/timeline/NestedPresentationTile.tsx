@@ -9,6 +9,7 @@ import {
     Presentation
 } from 'lucide-react';
 import SlideContentRenderer from '../slide-editor/SlideContentRenderer';
+import { IpcService } from '@/core/services/IpcService';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string; strokeWidth?: number }>> = {
     Presentation
@@ -73,9 +74,9 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
                                 setPreviewSlide(nestedSlide.id, nestedPresentation.id);
                                 setLiveSlide(nestedSlide.id);
 
-                                if (window.electron?.ipcRenderer) {
+                                if (IpcService.isElectron()) {
                                     const displaySettings = usePresenterStore.getState().settings.display;
-                                    await window.electron.ipcRenderer.invoke('open-projector', displaySettings);
+                                    await IpcService.invoke('open-projector', displaySettings);
                                 }
                             }}
                             className={cn(

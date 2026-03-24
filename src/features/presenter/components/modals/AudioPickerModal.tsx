@@ -9,6 +9,7 @@ import { X, Music, Search, Plus } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { IMediaItem, IAudioScope, ISlide } from '@/core/types';
 import { findOverlappingScopes } from '../../utils/timelineUtils';
+import { IpcService } from '@/core/services/IpcService';
 
 const AudioPickerModal: React.FC = () => {
     const { t } = useTranslation();
@@ -89,9 +90,9 @@ const AudioPickerModal: React.FC = () => {
 
     const handleImport = async () => {
         // Use Electron's native file picker if available for persistent absolute paths
-        if (window.electron?.ipcRenderer?.selectFile) {
+        if (IpcService.isElectron()) {
             try {
-                const filePath = await window.electron.ipcRenderer.selectFile({
+                const filePath = await IpcService.selectFile({
                     properties: ['openFile', 'multiSelections'],
                     filters: [
                         { name: 'Audio', extensions: ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'] }

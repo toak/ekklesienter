@@ -337,7 +337,8 @@ export const createSlideCrudSlice: PresentationSliceCreator = (set, get) => ({
             return pres.slides.findIndex(s => s.id === a) - pres.slides.findIndex(s => s.id === b);
         });
 
-        const lastIdx = Math.max(...sortedSlideIds.map(id => pres.slides.findIndex(s => s.id === id)));
+        const sortedIndices = sortedSlideIds.map(id => pres.slides.findIndex(s => s.id === id)).sort((a, b) => a - b);
+        const lastIdx = sortedIndices[sortedIndices.length - 1];
         let insertionIdx = lastIdx + 1;
 
         for (const slideId of sortedSlideIds) {
