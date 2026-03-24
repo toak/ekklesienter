@@ -1,21 +1,22 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
-import { useBibleStore } from '@/core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { getBookOrder, getSectionColors, getBookSection, getBookName, SECTION_NAMES, BibleSection, BOOK_ORDER } from '@/core/data/bookData';
-import { Book, BookOpen, Layers, Settings, GripHorizontal, Search, X, Hash, ChevronRight, Clock, Plus, Presentation, ChevronDown, List, Layout, Workflow, Monitor, Music, Coins, Baby, Mic2, Megaphone, Save, Check } from 'lucide-react';
+import { Book, BookOpen, Layers, Settings, GripHorizontal, Search, X, Hash, ChevronRight, Clock, Plus, Presentation, ChevronDown, List, Layout, Workflow, Monitor, Music, Coins, Baby, Mic2, Megaphone, Save, Check, LayoutTemplate } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { parseSearchQuery } from '@/features/search/utils/searchParser';
 import { searchVerses, SearchResult } from '@/features/search/services/globalSearchService';
 import { cn } from '@/core/utils/cn';
 import TranslationPicker from '@/shared/ui/TranslationPicker';
-import ServicePicker from '@/shared/ui/ServicePicker';
+import ServicePicker from '@/features/presenter/components/library/ServicePicker';
 import { useAtom } from 'jotai';
 import { appModeAtom } from '@/core/store/uiAtoms';
-import { usePresentationStore } from '@/core/store/presentationStore';
+import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
-import { MediaPoolPanel } from '@/features/presenter/components/media-pool/MediaPoolPanel';
+import { MediaPoolPanel } from '@/features/presenter/components/media/MediaPoolPanel';
 import { ISlide } from '@/core/types';
+import { GraceLibBin } from '@/features/presenter/components/library/GraceLibBin';
 
 
 /**
@@ -97,21 +98,16 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings }) => 
   const pickerTriggerRef = useRef<HTMLButtonElement>(null);
   const modeTriggerRef = useRef<HTMLButtonElement>(null);
   const { openModal } = useModalStore();
-  const {
-    activeServiceId,
-    setActiveService,
-    activeService,
-    saveActiveService,
-    activePresentationId,
-    activePresentation,
-    activeBlockId,
-    setActiveBlockId
-  } = usePresentationStore();
+  const activeServiceId = usePresentationStore(s => s.activeServiceId);
+  const setActiveService = usePresentationStore(s => s.setActiveService);
+  const activeService = usePresentationStore(s => s.activeService);
+  const activePresentationId = usePresentationStore(s => s.activePresentationId);
+  const graceLibSection = usePresentationStore(s => s.graceLibSection);
+  const setGraceLibSection = usePresentationStore(s => s.setGraceLibSection);
 
   const resizer = useVerticalResize('books-chapters-split', 55, 20, 80);
 
   const blocks = useLiveQuery(() => db.blocks.toArray()) || [];
-  const sections = useLiveQuery(() => db.sections.toArray()) || [];
 
   const books = useLiveQuery(
     async () => {
@@ -132,7 +128,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings }) => 
     const ordered: any[] = [];
     const usedIds = new Set();
 
-    BOOK_ORDER.forEach((info: any) => {
+    BOOK_ORDER.forEach((info) => {
       const book = booksMap.get(info.id);
       if (book) {
         ordered.push(book);
@@ -374,15 +370,15 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings }) => 
         )}
 
         {/* Navigation View (Conditional) */}
-        {appMode === 'scripture' ? (
-          <>
-            <div style={{ height: `${resizer.percent}%` }} className="flex flex-col shrink-0 min-h-0">
+        {/* Symmetric Top Area */}
+        <div style={{ height: `${resizer.percent}%` }} className="flex flex-col shrink-0 min-h-0">
+          {appMode === 'scripture' ? (
+            <>
               <div className="px-4 py-2 flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">
                   {t('books')}
                 </span>
               </div>
-
               <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar px-3 pb-4 space-y-0.5 min-h-0">
                 {filteredBooks.map((book) => {
                   const section = getBookSection(book.bookId);
@@ -431,16 +427,57 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings }) => 
                   );
                 })}
               </div>
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto no-scrollbar px-3 py-4 space-y-4">
+              <div className="px-1 flex items-center justify-between shrink-0">
+                <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1.5">
+                  <Layout className="w-3 h-3" />
+                  GraceLib
+                </span>
+              </div>
+              <div className="grid grid-cols-1 gap-2 shrink-0">
+                <GraceLibBin
+                  id="templates"
+                  name={t('templates', 'Templates')}
+                  icon={LayoutTemplate}
+                  isActive={graceLibSection === 'templates'}
+                  onClick={() => setGraceLibSection('templates')}
+                  description={t('templates_desc', 'Reusable Slide Layouts')}
+                />
+                <GraceLibBin
+                  id="presentations"
+                  name={t('presentations', 'Presentations')}
+                  icon={Presentation}
+                  isActive={graceLibSection === 'presentations'}
+                  onClick={() => setGraceLibSection('presentations')}
+                  description={t('presentations_desc', 'Global .ekt Library')}
+                />
+                <GraceLibBin
+                  id="media"
+                  name={t('media', 'Media')}
+                  icon={Music}
+                  isActive={graceLibSection === 'media'}
+                  onClick={() => setGraceLibSection('media')}
+                  description={t('media_desc', 'Local Assets & Bins')}
+                />
+              </div>
             </div>
+          )}
+        </div>
 
-            <div
-              onMouseDown={resizer.handleMouseDown}
-              className="h-1 bg-white/5 hover:bg-accent/40 active:bg-accent transition-all cursor-row-resize shrink-0 flex items-center justify-center relative z-10"
-            >
-              <div className="absolute inset-0 -top-2 -bottom-2" />
-            </div>
+        {/* Persistent Resizer */}
+        <div
+          onMouseDown={resizer.handleMouseDown}
+          className="h-1 bg-white/5 hover:bg-accent/40 active:bg-accent transition-all cursor-row-resize shrink-0 flex items-center justify-center relative z-10"
+        >
+          <div className="absolute inset-0 -top-2 -bottom-2" />
+        </div>
 
-            <div className="flex-1 flex flex-col min-h-0 bg-stone-950/20">
+        {/* Symmetric Bottom Area */}
+        <div className="flex-1 flex flex-col min-h-0 bg-stone-950/20">
+          {appMode === 'scripture' ? (
+            <>
               <div className="px-4 py-3 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-2">
                   <Hash className="w-3.5 h-3.5 text-stone-600" />
@@ -484,74 +521,19 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings }) => 
                   </div>
                 )}
               </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto no-scrollbar px-3 py-4 space-y-6">
-            {/* Blocks Section */}
-            <div className="space-y-3">
-              <div className="px-1 flex items-center justify-between">
+            </>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 overflow-y-auto no-scrollbar px-3 py-4">
+              <div className="px-1 mb-3 flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1.5">
-                  <Layout className="w-3 h-3" />
-                  {t('blocks', 'Blocks')}
-                </span>
-                <span className="text-[10px] font-bold text-stone-600 px-2 py-0.5 bg-white/5 rounded-full">
-                  {blocks.length}
+                  <Music className="w-3 h-3" />
+                  Media Pool
                 </span>
               </div>
-              <div className="grid grid-cols-1 gap-2">
-                {blocks.map((block) => {
-                  const IconMap: any = { Monitor, Music, Coins, Baby, Mic2, Megaphone, Plus, BookOpen };
-                  const BlockIcon = IconMap[block.icon] || Presentation;
-                  const isActive = activeBlockId === block.id;
-
-                  return (
-                    <button
-                      key={block.id}
-                      onClick={() => {
-                        if (block.id === 'bible') {
-                          openModal(ModalType.BIBLE_SELECTION);
-                        } else {
-                          setActiveBlockId(isActive ? null : block.id);
-                        }
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 p-3 rounded-2xl border transition-all group active:scale-[0.98] shadow-lg shadow-black/10",
-                        isActive
-                          ? "bg-accent/10 border-accent/40"
-                          : "bg-stone-900/40 border-white/5 hover:border-accent/40 hover:bg-stone-800/60"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center border shrink-0 group-hover:scale-110 transition-transform",
-                        isActive ? "bg-accent/20 border-accent/20" : "bg-accent/20 border-accent/20"
-                      )}>
-                        <BlockIcon className={cn("w-5 h-5", isActive ? "text-accent" : "text-accent")} />
-                      </div>
-                      <div className="flex flex-col text-left min-w-0 flex-1">
-                        <span className={cn(
-                          "text-xs font-bold truncate uppercase tracking-tight transition-colors",
-                          isActive ? "text-accent" : "text-stone-200"
-                        )}>
-                          {isRu ? block.nameRu : block.name}
-                        </span>
-                        <span className="text-[10px] font-bold text-stone-600 uppercase tracking-widest truncate">
-                          {isRu ? (block.description || block.nameRu) : block.description || block.name}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Media Pool Section */}
-            <div className="flex-1 min-h-0">
               <MediaPoolPanel />
             </div>
-          </div>
-
-        )}
+          )}
+        </div>
       </div>
 
       {/* Footer / Context Info */}

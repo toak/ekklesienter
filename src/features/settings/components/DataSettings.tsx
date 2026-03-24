@@ -2,22 +2,30 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
-import { useBibleStore } from '@/core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import BibleManager from './BibleManager';
 import { AlertCircle, Database, Trash2, Info, Layers } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
+import { useModalStore, ModalType } from '@/core/store/modalStore';
 
 const DataSettings: React.FC = () => {
     const { t } = useTranslation();
+    const { openModal } = useModalStore();
     const { secondTranslationId, setSecondTranslation } = useBibleStore();
     const translations = useLiveQuery(() => db.translations.toArray()) || [];
 
     const handleReset = async () => {
-        // We'll keep the standard confirm for safety but maybe style the trigger
-        if (confirm(t('reset_db_confirm'))) {
-            await db.delete();
-            window.location.reload();
-        }
+        openModal(ModalType.CONFIRM, {
+            title: t('reset_database'),
+            message: t('reset_db_confirm'),
+            variant: 'danger',
+            onSelection: async (confirmed: boolean) => {
+                if (confirmed) {
+                    await db.delete();
+                    window.location.reload();
+                }
+            }
+        });
     };
 
     return (

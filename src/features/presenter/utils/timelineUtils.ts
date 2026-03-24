@@ -13,7 +13,7 @@ export function findOverlappingScopes(
     const seenIds = new Set<string>();
 
     visualTimeline.forEach((item) => {
-        if (item.slide?.audioScopes) {
+        if (item.slide?.type === 'normal' && item.slide.audioScopes) {
             item.slide.audioScopes.forEach((scope) => {
                 if (seenIds.has(scope.id)) return;
 

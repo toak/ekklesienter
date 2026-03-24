@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHistoryStore } from '@/core/store/historyStore';
-import { useBibleStore } from '@/core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { Clock, History as HistoryIcon, Trash2, ChevronRight } from 'lucide-react';
 import { getBookName } from '@/core/data/bookData';
 

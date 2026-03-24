@@ -35,6 +35,16 @@ contextBridge.exposeInMainWorld('electron', {
             write: (filename: string, data: Uint8Array) => ipcRenderer.invoke('templates:write', filename, data),
             delete: (filename: string) => ipcRenderer.invoke('templates:delete', filename),
             getPath: () => ipcRenderer.invoke('templates:get-path'),
+            seedBundled: () => ipcRenderer.invoke('templates:seed-bundled'),
+        },
+        export: {
+            saveFile: (options: any) => ipcRenderer.invoke('export:save-file', options),
+            saveCollection: (options: any) => ipcRenderer.invoke('export:save-collection', options),
+        },
+        onAspectRatioChanged(callback: (ratio: number) => void) {
+            const sub = (_event: any, ratio: number) => callback(ratio);
+            ipcRenderer.on('on-aspect-ratio-changed', sub);
+            return () => ipcRenderer.removeListener('on-aspect-ratio-changed', sub);
         }
     },
 });

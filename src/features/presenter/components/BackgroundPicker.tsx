@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PresenterSettings, IStyleLayer, BackgroundSettings } from '@/core/types';
 import { ensureLayers } from '@/core/utils/styleMigration';
@@ -47,7 +47,7 @@ const BLEND_MODES = [
     { value: 'luminosity', label: 'Luminosity' },
 ];
 
-import { SlideBackground } from './SlideBackground';
+import { SlideBackground } from './display/SlideBackground';
 
 interface BackgroundPickerProps {
     background: IStyleLayer[] | BackgroundSettings | undefined;
@@ -66,11 +66,23 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
     const [isLoading, setIsLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<'selection' | 'adjustments'>('selection');
 
+    // Sync activeLayerId if layers change and current activeLayerId is not found
+    useEffect(() => {
+        if (activeLayerId && !layers.some(l => l.id === activeLayerId)) {
+            if (layers.length > 0) setActiveLayerId(layers[0].id);
+            else setActiveLayerId(null);
+        }
+    }, [layers, activeLayerId]);
+
     const activeLayer = layers.find(l => l.id === activeLayerId) || layers[0];
 
     const updateLayer = (id: string, updates: Partial<IStyleLayer>) => {
         const newLayers = layers.map(l => l.id === id ? { ...l, ...updates } : l);
         onChange(newLayers);
+        // If the ID was stable/placeholder and changed, update activeLayerId
+        if (updates.id && id === activeLayerId) {
+            setActiveLayerId(updates.id);
+        }
     };
 
     const addLayer = () => {
@@ -141,9 +153,10 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
         const id = crypto.randomUUID();
         try {
             await db.backgrounds.put({ id, name: file.name, data: file, mimeType: file.type });
-            const url = URL.createObjectURL(file);
-            if (type === 'image') updateLayer(activeLayer.id, { type: 'image', image: { url, source: 'local', id, isFromDb: true } });
-            else updateLayer(activeLayer.id, { type: 'video', video: { url, source: 'local', id, isMuted: true, isLooping: true, isFromDb: true } });
+            // Do not pass temporary blob URL to persistent state, as it becomes invalid after refresh.
+            // Component is responsible for loading from DB using the ID.
+            if (type === 'image') updateLayer(activeLayer.id, { type: 'image', image: { url: '', source: 'local', id, isFromDb: true } });
+            else updateLayer(activeLayer.id, { type: 'video', video: { url: '', source: 'local', id, isMuted: true, isLooping: true, isFromDb: true } });
         } catch (error) {
             console.error('Failed to save background to DB:', error);
         }

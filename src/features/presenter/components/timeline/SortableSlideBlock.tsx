@@ -1,0 +1,137 @@
+import React from 'react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { cn } from '@/core/utils/cn';
+import { ISlide, ICanvasSlide, INestedSlide, IPresentationFile } from '@/core/types';
+import { SlideTile } from './SlideTile';
+import { TransitionSeparator } from './TransitionSeparator';
+import NestedPresentationTile from './NestedPresentationTile';
+
+export interface SortableSlideBlockProps {
+    slide: ISlide;
+    index: number;
+    activePresentationId: string;
+    previewSlideId: string | null;
+    selectedPresentationId: string | null;
+    liveSlideId: string | null;
+    blocksMap: Map<string, any>;
+    templatesMap: Map<string, any>;
+    presentationsMap: Map<string, IPresentationFile>;
+    navigationParentSlideId: string | null;
+    lang: string;
+    onSelect: (id: string, e?: React.MouseEvent) => void;
+    onLive: (id: string) => void;
+    onContextMenu: (e: React.MouseEvent, id: string) => void;
+    onToggleExpansion: (id: string) => void;
+    isSelected?: boolean;
+    isMultiSelect?: boolean;
+    isSubItemSelected?: boolean;
+    isMultiDragHidden?: boolean;
+    setContextMenu: (menu: any) => void;
+}
+
+/**
+ * SortableSlideBlock component for the presentation timeline.
+ * Integrates with dnd-kit for drag-and-drop sorting and renders the SlideTile and its separators.
+ */
+export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
+    slide,
+    index,
+    activePresentationId,
+    previewSlideId,
+    selectedPresentationId,
+    liveSlideId,
+    blocksMap,
+    templatesMap,
+    presentationsMap,
+    lang,
+    onSelect,
+    onLive,
+    onContextMenu,
+    onToggleExpansion,
+    isSelected,
+    isMultiSelect,
+    isSubItemSelected,
+    isMultiDragHidden,
+    navigationParentSlideId,
+    setContextMenu
+}) => {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: slide.id });
+
+    const style = {
+        transform: transform && !isDragging
+            ? CSS.Transform.toString(transform)
+            : undefined,
+        transition,
+        // When dragging multiple items, hide the counterparts in the timeline completely
+        // to avoid visual clutter and layout measurement loops.
+        opacity: isDragging ? 0 : 1, 
+        display: 'flex',
+        gap: '0.75rem',
+        alignItems: 'center',
+    };
+
+    const isMaster = slide.blockId === 'master-presentation';
+    const masterPresId = slide.type === 'normal' ? (slide as ICanvasSlide).masterPresentationId : (slide.type === 'nested' ? (slide as INestedSlide).presentationId : undefined);
+    const nestedPres = masterPresId ? presentationsMap.get(masterPresId) : null;
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={cn(
+                "relative flex items-center h-fit",
+                // Remove transforms here to prevent infinite measurement loops
+                isDragging && "z-50"
+            )}
+        >
+            <TransitionSeparator slide={slide} activePresentationId={activePresentationId} />
+            <SlideTile
+                slide={slide}
+                index={index}
+                activePresentationId={activePresentationId}
+                previewSlideId={previewSlideId}
+                selectedPresentationId={selectedPresentationId}
+                liveSlideId={liveSlideId}
+                blocksMap={blocksMap}
+                templatesMap={templatesMap}
+                lang={lang}
+                onSelect={onSelect}
+                onLive={onLive}
+                onContextMenu={onContextMenu}
+                onToggleExpansion={onToggleExpansion}
+                isSelected={isSelected}
+                isMultiSelect={isMultiSelect}
+                isSubItemSelected={isSubItemSelected}
+                isMultiDragHidden={isMultiDragHidden}
+                presentationsMap={presentationsMap}
+                navigationParentSlideId={navigationParentSlideId}
+                listeners={listeners}
+            />
+
+            {isMaster && slide.isExpanded && nestedPres && (
+                <NestedPresentationTile
+                    slide={slide}
+                    nestedPresentation={nestedPres}
+                    blocksMap={blocksMap}
+                    templatesMap={templatesMap}
+                    lang={lang}
+                    previewSlideId={previewSlideId}
+                    selectedPresentationId={selectedPresentationId}
+                    onContextMenu={(e, slideId, presentationId) => {
+                        setContextMenu({ x: e.clientX, y: e.clientY, slideId, presentationId });
+                    }}
+                />
+            )}
+        </div>
+    );
+});
+
+SortableSlideBlock.displayName = 'SortableSlideBlock';

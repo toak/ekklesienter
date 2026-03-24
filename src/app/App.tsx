@@ -2,15 +2,15 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import NavigationPanel from '../features/bible-browser/components/NavigationPanel';
 import VerseList from '../features/bible-browser/components/VerseList';
-import SlideDisplay from '../features/presenter/components/SlideDisplay';
-import ProjectorView from '../features/presenter/components/ProjectorView';
+import SlideDisplay from '@/features/presenter/components/display/SlideDisplay';
+import ProjectorView from '@/features/presenter/components/display/ProjectorView';
 import { db } from '../core/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Verse, ILogo } from '../core/types';
 import { getBookName } from '../core/data/bookData';
 import { useAtom, useSetAtom } from 'jotai';
 import { sidebarOpenAtom, themeAccentAtom, historyOpenAtom, searchOpenAtom, appModeAtom, activeOverrideAtom, liveLogoAtom, slideDesignPanelOpenAtom, isTimelineHoveredAtom, selectedCanvasItemIdsAtom, OverrideType } from '../core/store/uiAtoms';
-import { useBibleStore } from '../core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import {
   SidebarClose, SidebarOpen, MonitorPlay, Clock,
   Search as SearchIcon, Palette, Square, Circle, Image as ImageIcon,
@@ -19,30 +19,34 @@ import {
 import SettingsModal from '@/features/settings/components/SettingsModal';
 import HistoryPanel from '../features/bible-browser/components/HistoryPanel';
 import QuickSearchModal from '../features/search/components/QuickSearchModal';
-import CustomizationPanel from '@/features/presenter/components/CustomizationPanel';
-import { usePresenterStore } from '@/core/store/presenterStore';
-import { usePresentationStore } from '@/core/store/presentationStore';
+import CustomizationPanel from '@/features/presenter/components/slide-properties/CustomizationPanel';
+import { usePresenterStore } from '@/features/presenter/store/presenterStore';
+import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/core/utils/cn';
 import { processVerseText, truncateMiddle } from '@/core/utils/markdownUtils';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
 import { useLogoUrl } from '@/core/hooks/useLogoUrl';
-import PresentationLibrary from '../features/bible-browser/components/PresentationLibrary';
-import SlideTimeline from '../features/presenter/components/SlideTimeline';
-import VariableEditor from '../features/presenter/components/VariableEditor';
-import BibleSelectionModal from '../features/presenter/components/BibleSelectionModal';
-import TemplatePickerModal from '../features/presenter/components/TemplatePickerModal';
+import PresentationLibrary from '@/features/presenter/components/library/PresentationLibrary';
+import SlideTimeline from '@/features/presenter/components/timeline/SlideTimeline';
+import VariableEditor from '@/features/presenter/components/slide-editor/VariableEditor';
+import BibleSelectionModal from '@/features/presenter/components/modals/BibleSelectionModal';
+import TemplatePickerModal from '@/features/presenter/components/modals/TemplatePickerModal';
 import SlideDesignPanel from '../features/presenter/components/SlideDesignPanel';
-import AudioPickerModal from '../features/presenter/components/AudioPickerModal';
-import AudioConflictModal from '../features/presenter/components/AudioConflictModal';
-import SaveNestedConfirmModal from '../features/presenter/components/SaveNestedConfirmModal';
+import AudioPickerModal from '@/features/presenter/components/modals/AudioPickerModal';
+import AudioConflictModal from '@/features/presenter/components/modals/AudioConflictModal';
+import SaveNestedConfirmModal from '@/features/presenter/components/modals/SaveNestedConfirmModal';
+import PresentationImportModal from '@/features/presenter/components/modals/PresentationImportModal';
+import PresentationPickerModal from '../features/presenter/components/modals/PresentationPickerModal';
 import { LiveSyncService } from '@/core/services/liveSyncService';
-import { EktmpService } from '@/core/services/ektmpService';
-import { DEFAULT_TEMPLATES } from '@/core/data/presentationData';
-import { audioService } from '@/core/services/AudioService';
+import { EktmpService } from '@/features/presenter/services/ektmpService';
+
+import { audioService } from '@/features/presenter/services/AudioService';
 import { Toaster } from 'sonner';
-import { FontPrewarmer } from '@/features/presenter/components/FontPrewarmer';
+import { FontPrewarmer } from '@/features/presenter/components/fonts/FontPrewarmer';
+import PromptModal from '@/shared/ui/modals/PromptModal';
+import ConfirmModal from '@/shared/ui/modals/ConfirmModal';
 
 
 
@@ -148,8 +152,17 @@ const ControllerLayout: React.FC = () => {
     [activePresentationId]
   );
   useEffect(() => {
-    audioService.sync(liveSlideId, audioPresentationSlides || []);
-  }, [liveSlideId, audioPresentationSlides]);
+    if (!activePresentationId || !audioPresentationSlides?.length) {
+      // Small delay to avoid stopping when switching presentations if the new one is still loading
+      const timer = setTimeout(() => {
+        if (!activePresentationId || !audioPresentationSlides?.length) {
+          audioService.stopAll(1.0);
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    audioService.sync(liveSlideId, audioPresentationSlides);
+  }, [liveSlideId, audioPresentationSlides, activePresentationId]);
   const { t, i18n } = useTranslation();
 
   const lang = i18n.language?.substring(0, 2) || 'en';
@@ -188,42 +201,27 @@ const ControllerLayout: React.FC = () => {
         // Clear live states in both stores to ensure UI consistency
         useBibleStore.setState({ projectorIsLive: false });
         usePresentationStore.getState().setLiveSlide(null);
+        audioService.stopAll(0.5); // Immediately stop all audio when projector closes
       });
     }
 
     // Initialize Template System
     const initTemplates = async () => {
       try {
-        await EktmpService.bootstrapDefaults(DEFAULT_TEMPLATES);
+        // 1. Seed bundled .ektmp files from app resources to user templates dir
+        await window.electron?.templates?.seedBundled();
+        // 2. Sync all filesystem templates into IndexedDB (also auto-creates blocks)
         await EktmpService.syncFileSystemTemplates();
       } catch (err) {
         console.error('Failed to initialize template system:', err);
       }
     };
     initTemplates();
-
-    // STAGE 7 CLEANUP: Clear existing data once as requested
-    const performCleanup = async () => {
-      const isCleaned = localStorage.getItem('stage7_cleaned_v1');
-      if (!isCleaned) {
-        console.log('Performing Stage 7 Cleanup...');
-        try {
-          await db.serviceFiles.clear();
-          await db.presentationFiles.clear();
-          // Clear legacy tables if they exist
-          if ((db as any).workflows) await (db as any).workflows.clear();
-          if ((db as any).workflowFolders) await (db as any).workflowFolders.clear();
-
-          localStorage.setItem('stage7_cleaned_v1', 'true');
-          console.log('Stage 7 Cleanup Complete');
-          window.location.reload();
-        } catch (err) {
-          console.error('Cleanup failed:', err);
-        }
-      }
-    };
-    performCleanup();
   }, []);
+
+  useEffect(() => {
+  }, []);
+
 
   // Initialize store state from persisted IDs
   useEffect(() => {
@@ -231,17 +229,14 @@ const ControllerLayout: React.FC = () => {
       const { activeServiceId, activePresentationId, selectedPresentationId, setActiveService, setActivePresentation, activeService, activePresentation, selectedPresentation } = usePresentationStore.getState();
 
       if (activeServiceId && !activeService) {
-        console.log('App: Restoring active service:', activeServiceId);
         await setActiveService(activeServiceId);
       }
 
       if (activePresentationId && !activePresentation) {
-        console.log('App: Restoring active presentation:', activePresentationId);
         await setActivePresentation(activePresentationId);
       }
 
       if (selectedPresentationId && !selectedPresentation && selectedPresentationId !== activePresentationId) {
-        console.log('App: Restoring selected presentation:', selectedPresentationId);
         const { setPreviewSlide } = usePresentationStore.getState();
         // This will load the selected presentation into the store
         setPreviewSlide(usePresentationStore.getState().previewSlideId, selectedPresentationId);
@@ -338,31 +333,58 @@ const ControllerLayout: React.FC = () => {
 
     const isMod = e.metaKey || e.ctrlKey;
 
-    // Enter: Open projector and send content
+    // Enter: Contextual Actions or Open Projector
     if (e.key === 'Enter') {
-      if (isMod && appMode === 'presentation') {
-        const slides = activePresentation?.slides || [];
-        if (slides.length > 0) {
+      if (appMode === 'presentation') {
+        const uiState = await import('@/core/store/uiAtoms');
+        const defaultStoreContext = await import('jotai/vanilla');
+        const store = defaultStoreContext.getDefaultStore();
+
+        const isPreviewHovered = store.get(uiState.slidePreviewHoveredAtom);
+        const isDesignHovered = store.get(uiState.slideDesignHoveredAtom);
+        const isTimelineHoveredGlobal = store.get(uiState.isTimelineHoveredAtom);
+        const isNavHovered = store.get(uiState.sidebarOpenAtom); // Simplified proxy for nav hover if we wanted one, though user said "navigation panel". Here we assume if they are on timeline/nav it goes live.
+
+        // 1. Hovering over Slide Preview AND items selected -> Edit selected text
+        if (isPreviewHovered) {
+          const selectedItemIds = store.get(uiState.selectedCanvasItemIdsAtom);
+          if (selectedItemIds.length > 0) {
+            const firstId = selectedItemIds[selectedItemIds.length - 1]; // or [0]
+            store.set(uiState.editingCanvasItemIdAtom as import('jotai').WritableAtom<string | null, [string | null], void>, firstId);
+            store.set(uiState.canvasToolAtom, 'text');
+            e.preventDefault?.();
+            return;
+          }
+        }
+
+        // 2. Default Contextual Actions / Go Live
+        if (isMod) {
+          const slides = activePresentation?.slides || [];
+          if (slides.length > 0) {
+            e.preventDefault?.();
+            const firstId = slides[0].id;
+            setPreviewSlide(firstId);
+            setLiveSlide(firstId);
+            openProjector();
+            return;
+          }
+        }
+
+        if (previewSlideId) {
           e.preventDefault?.();
-          const firstSlideId = slides[0].id;
-          setPreviewSlide(firstSlideId);
-          setLiveSlide(firstSlideId);
+          setLiveSlide(previewSlideId);
+          openProjector();
+          return;
+        }
+      } else {
+        // Scripture Mode Default Enter behavior
+        const canProject = (appMode === 'scripture' && (useBibleStore.getState().activeVerse || useBibleStore.getState().selectedVerses.length >= 2));
+
+        if (canProject) {
+          e.preventDefault?.();
+          useBibleStore.getState().commitToProjector();
           openProjector();
         }
-        return;
-      }
-
-      const canProject = (appMode === 'scripture' && (useBibleStore.getState().activeVerse || useBibleStore.getState().selectedVerses.length >= 2)) ||
-        (appMode === 'presentation' && previewSlideId);
-
-      if (canProject) {
-        e.preventDefault?.();
-        if (appMode === 'presentation') {
-          setLiveSlide(previewSlideId);
-        } else if (appMode === 'scripture') {
-          useBibleStore.getState().commitToProjector();
-        }
-        openProjector();
       }
     }
 
@@ -431,16 +453,13 @@ const ControllerLayout: React.FC = () => {
     if (isMod && (e.code === 'KeyZ' || e.key.toLowerCase() === 'z')) {
       e.preventDefault?.();
       if (e.shiftKey) {
-        console.log('Shortcut: Redo');
         await redo();
       } else {
-        console.log('Shortcut: Undo');
         await undo();
       }
     }
     if (isMod && (e.code === 'KeyY' || e.key.toLowerCase() === 'y')) {
       e.preventDefault?.();
-      console.log('Shortcut: Redo (Y)');
       await redo();
     }
 
@@ -478,7 +497,6 @@ const ControllerLayout: React.FC = () => {
           // Canvas items deletion is handled by SlideCanvas.tsx key listener if it's focused,
           // but if we are here, we might want to handle it globally or just avoid deleting the slide.
           // For now, if elements are selected, we DO NOT delete the slide.
-          console.log('App: Elements selected, skipping slide deletion');
         } else if (canDeleteSlide && previewSlideId && selectedPresentationId) {
           // Delete slide ONLY if timeline is hovered and NO elements are selected
           e.preventDefault?.();
@@ -519,7 +537,7 @@ const ControllerLayout: React.FC = () => {
   // Keyboard shortcuts and Relayed hotkeys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => executeHotkey(e);
-    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true); // capture phase: fires before stopPropagation in children
 
     let unsubscribeRelay: (() => void) | undefined;
     if (window.electron?.ipcRenderer) {
@@ -529,7 +547,7 @@ const ControllerLayout: React.FC = () => {
     }
 
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       unsubscribeRelay?.();
     };
   }, [executeHotkey]);
@@ -540,7 +558,6 @@ const ControllerLayout: React.FC = () => {
     if (!window.electron?.ipcRenderer) return;
 
     const unsubscribe = window.electron.ipcRenderer.on('projector-ready', (payload?: { ratio: number }) => {
-      console.log('Projector window ready, syncing data...');
       if (payload?.ratio) {
         usePresenterStore.getState().updateDisplay({ aspectRatio: payload.ratio });
       }
@@ -604,7 +621,6 @@ const ControllerLayout: React.FC = () => {
       ...PRELOADED_LOGOS.flatMap(g => g.logos)
     ];
     const active = allLogos.find(l => l.id === settings.logo.activeLogoId);
-    console.log('App: Syncing active logo to atom:', active?.id, active?.name);
     setActiveLogo(active || null);
   }, [settings.logo.activeLogoId, settings.logo.customLogos, settings.logo.customGroups, settings.logo.logoGroups, setActiveLogo]);
 
@@ -613,7 +629,6 @@ const ControllerLayout: React.FC = () => {
   }, [setActiveOverride]);
 
   useEffect(() => {
-    console.log('App: Sending override command to projector:', activeOverride, activeLogo?.id);
     // Sync latest settings first so projector has correct override backgrounds
     usePresenterStore.getState().syncSettings();
     LiveSyncService.setOverride(activeOverride as OverrideType | null, activeOverride === 'logo' ? activeLogo : null);
@@ -843,8 +858,8 @@ const ControllerLayout: React.FC = () => {
         <AudioPickerModal />
         <AudioConflictModal />
         <SaveNestedConfirmModal />
-
-
+        <PresentationImportModal />
+        <PresentationPickerModal />
         {/* Previous Verse Preview (Bottom Left) */}
         {prevVersePreview && appMode === 'scripture' && !useModalStore.getState().isModalOpen(ModalType.CUSTOMIZATION) && (
           <div className="absolute bottom-6 left-6 z-40">
@@ -896,7 +911,7 @@ const ControllerLayout: React.FC = () => {
 
       {/* Slide Design Panel (Right Side) — presentation mode only */}
       {designPanelOpen && appMode === 'presentation' && (
-        <div style={{ width: 380 }} className="h-full shrink-0 animate-in slide-in-from-right duration-300">
+        <div style={{ width: 460 }} className="h-full shrink-0 animate-in slide-in-from-right duration-300">
           <SlideDesignPanel />
         </div>
       )}
@@ -920,6 +935,8 @@ const App: React.FC = () => {
     <HashRouter>
       <Toaster position="top-center" expand={false} visibleToasts={5} />
       <FontPrewarmer />
+      <PromptModal />
+      <ConfirmModal />
       <Routes>
         <Route path="/" element={<ControllerLayout />} />
         <Route path="/projector" element={<ProjectorView />} />

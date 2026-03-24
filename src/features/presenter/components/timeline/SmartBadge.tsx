@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
-import { ISlide } from '@/core/types';
+import { ISlide, ICanvasSlide } from '@/core/types';
 import { Timer, ArrowRightLeft } from 'lucide-react';
 
 interface SmartBadgeProps {
@@ -14,8 +14,9 @@ interface SmartBadgeProps {
 const SmartBadge: React.FC<SmartBadgeProps> = ({ slide }) => {
     const { t } = useTranslation();
 
-    const hasDuration = slide.duration !== undefined && slide.duration > 0;
-    const hasTransition = slide.transition !== undefined && slide.transition !== 'none';
+    const canvasSlide = slide.type === 'normal' ? slide as ICanvasSlide : null;
+    const hasDuration = canvasSlide?.duration !== undefined && canvasSlide.duration > 0;
+    const hasTransition = canvasSlide?.transition !== undefined && canvasSlide.transition.type !== 'none';
 
     if (!hasDuration && !hasTransition) return null;
 
@@ -27,7 +28,7 @@ const SmartBadge: React.FC<SmartBadgeProps> = ({ slide }) => {
                     title={t('auto_advance_timer', 'Auto-advance timer')}
                 >
                     <Timer className="w-2.5 h-2.5" />
-                    {slide.duration}s
+                    {canvasSlide?.duration}s
                 </div>
             )}
 

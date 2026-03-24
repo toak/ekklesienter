@@ -1,7 +1,7 @@
 {
   "name": "ekklesienter",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.1.3",
   "description": "Premium Bible presentation and worship software",
   "author": "Boris Smiyan",
   "main": "dist-electron/main.js",
@@ -10,10 +10,16 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && electron-builder",
+    "build:renderer": "tsc && vite build",
     "build:mac": "tsc && vite build && electron-builder --mac",
+    "build:mac-modern": "node scripts/build-mac.js modern",
+    "build:mac-legacy": "node scripts/build-mac.js legacy",
+    "build:mac-all": "npm run build:mac-modern && npm run build:mac-legacy",
     "build:win": "tsc && vite build && electron-builder --win",
     "build:all": "tsc && vite build && electron-builder -mw",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui"
   },
   "build": {
     "appId": "com.ekklesienter.app",
@@ -39,6 +45,15 @@
         }
       ]
     },
+    "extraResources": [
+      {
+        "from": "bundled-templates/",
+        "to": "bundled-templates/",
+        "filter": [
+          "**/*.ektmp"
+        ]
+      }
+    ],
     "win": {
       "target": [
         {
@@ -50,6 +65,9 @@
           ]
         }
       ]
+    },
+    "nsis": {
+      "include": "electron/installer.nsh"
     }
   },
   "dependencies": {
@@ -105,15 +123,21 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/jszip": "^3.4.0",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "^4.0.18",
     "electron": "^40.1.0",
     "electron-builder": "^26.7.0",
+    "jsdom": "^28.1.0",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.2",
     "vite": "^6.2.0",
     "vite-plugin-electron": "^0.29.0",
-    "vite-plugin-electron-renderer": "^0.14.6"
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vitest": "^4.0.18"
   }
 }

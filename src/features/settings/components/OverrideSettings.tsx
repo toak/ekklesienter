@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Moon, Sun, Image as ImageIcon, Lock } from 'lucide-react';
-import { usePresenterStore } from '@/core/store/presenterStore';
+import { usePresenterStore } from '@/features/presenter/store/presenterStore';
 import { cn } from '@/core/utils/cn';
-import { BackgroundPicker } from '@/features/presenter/components/BackgroundPicker';
-import { SlideBackground } from '@/features/presenter/components/SlideBackground';
+import { BackgroundPicker } from '@/features/presenter/components/slide-properties/BackgroundPicker';
+import { SlideBackground } from '@/features/presenter/components/display/SlideBackground';
 
 type OverrideTab = 'blackout' | 'whiteout' | 'logo';
 

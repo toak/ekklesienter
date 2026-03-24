@@ -7,7 +7,7 @@ export const migrateBackgroundToLayers = (bg: BackgroundSettings | undefined): I
     if (!bg) return [];
 
     const layer: IStyleLayer = {
-        id: crypto.randomUUID(),
+        id: 'legacy-layer-1',
         type: bg.type,
         visible: true,
         opacity: 1,

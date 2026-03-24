@@ -8,6 +8,9 @@ export enum ModalType {
     AUDIO_PICKER = 'AUDIO_PICKER',
     AUDIO_CONFLICT = 'AUDIO_CONFLICT',
     SAVE_NESTED_CONFIRM = 'SAVE_NESTED_CONFIRM',
+    PROMPT = 'PROMPT',
+    CONFIRM = 'CONFIRM',
+    PRESENTATION_IMPORTER = 'PRESENTATION_IMPORTER',
 }
 
 
@@ -35,7 +38,15 @@ export const useModalStore = create<ModalStore>((set, get) => ({
     closeModal: (id) => {
         set((state) => {
             if (id) {
-                return { stack: state.stack.filter((m) => m.id !== id) };
+                // Find the index of the last modal with this ID to support pop-like behavior
+                const lastIndex = [...state.stack].reverse().findIndex(m => m.id === id);
+                if (lastIndex !== -1) {
+                    const actualIndex = state.stack.length - 1 - lastIndex;
+                    const newStack = [...state.stack];
+                    newStack.splice(actualIndex, 1);
+                    return { stack: newStack };
+                }
+                return { stack: state.stack };
             }
             return { stack: state.stack.slice(0, -1) };
         });

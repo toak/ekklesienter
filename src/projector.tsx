@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import ProjectorView from './features/presenter/components/ProjectorView';
+import ProjectorView from '@/features/presenter/components/display/ProjectorView';
 
 import './core/styles/globals.css';
 import './core/i18n';

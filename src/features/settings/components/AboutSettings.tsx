@@ -14,7 +14,7 @@ interface ChangelogEntry {
 const AboutSettings: React.FC = () => {
     const { t } = useTranslation();
 
-    const changelogEntries = t('changelog_entries', { returnObjects: true }) as ChangelogEntry[];
+    const changelogEntries = t('changelog_entries', { returnObjects: true }) as unknown as ChangelogEntry[];
 
     return (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">

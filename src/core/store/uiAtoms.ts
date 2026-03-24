@@ -1,4 +1,5 @@
 import { atom, PrimitiveAtom } from 'jotai';
+import { atomWithStorage } from 'jotai/utils';
 import { AppMode, ILogo } from '../types';
 
 export const fontPreviewFamilyAtom = atom(null as string | null) as PrimitiveAtom<string | null>;
@@ -6,6 +7,8 @@ export const fontPreviewWeightAtom = atom(null as string | null) as PrimitiveAto
 
 // App state
 export const appModeAtom = atom<AppMode>('scripture');
+export const devModeAtom = atomWithStorage('dev-mode', false);
+export const isDevAuthenticatedAtom = atomWithStorage('dev-authenticated', false);
 
 // Text settings
 export const fontSizeAtom = atom(3.5); // rem
@@ -22,6 +25,10 @@ export const selectedCanvasItemIdsAtom = atom<string[]>([]);
 export const timelineHeightAtom = atom(236); // Strictly limited to 236px
 export const isTimelineHoveredAtom = atom(false);
 export const editingCanvasItemIdAtom = atom<string | null>(null);
+export const selectedTransitionSlideIdAtom = atom(null as string | null) as PrimitiveAtom<string | null>;
+
+export type SlideDesignTab = 'background' | 'elements' | 'style' | 'audio' | 'timer' | 'transition';
+export const slideDesignTabAtom = atom<SlideDesignTab>('style');
 
 export type CanvasTool = 'select' | 'text';
 export const canvasToolAtom = atom<CanvasTool>('select');
@@ -49,3 +56,8 @@ export const slideStyleAtom = atom((get) => ({
 // Drag/Update state for Slide Editor (used to pause sync)
 export const slideEditorDragActiveAtom = atom(false);
 export const slideEditorPendingUpdateAtom = atom(false);
+
+// Hover states for Enter key contextual actions
+export const slidePreviewHoveredAtom = atom(false);
+export const slideDesignHoveredAtom = atom(false);
+export const presenterPanelHoveredAtom = atom(false);

@@ -1,5 +1,6 @@
 import { db } from '@/core/db';
 import { Verse } from '@/core/types';
+import { sanitizeHtml } from '@/core/utils/sanitizeHtml';
 
 export interface SearchResult {
     verse: Verse;
@@ -39,6 +40,7 @@ export async function searchVerses(
  */
 function highlightMatches(text: string, query: string): string {
     if (!query) return text;
+    const sanitized = sanitizeHtml(text);
     const regex = new RegExp(`(${query})`, 'gi');
-    return text.replace(regex, '<mark class="bg-accent/30 text-accent px-0.5 rounded-sm ring-1 ring-accent/20">$1</mark>');
+    return sanitized.replace(regex, '<mark class="bg-accent/30 text-accent px-0.5 rounded-sm ring-1 ring-accent/20">$1</mark>');
 }

@@ -1,14 +1,14 @@
 import React, { useCallback, useRef, useMemo, useState, useEffect } from 'react';
 import { cn } from '@/core/utils/cn';
-import { IAudioScope, ISlide } from '@/core/types';
+import { IAudioScope, ISlide, ICanvasSlide } from '@/core/types';
 import { Music, Repeat, Trash2, Volume2, ArrowRightLeft } from 'lucide-react';
-import { usePresentationStore } from '@/core/store/presentationStore';
-import { usePresenterStore } from '@/core/store/presenterStore';
+import { usePresentationStore } from '@/features/presenter/store/presentationStore';
+import { usePresenterStore } from '@/features/presenter/store/presenterStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 import { gainToDb, dbToGain } from '@/core/utils/audioUtils';
-import { audioService } from '@/core/services/AudioService';
+import { audioService } from '@/features/presenter/services/AudioService';
 
 interface AudioScopeBlockProps {
     scope: IAudioScope;
@@ -59,13 +59,23 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
                 if (points) {
                     setWaveform(points);
                 } else {
-                    setHasError(true);
-                    // AUTO-REPAIR: If file is missing, try to find it in mediaPool by name
-                    if (scope.fileName) {
-                        const match = await db.mediaPool.where('name').equals(scope.fileName).first();
-                        if (match && match.path !== scope.fileId) {
-                            console.log(`[AudioScopeBlock] Auto-repairing missing file: ${scope.fileName} -> ${match.path}`);
-                            updateAudioScope(scope.id, { fileId: match.path });
+                    // AI Fix: If no points, check if file exists but is just too large/streamed
+                    const exists = await db.mediaPool.get(scope.fileId);
+                    if (exists) {
+                        setWaveform([]); // Clear waveform, but not an error
+                        setHasError(false);
+                    } else {
+                        setHasError(true);
+                        // AUTO-REPAIR: If file is missing, try to find it in mediaPool by name
+                        if (scope.fileName) {
+                            try {
+                                const match = await db.mediaPool.where('name').equals(scope.fileName).first();
+                                if (match && match.path !== scope.fileId) {
+                                    updateAudioScope(scope.id, { fileId: match.path });
+                                }
+                            } catch (e) {
+                                console.warn('[AudioScopeBlock] Failed to auto-repair:', e);
+                            }
                         }
                     }
                 }
@@ -74,6 +84,7 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
         fetchWaveform();
         return () => { isMounted = false; };
     }, [scope.fileId, scope.fileName, scope.id, updateAudioScope]);
+
 
     const mediaItem = useLiveQuery(
         async () => {
@@ -290,7 +301,7 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
 
         // Find if any scope starts at this next slide
         return activePresentation.slides.some(s =>
-            s.audioScopes?.some(scp => scp.startSlideId === visualTimeline[nextSlideIdx]?.slide?.id)
+            (s.type === 'normal' && (s as ICanvasSlide).audioScopes?.some(scp => scp.startSlideId === visualTimeline[nextSlideIdx]?.slide?.id))
         );
     }, [activePresentation, propEndIdx, visualTimeline]);
 
@@ -499,8 +510,10 @@ const AudioScopeBlock: React.FC<AudioScopeBlockProps> = ({
                     )}>
                         {displayName}
                         {hasError && !isLoading && " (Missing)"}
+                        {!hasError && !isLoading && waveform.length === 0 && " (Streaming)"}
                         {isLoading && " (Loading...)"}
                     </span>
+
                 </div>
             </div>
 

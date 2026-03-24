@@ -86,35 +86,45 @@ export const ContextMenuItem: React.FC<{
     onClick: () => void;
     shortcut?: string;
     danger?: boolean;
-}> = ({ icon, label, onClick, shortcut, danger }) => (
+    disabled?: boolean;
+}> = ({ icon, label, onClick, shortcut, danger, disabled }) => (
     <button
         onClick={(e) => {
             e.stopPropagation();
-            onClick();
+            if (!disabled) onClick();
         }}
+        disabled={disabled}
         className={cn(
             "group w-full text-left px-4 py-2.5 text-xs font-bold transition-all duration-200 flex items-center gap-3 relative overflow-hidden",
-            danger
-                ? "text-red-400 hover:bg-red-500/10 hover:text-red-300"
-                : "text-stone-300 hover:bg-accent/10 hover:text-accent"
+            disabled
+                ? "opacity-40 cursor-not-allowed text-stone-500"
+                : danger
+                    ? "text-red-400 hover:bg-red-500/10 hover:text-red-300 pointer-events-auto"
+                    : "text-stone-300 hover:bg-accent/10 hover:text-accent pointer-events-auto"
         )}
     >
         {/* Hover Indicator */}
-        {!danger && (
+        {!danger && !disabled && (
             <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-accent rounded-r-full scale-y-0 group-hover:scale-y-100 transition-transform duration-200" />
         )}
 
         {icon && (
             <span className={cn(
-                "w-4 h-4 transition-transform duration-200 group-hover:scale-110",
-                danger ? "text-red-400 opacity-80" : "text-stone-500 group-hover:text-accent"
+                "w-4 h-4 transition-transform duration-200",
+                !disabled && "group-hover:scale-110",
+                disabled ? "text-stone-600" : danger ? "text-red-400 opacity-80" : "text-stone-500 group-hover:text-accent"
             )}>
                 {icon}
             </span>
         )}
         <span className="flex-1 tracking-wide">{label}</span>
         {shortcut && (
-            <span className="text-[9px] font-black text-stone-600 uppercase tracking-tighter bg-white/5 px-1.5 py-0.5 rounded-md group-hover:bg-accent/20 group-hover:text-accent transition-colors">
+            <span className={cn(
+                "text-[9px] font-black uppercase tracking-tighter px-1.5 py-0.5 rounded-md transition-colors",
+                disabled
+                    ? "text-stone-700 bg-white/2"
+                    : "text-stone-600 bg-white/5 group-hover:bg-accent/20 group-hover:text-accent"
+            )}>
                 {shortcut}
             </span>
         )}

@@ -41,7 +41,13 @@ export type PresentationMode = 'normal' | 'fullscreen';
 
 // --- Presentation Slide System Types ---
 
-export type TransitionType = 'none' | 'fade' | 'slide-left' | 'slide-right' | 'zoom';
+export type TransitionDirection = 'top' | 'right' | 'bottom' | 'left' | 'in' | 'out';
+
+export interface ISlideTransition {
+  type: string;
+  duration: number; // in seconds, supports decimals
+  direction?: TransitionDirection;
+}
 
 export interface IAudioAttachment {
   filename: string;
@@ -188,12 +194,14 @@ export interface ITimerTrigger {
 
 export interface ITimerSettings {
   duration: number; // in seconds
-  style: 'minimal' | 'digital' | 'circular' | 'neon' | 'bar' | 'flip' | 'modern' | 'dots' | 'glass' | 'bold';
+  style: 'minimal_ring' | 'modern_bold' | 'serene' | 'brutalist' | 'neon_cyber' | 'aurora' | 'old_digital' | 'flip_clock' | 'neo_brutalist' | 'vhs_crt';
   endAction: 'none' | 'loop' | 'next' | 'blackout';
   showMilliseconds?: boolean;
   prefix?: string;
   suffix?: string;
-  themeColor?: string;
+  subtitle?: string;
+  themeFill?: IStyleLayer[];
+  customFills?: Record<string, IStyleLayer[]>;
   fontSize?: number;
   backgroundOpacity?: number; // 0-1
   triggers?: ITimerTrigger[];
@@ -202,12 +210,14 @@ export interface ITimerSettings {
 
 export interface IAudioScope {
   id: string;
+  presentationId: string;
   startSlideId: string;
   endSlideId: string;
   fileId: string;   // Reference to the audio file in the DB or filesystem
   fileName?: string; // Original filename for persistence and auto-repair
   volume: number;   // 0-1
   loop: boolean;
+  isGlobal?: boolean;
   isMuted?: boolean;
   trimStart?: number; // In seconds
   trimEnd?: number;   // In seconds
@@ -216,28 +226,67 @@ export interface IAudioScope {
     fadeOutDuration: number;
   };
   volumeFadeDuration?: number; // custom duration for programmatic fades
+  onEnded?: () => void;
 }
 
-export type SlideType = 'normal' | 'nested' | 'timer';
+export type SlideType = 'normal' | 'nested' | 'timer' | 'verse' | 'group';
 
-export interface ISlide {
+export interface IBaseSlide {
   id: string;
-  type?: SlideType;
+  type: SlideType;
   order: number;
   blockId: string;
   templateId: string;
+  notes?: string;
+  isExpanded?: boolean; // UI state for timeline
+}
+
+export interface ICanvasSlide extends IBaseSlide {
+  type: 'normal';
   backgroundOverride?: IStyleLayer[];
   content: ISlideContent;
   audio?: IAudioAttachment; // Legacy attached audio
   audioScopes?: IAudioScope[]; // New event-based audio tracks
   duration?: number;
-  transition?: TransitionType;
+  transition?: ISlideTransition;
+  timerSettings?: ITimerSettings;
   linkedPresentationId?: string; // ID of the nested presentation file (Linked global `.ekt` library file)
   localNestedPresentationId?: string; // ID if detached
   masterPresentationId?: string; // ID of the nested presentation file (Legacy)
-  isExpanded?: boolean; // UI state for timeline
-  timerSettings?: ITimerSettings;
+  lastSyncedAt?: string; // ISO string of the library original's updatedAt at time of sync/insertion
 }
+
+export interface IVerseSlide extends IBaseSlide {
+  type: 'verse';
+  verseRef: string;
+  translation: string;
+  highlightWords?: string[];
+  showReference?: boolean;
+  textStyle?: Record<string, any>;
+}
+
+export interface ITimerSlide extends IBaseSlide {
+  type: 'timer';
+  durationSec: number;
+  countDirection: 'up' | 'down';
+  playlist?: string[];
+  onComplete?: 'stop' | 'loop' | 'nextSlide';
+  warningAtSec?: number;
+}
+
+export interface INestedSlide extends IBaseSlide {
+  type: 'nested';
+  ektpHash?: string; // before import
+  presentationId?: string; // after import
+  entrySlideId?: string; // optional start slide
+  previewHash?: string; // optional thumbnail
+}
+
+export interface IGroupSlide extends IBaseSlide {
+  type: 'group';
+}
+
+export type ISlide = ICanvasSlide | IVerseSlide | ITimerSlide | INestedSlide | IGroupSlide;
 
 
 export interface IBlock {
@@ -281,7 +330,23 @@ export interface IMediaItem {
   name: string;
   path: string; // Absolute path or URL
   type: MediaType;
+  data?: Blob; // Optional binary data for imported/bundled media
+  binId?: string; // Reference to IMediaBin (null = root)
   createdAt: number;
+  updatedAt?: number;
+}
+
+export interface IMediaBin {
+  id: string;
+  name: string;
+  createdAt: number;
+}
+
+export interface IPresentationBin {
+  id: string;
+  name: string;
+  createdAt: number;
+  parentId?: string; // For nested bins
 }
 
 export interface IServiceFile {
@@ -310,6 +375,7 @@ export interface IPresentationFile {
   name: string;
   workflowId?: string;
   serviceId?: string; // Links to IServiceFile if nested
+  binId?: string; // Reference to IPresentationBin (null = root)
   isMaster?: boolean; // True if it's the master presentation in a service
   version?: string; // Schema version
   engineVersion?: string; // App version that created/saved the file
@@ -319,8 +385,14 @@ export interface IPresentationFile {
   fileHandle?: any; // Persistent handle for incremental saves
   thumbnailUrl?: string; // Local blob URL or base64 for the first slide preview
   hasPreview?: boolean; // Flag to indicate if a preview.png exists in the ZIP
+  
+  slideStorageMode?: 'inline' | 'split';
+  slideIndex?: Array<{ id: string; order: number; type?: SlideType }>;
+  ektpHash?: string; // SHA-256 of the imported .ektp archive, for deduplication
+
   slides: ISlide[];
   audioScopes?: IAudioScope[];
+  endTransition?: ISlideTransition;
   metadata?: {
     church?: string;
     date?: Date;
@@ -360,6 +432,7 @@ export interface ITemplateTextStyle {
 
 export interface ITemplateSlide {
   id: string; // internal id for the layout/slide
+  type: SlideType;
   name?: string;
   nameRu?: string;
   categoryId?: string; // assigned block ID (e.g. 'bible', 'sermon')
@@ -513,7 +586,7 @@ export interface BackgroundSettings {
 export interface FontSettings {
   family: string;
   weight: string;
-  size: number; // rem
+  size: number; // px
   color: string;
   shadow: boolean;
   shadowColor?: string;
@@ -528,7 +601,7 @@ export interface ReferenceStyleSettings {
   position: 'top' | 'bottom';
   opacity: number;
   scale: number;
-  fontSize?: number; // rem, if undefined use relative scale
+  fontSize?: number; // px, if undefined use relative scale
   color?: string;
   fontFamily?: string;
 }
@@ -537,7 +610,7 @@ export interface TranslationLabelSettings {
   enabled: boolean;
   color: string;
   opacity: number;
-  fontSize: number; // rem
+  fontSize: number; // px
   fontFamily: string;
 }
 
@@ -580,4 +653,24 @@ export interface PresenterSettings {
     whiteout: OverrideSettings;
     logo: OverrideSettings;
   };
+}
+
+export type ProjectorCommandType = 
+  | 'show-verse' 
+  | 'show-slide' 
+  | 'set-override' 
+  | 'clear-override' 
+  | 'projector-ready' 
+  | 'sync-state';
+
+export interface IProjectorCommand {
+  type: ProjectorCommandType;
+  payload: any;
+}
+
+export interface IProjectorState {
+  activeSlideId: string | null;
+  activePresentationId: string | null;
+  activeOverride: 'blackout' | 'whiteout' | 'logo' | null;
+  timestamp: number;
 }

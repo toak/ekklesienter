@@ -143,8 +143,6 @@ export class MyBibleParser {
             const mappingType = detectMappingType(bookNumbers);
 
             // DIAGNOSTIC LOG: Print ALL unique book IDs found in the file
-            console.log(`[MyBibleParser] Raw Book IDs found (${bookNumbers.length}): [${bookNumbers.join(', ')}]`);
-            console.log(`[MyBibleParser] Detected mapping type: ${mappingType} (Max ID: ${Math.max(...bookNumbers)})`);
 
             const bookMap = mappingType === 'mybible' ? MYBIBLE_TO_STANDARD : SEQUENTIAL_TO_STANDARD;
 
@@ -166,7 +164,6 @@ export class MyBibleParser {
                 // Try to read the 'books' table to get accurate names and mappings
                 const booksRows = db.exec("SELECT book_number, short_name, long_name FROM books");
                 if (booksRows.length > 0 && booksRows[0].values) {
-                    console.log(`[MyBibleParser] Found 'books' table with ${booksRows[0].values.length} entries. Building dynamic map.`);
 
                     for (const row of booksRows[0].values) {
                         const bNum = Number(row[0]);
@@ -272,7 +269,6 @@ export class MyBibleParser {
                             bookId = id;
                             // Cache the result!
                             dynamicBookMap[bookNumber] = id;
-                            console.log(`[MyBibleParser] Fuzzy match success (alias): "${bookName}" -> ${bookId} (Cached)`);
                             break;
                         }
                     }
@@ -294,7 +290,6 @@ export class MyBibleParser {
 
                         if (bookId) {
                             dynamicBookMap[bookNumber] = bookId; // Cache result
-                            console.log(`[MyBibleParser] Fuzzy match success (standard): "${bookName}" -> ${bookId} (Cached)`);
                         }
                     }
                 }

@@ -118,5 +118,6 @@ export default {
     "template_id": "Имя файла / ID",
     "category": "Категория",
     "background": "Фон",
-    "select_block_hint_templates": "Выберите блок на левой панели, чтобы увидеть его шаблоны"
+    "select_block_hint_templates": "Выберите блок на левой панели, чтобы увидеть его шаблоны",
+    "type_here": "Введите текст..."
 };

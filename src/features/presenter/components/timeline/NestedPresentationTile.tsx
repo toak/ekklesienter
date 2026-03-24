@@ -1,14 +1,14 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/core/utils/cn';
-import { ISlide, IBlock, ITemplate, IPresentationFile } from '@/core/types';
-import { usePresentationStore } from '@/core/store/presentationStore';
-import { usePresenterStore } from '@/core/store/presenterStore';
+import { ISlide, ICanvasSlide, INestedSlide, IBlock, ITemplate, IPresentationFile } from '@/core/types';
+import { usePresentationStore } from '@/features/presenter/store/presentationStore';
+import { usePresenterStore } from '@/features/presenter/store/presenterStore';
 import {
     ChevronRight, ChevronDown, ExternalLink, Layers, Link2,
     Presentation
 } from 'lucide-react';
-import SlideContentRenderer from '../SlideContentRenderer';
+import SlideContentRenderer from '../slide-editor/SlideContentRenderer';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string; strokeWidth?: number }>> = {
     Presentation
@@ -45,7 +45,7 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
 
     if (!slide.isExpanded) return null;
 
-    const isLinked = Boolean(slide.linkedPresentationId);
+    const isLinked = slide.type === 'normal' && Boolean((slide as ICanvasSlide).linkedPresentationId);
 
     return (
         <div className="flex items-center gap-2 px-2 bg-white/2 rounded-2xl border border-white/5 py-3 ml-[-8px]">
@@ -89,7 +89,7 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
                             <SlideContentRenderer
                                 template={nt}
                                 block={nb}
-                                variables={nestedSlide.content.variables}
+                                variables={(nestedSlide as ICanvasSlide).content?.variables || {}}
                                 lang={lang}
                                 isPreview={true}
                                 scale={96 / 1920}

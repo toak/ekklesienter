@@ -56,6 +56,17 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': path.resolve(__dirname, './src'),
       }
-    }
+    },
+    // @ts-ignore
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: ['./src/test/setup.tsx'],
+      include: ['src/**/*.{test,spec}.{ts,tsx}'],
+      coverage: {
+        reporter: ['text', 'json', 'html'],
+        exclude: ['node_modules/', 'src/test/setup.tsx'],
+      },
+    },
   };
 });

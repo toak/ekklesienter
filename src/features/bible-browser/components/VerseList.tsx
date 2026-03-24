@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useRef, useState } from 'react';
-import { useBibleStore } from '@/core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { Verse } from '@/core/types';
 import { List, Edit, CheckCircle2, Trash2, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';

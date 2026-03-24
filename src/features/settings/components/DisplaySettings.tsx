@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Monitor, Cpu, ScreenShare } from 'lucide-react';
-import { usePresenterStore } from '@/core/store/presenterStore';
+import { usePresenterStore } from '@/features/presenter/store/presenterStore';
 import { cn } from '@/core/utils/cn';
 
 interface IDisplayInfo {

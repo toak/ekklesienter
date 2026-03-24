@@ -1,14 +1,19 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAtom } from 'jotai';
-import { themeAccentAtom } from '@/core/store/uiAtoms';
+import { themeAccentAtom, devModeAtom, isDevAuthenticatedAtom } from '@/core/store/uiAtoms';
 import { useHistoryStore } from '@/core/store/historyStore';
-import { Globe, Palette, Clock } from 'lucide-react';
+import { Globe, Palette, Clock, Code } from 'lucide-react';
+import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { toast } from '@/core/utils/toast';
 import { cn } from '@/core/utils/cn';
 
 const GeneralSettings: React.FC = () => {
     const { t, i18n } = useTranslation();
+    const { openModal } = useModalStore();
     const [themeAccent, setThemeAccent] = useAtom(themeAccentAtom);
+    const [devMode, setDevMode] = useAtom(devModeAtom);
+    const [isDevAuthenticated, setIsDevAuthenticated] = useAtom(isDevAuthenticatedAtom);
 
     const languages = [
         { code: 'en', label: 'English', native: 'English' },
@@ -143,6 +148,60 @@ const GeneralSettings: React.FC = () => {
                         );
                     })}
                 </div>
+            </div>
+
+            {/* Developer Mode Card */}
+            <div className="col-span-1 md:col-span-2 bg-stone-900/40 border border-white/5 rounded-3xl p-6 relative overflow-hidden group">
+                <div className="flex items-center justify-between relative z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-stone-800 rounded-xl">
+                            <Code className="w-5 h-5 text-accent" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold text-white tracking-tight">{t('developer_mode', 'Developer Mode')}</h3>
+                            <p className="text-xs text-stone-500 font-medium">{t('dev_mode_desc', 'Unlock system templates and advanced tools')}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex flex-col items-end gap-2">
+                        <button
+                            onClick={() => {
+                                if (!devMode) {
+                                    if (!isDevAuthenticated) {
+                                        openModal(ModalType.PROMPT, {
+                                            title: t('enter_dev_password', 'Enter Developer Password'),
+                                            type: 'password',
+                                            onSelection: (pass: string | null) => {
+                                                if (pass === 'GLUE') {
+                                                    setIsDevAuthenticated(true);
+                                                    setDevMode(true);
+                                                    toast.success(t('dev_mode_unlocked', 'Developer Mode Unlocked'), t('system_templates_accessible', 'System templates are now editable'));
+                                                } else if (pass !== null) {
+                                                    toast.error(t('incorrect_password', 'Incorrect Password'), t('check_password_try_again', 'Please check the password and try again'));
+                                                }
+                                            }
+                                        });
+                                    } else {
+                                        setDevMode(true);
+                                    }
+                                } else {
+                                    setDevMode(false);
+                                }
+                            }}
+                            className={cn(
+                                "w-12 h-6 rounded-full transition-all relative",
+                                devMode ? "bg-accent" : "bg-stone-800"
+                            )}
+                        >
+                            <div className={cn(
+                                "absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-md",
+                                devMode ? "left-7" : "left-1"
+                            )} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Password input removed in favor of global PromptModal */}
             </div>
 
         </div>

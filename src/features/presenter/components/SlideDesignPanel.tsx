@@ -1,18 +1,29 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useAtom } from 'jotai';
-import { selectedCanvasItemIdsAtom, editingCanvasItemIdAtom, canvasToolAtom, slideDesignPanelOpenAtom, slideEditorDragActiveAtom, slideEditorPendingUpdateAtom } from '@/core/store/uiAtoms';
-import { usePresentationStore } from '@/core/store/presentationStore';
+import { useAtom, useSetAtom, useAtomValue } from 'jotai';
+import {
+    selectedCanvasItemIdsAtom,
+    editingCanvasItemIdAtom,
+    canvasToolAtom,
+    slideDesignPanelOpenAtom,
+    slideEditorDragActiveAtom,
+    slideEditorPendingUpdateAtom,
+    slideDesignHoveredAtom,
+    slideDesignTabAtom,
+    SlideDesignTab,
+    selectedTransitionSlideIdAtom
+} from '@/core/store/uiAtoms';
+import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { useModalStore } from '@/core/store/modalStore';
-import { ImageIcon, Layers, Clock, Copy, Palette, Music, X } from 'lucide-react';
+import { ImageIcon, Layers, Clock, Copy, Palette, Music, X, Wand2, ArrowRightLeft } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import { BackgroundPicker } from './BackgroundPicker';
-import { ICanvasItem, ICanvasItemText, IStyleLayer } from '@/core/types';
+import { BackgroundPicker } from './slide-properties/BackgroundPicker';
+import { ICanvasItem, ICanvasItemText, IStyleLayer, ICanvasSlide } from '@/core/types';
 import type { TFunction } from 'i18next';
 import { ensureLayers } from '@/core/utils/styleMigration';
-import { getUniqueSelectionStyles, getStyleHash, normalizeColor } from '../utils/styleExtraction';
+import { getUniqueSelectionStyles, calculateStyleUpdates } from '../utils/styleExtraction';
 import { toast } from '@/core/utils/toast';
 import { KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
@@ -20,8 +31,8 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import {
     type DesignTab, createCanvasItem,
     LayerItem, TemplatePicker, ItemProperties,
-    TimerTabContent, AudioTabContent, ElementsTabContent,
-} from './slide-design';
+    TimerTabContent, AudioTabContent, ElementsTabContent, TransitionTabContent,
+} from './slide-properties';
 
 const SlideDesignPanel: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -30,7 +41,9 @@ const SlideDesignPanel: React.FC = () => {
     const [selectedIds, setSelectedIds] = useAtom(selectedCanvasItemIdsAtom);
     const selectedItemId = selectedIds[selectedIds.length - 1] || null;
     const [, setEditingId] = useAtom(editingCanvasItemIdAtom) as [string | null, (v: string | null) => void];
-    const [activeTab, setActiveTab] = useState<DesignTab>('style');
+    const [activeTab, setActiveTab] = useAtom(slideDesignTabAtom);
+    const selectedTransId = useAtomValue(selectedTransitionSlideIdAtom);
+    const setSelectedTransId = useSetAtom(selectedTransitionSlideIdAtom);
     const [dragActive, setDragActive] = useAtom(slideEditorDragActiveAtom);
     const [pendingUpdate, setPendingUpdate] = useAtom(slideEditorPendingUpdateAtom);
     const openModal = useModalStore(s => s.openModal);
@@ -41,6 +54,7 @@ const SlideDesignPanel: React.FC = () => {
         updateCanvasItemsOrder, removeCanvasItem, updatePresentationSlides, takeSnapshot,
         selectedAudioScopeId, selectAudioScope, activePresentation, selectedPresentation,
         updateAudioScope, removeAudioScope, applyBackgroundToAll, updateTimerSettings,
+        updateSlideTransition, triggerTransitionPreview, updatePresentationEndTransition,
     } = usePresentationStore();
 
     const sensors = useSensors(
@@ -49,9 +63,27 @@ const SlideDesignPanel: React.FC = () => {
     );
 
     // ─── Auto-tab effects ───
-    useEffect(() => { if (selectedItemId) { setActiveTab('style'); setPanelOpen(true); } }, [selectedItemId, setPanelOpen]);
-    useEffect(() => { if (previewSlideId && !selectedAudioScopeId) { setSelectedIds([]); setActiveTab('style'); setPanelOpen(true); } }, [previewSlideId, selectedAudioScopeId, setSelectedIds, setPanelOpen]);
-    useEffect(() => { if (selectedAudioScopeId) { setActiveTab('audio'); setPanelOpen(true); } }, [selectedAudioScopeId, setPanelOpen]);
+    useEffect(() => { if (selectedItemId) { setActiveTab('style'); setPanelOpen(true); } }, [selectedItemId, setPanelOpen, setActiveTab]);
+
+    useEffect(() => {
+        // If we have a slide but no transition or audio selected, default to slide tabs (background/style/etc)
+        const isSlideTab = ['style', 'background', 'elements', 'transition', 'timer'].includes(activeTab);
+
+        if (previewSlideId && !selectedAudioScopeId && !selectedTransId) {
+            if (!isSlideTab || activeTab === 'audio' || activeTab === 'transition') {
+                setActiveTab('style');
+                setPanelOpen(true);
+            }
+        }
+    }, [previewSlideId, selectedAudioScopeId, selectedTransId, setActiveTab, setPanelOpen, activeTab]);
+
+    useEffect(() => { if (selectedAudioScopeId) { setActiveTab('audio'); setPanelOpen(true); } }, [selectedAudioScopeId, setPanelOpen, setActiveTab]);
+    useEffect(() => {
+        if (selectedTransId) {
+            setActiveTab('transition');
+            setPanelOpen(true);
+        }
+    }, [selectedTransId, setActiveTab, setPanelOpen]);
 
     // ─── Data queries ───
     const dbPresentation = useLiveQuery(() => selectedPresentationId ? db.presentationFiles.get(selectedPresentationId) : undefined, [selectedPresentationId]);
@@ -62,8 +94,8 @@ const SlideDesignPanel: React.FC = () => {
     const templatesMap = useMemo(() => new Map(allTemplates.map(t => [t.id, t])), [allTemplates]);
     const selectedSlide = useMemo(() => presentation?.slides?.find(s => s.id === previewSlideId), [presentation, previewSlideId]);
     const template = selectedSlide ? templatesMap.get(selectedSlide.templateId) : undefined;
-    const slideBg = selectedSlide?.backgroundOverride || template?.background;
-    const dbCanvasItems = selectedSlide?.content?.canvasItems;
+    const slideBg = selectedSlide?.type === 'normal' ? (selectedSlide as ICanvasSlide).backgroundOverride || template?.background : template?.background;
+    const dbCanvasItems = selectedSlide?.type === 'normal' ? (selectedSlide as ICanvasSlide).content?.canvasItems : undefined;
     const [localItems, setLocalItems] = useState<ICanvasItem[]>([]);
 
     useEffect(() => {
@@ -76,34 +108,7 @@ const SlideDesignPanel: React.FC = () => {
 
     const handleSelectionStyleUpdate = useCallback((oldLayer: IStyleLayer, updates: Partial<IStyleLayer>) => {
         if (!previewSlideId) return;
-        const oldHash = getStyleHash(oldLayer);
-        const allUpdates: Array<{ id: string; updates: Partial<ICanvasItem> }> = [];
-        selectedIds.forEach(id => {
-            const item = localItems.find(i => i.id === id);
-            if (!item) return;
-            const newItem: Partial<ICanvasItem> = {};
-            let changed = false;
-            if (item.fills) { const newFills = item.fills.map(f => { if (getStyleHash(f) === oldHash) { changed = true; return { ...f, ...updates }; } return f; }); if (changed) newItem.fills = newFills; }
-            if (item.strokes) { let sc = false; const ns = item.strokes.map(s => { if (getStyleHash(s) === oldHash) { sc = true; changed = true; return { ...s, ...updates }; } return s; }); if (sc) newItem.strokes = ns; }
-            if (item.type === 'text' && item.text) {
-                const tu: Partial<ICanvasItemText> = {};
-                let tc = false;
-                if (item.text.textFills) { const nf = item.text.textFills.map(f => { if (getStyleHash(f) === oldHash) { tc = true; changed = true; return { ...f, ...updates }; } return f; }); if (tc) tu.textFills = nf; }
-                if (oldLayer.type === 'color' && updates.color && item.text.color && normalizeColor(item.text.color) === oldHash.replace('color|', '')) { tu.color = updates.color; tc = true; changed = true; }
-                if (oldLayer.type === 'color' && updates.color && oldLayer.color) {
-                    const oe = oldLayer.color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                    let nc = item.text.content;
-                    let cc = false;
-                    const sr = new RegExp(`(color\\s*:\\s*)${oe}`, 'gi');
-                    const ar = new RegExp(`(color\\s*=\\s*["']?)${oe}(["']?)`, 'gi');
-                    if (sr.test(nc)) { nc = nc.replace(sr, `$1${updates.color}`); cc = true; }
-                    if (ar.test(nc)) { nc = nc.replace(ar, `$1${updates.color}$2`); cc = true; }
-                    if (cc) { tu.content = nc; tc = true; changed = true; }
-                }
-                if (tc) newItem.text = { ...item.text, ...tu };
-            }
-            if (changed) allUpdates.push({ id, updates: newItem });
-        });
+        const allUpdates = calculateStyleUpdates(selectedIds, localItems, oldLayer, updates);
         if (allUpdates.length > 0) batchUpdateCanvasItems(previewSlideId, allUpdates);
     }, [previewSlideId, selectedIds, localItems, batchUpdateCanvasItems]);
 
@@ -112,7 +117,12 @@ const SlideDesignPanel: React.FC = () => {
         if (!selectedAudioScopeId) return undefined;
         const slides = presentation?.slides || activePresentation?.slides;
         if (!slides) return undefined;
-        for (const s of slides) { const found = s.audioScopes?.find(scp => scp.id === selectedAudioScopeId); if (found) return found; }
+        for (const s of slides) { 
+            if (s.type === 'normal') {
+                const found = (s as ICanvasSlide).audioScopes?.find(scp => scp.id === selectedAudioScopeId); 
+                if (found) return found; 
+            }
+        }
         return undefined;
     }, [selectedAudioScopeId, presentation?.slides, activePresentation?.slides]);
 
@@ -126,11 +136,12 @@ const SlideDesignPanel: React.FC = () => {
     if (!panelOpen && !selectedAudioScopeId) return null;
 
     // ─── Tab configuration ───
-    const tabs: { id: DesignTab; icon: React.ElementType; label: string }[] = [
-        ...(selectedSlide?.type === 'timer' ? [{ id: 'timer' as DesignTab, icon: Clock, label: t('timer', 'Timer') }] : []),
+    const tabs: { id: SlideDesignTab; icon: React.ElementType; label: string }[] = [
+        ...((selectedSlide?.type === 'timer' || (selectedSlide?.type === 'normal' && (selectedSlide as ICanvasSlide).timerSettings)) ? [{ id: 'timer' as DesignTab, icon: Clock, label: t('timer', 'Timer') }] : []),
         { id: 'background' as DesignTab, icon: ImageIcon, label: t('background', 'Background') },
         { id: 'elements' as DesignTab, icon: Layers, label: t('elements', 'Elements') },
-        ...((selectedAudioScopeId || selectedSlide?.type === 'timer') ? [] : [{ id: 'style' as DesignTab, icon: Palette, label: selectedItemId ? t('properties', 'Properties') : t('design', 'Design') }]),
+        ...(selectedTransId ? [{ id: 'transition' as DesignTab, icon: ArrowRightLeft, label: t('transition', 'Transition') }] : []),
+        ...((selectedAudioScopeId || selectedSlide?.type === 'timer' || selectedTransId) ? [] : [{ id: 'style' as DesignTab, icon: Palette, label: selectedItemId ? t('properties', 'Properties') : t('design', 'Design') }]),
         ...(selectedAudioScopeId ? [{ id: 'audio' as DesignTab, icon: Music, label: t('audio', 'Audio') }] : []),
     ];
 
@@ -140,11 +151,17 @@ const SlideDesignPanel: React.FC = () => {
     const updateCanvasItemLocal = (id: string, updates: Partial<ICanvasItem>) => { if (previewSlideId) updateCanvasItem(previewSlideId, id, updates); };
     const handleRemoveItem = (itemId: string) => { if (previewSlideId) removeCanvasItem(previewSlideId, itemId); if (selectedItemId === itemId) setSelectedIds([]); };
 
+    const setSlideDesignHovered = useSetAtom(slideDesignHoveredAtom);
+
     return (
-        <div className={cn(
-            "fixed right-0 top-0 bottom-0 w-[460px] bg-[#0c0a09]/95 backdrop-blur-2xl z-40 flex flex-col transition-transform duration-500 ease-out border-l border-white/5",
-            panelOpen || selectedAudioScopeId ? "translate-x-0" : "translate-x-full"
-        )}>
+        <div
+            className={cn(
+                "fixed right-0 top-0 bottom-0 w-[460px] bg-[#0c0a09]/95 backdrop-blur-2xl z-40 flex flex-col transition-transform duration-500 ease-out border-l border-white/5",
+                panelOpen || selectedAudioScopeId ? "translate-x-0" : "translate-x-full"
+            )}
+            onMouseEnter={() => setSlideDesignHovered(true)}
+            onMouseLeave={() => setSlideDesignHovered(false)}
+        >
             {/* ─── Header ─── */}
             <div className="px-4 pt-4 pb-0 shrink-0">
                 <div className="flex items-center justify-between mb-4">
@@ -160,7 +177,7 @@ const SlideDesignPanel: React.FC = () => {
                         </div>
                     </div>
                     <button
-                        onClick={() => { setPanelOpen(false); selectAudioScope(null); }}
+                        onClick={() => { setPanelOpen(false); selectAudioScope(null); setSelectedTransId(null); }}
                         className="p-2 bg-white/5 hover:bg-white/10 hover:text-white rounded-xl text-stone-500 transition-all border border-white/5 active:scale-95 cursor-pointer"
                         aria-label="Close"
                     >
@@ -193,13 +210,29 @@ const SlideDesignPanel: React.FC = () => {
             {/* ─── Content ─── */}
             <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-6">
                 {/* ═══ Timer Tab ═══ */}
-                {activeTab === 'timer' && selectedSlide?.type === 'timer' && (
-                    <TimerTabContent selectedSlide={selectedSlide} updateTimerSettings={updateTimerSettings} openModal={openModal} t={t as TFunction} />
+                {activeTab === 'timer' && (selectedSlide?.type === 'timer' || selectedSlide?.type === 'normal') && (
+                    <TimerTabContent selectedSlide={selectedSlide as any} updateTimerSettings={updateTimerSettings} openModal={openModal} t={t as TFunction} />
                 )}
 
                 {/* ═══ Audio Tab ═══ */}
                 {activeTab === 'audio' && (
                     <AudioTabContent scope={scope} mediaItem={mediaItem} selectedAudioScopeId={selectedAudioScopeId} updateAudioScope={updateAudioScope} removeAudioScope={removeAudioScope} selectAudioScope={selectAudioScope} t={t as TFunction} />
+                )}
+
+                {/* ═══ Transition Tab ═══ */}
+                {activeTab === 'transition' && (selectedSlide || selectedTransId === 'presentation-end') && (
+                    <TransitionTabContent
+                        selectedSlide={selectedTransId === 'presentation-end' ? undefined : selectedSlide}
+                        transition={selectedTransId === 'presentation-end' ? presentation?.endTransition : undefined}
+                        onUpdate={async (trans) => {
+                            if (selectedTransId === 'presentation-end') {
+                                await updatePresentationEndTransition(trans);
+                            } else if (selectedSlide) {
+                                await updateSlideTransition(selectedSlide.id, trans);
+                            }
+                        }}
+                        triggerTransitionPreview={triggerTransitionPreview}
+                    />
                 )}
 
                 {/* ═══ Non-audio content ═══ */}

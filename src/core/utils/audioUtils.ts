@@ -21,8 +21,8 @@ export const dbToGain = (db: number): number => {
  * It combines channels and returns an array of normalized peaks (0 to 1).
  */
 export const generateWaveformPoints = (buffer: AudioBuffer, samples: number): number[] => {
-    const { duration, numberOfChannels, sampleRate } = buffer;
-    const channelData = [];
+    const { numberOfChannels, length } = buffer;
+    const channelData: Float32Array[] = [];
 
     // Get data for all channels
     for (let i = 0; i < numberOfChannels; i++) {
@@ -30,7 +30,14 @@ export const generateWaveformPoints = (buffer: AudioBuffer, samples: number): nu
     }
 
     const points: number[] = [];
-    const blockSize = Math.floor(buffer.length / samples);
+    const blockSize = Math.floor(length / samples);
+
+    // AI Performance Optimization: For very large buffers, we sample instead of checking EVERY point.
+    // 44.1kHz * 60s = 2.6M samples. Doing 100 iterations of 26k iterations = 2.6M operations.
+    // With 2 channels, that's 5.2M operations in a blocking loop.
+    // We cap the samples checked per block to 1000 for responsive UI.
+    const maxSamplesPerBlock = 1000;
+    const sampleStep = Math.max(1, Math.floor(blockSize / maxSamplesPerBlock));
 
     for (let i = 0; i < samples; i++) {
         const start = i * blockSize;
@@ -39,7 +46,8 @@ export const generateWaveformPoints = (buffer: AudioBuffer, samples: number): nu
         // Find maximum peak in this block across all channels
         for (let c = 0; c < numberOfChannels; c++) {
             const data = channelData[c];
-            for (let j = 0; j < blockSize; j++) {
+            // Iterate with sampleStep to jump over points if block is too large
+            for (let j = 0; j < blockSize; j += sampleStep) {
                 const val = Math.abs(data[start + j]);
                 if (val > max) max = val;
             }
@@ -49,3 +57,4 @@ export const generateWaveformPoints = (buffer: AudioBuffer, samples: number): nu
 
     return points;
 };
+

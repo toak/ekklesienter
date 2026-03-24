@@ -2,7 +2,7 @@ import React, { useRef, useState, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
-import { useBibleStore } from '@/core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { Upload, Trash2, CheckCircle, AlertCircle, Loader2, BookOpen, Plus, Search, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { BibleData } from '@/core/types';
 import ParserWorker from '@/core/workers/parser.worker?worker';

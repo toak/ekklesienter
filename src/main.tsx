@@ -18,15 +18,17 @@ if (import.meta.env.DEV) {
     console.error('UNHANDLED RENDERER REJECTION:', event.reason);
   });
 
-  console.log('Renderer: Error Logging Initialized');
-  console.log('Renderer: window.electron status:', window.electron ? 'Available' : 'NOT FOUND');
 }
+
+import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <PerformanceMonitor />
-    <Suspense fallback={<div className="h-screen w-screen bg-stone-950 flex items-center justify-center text-stone-500 font-serif">Loading...</div>}>
-      <App />
-    </Suspense>
+    <ErrorBoundary>
+      <PerformanceMonitor />
+      <Suspense fallback={<div className="h-screen w-screen bg-stone-950 flex items-center justify-center text-stone-500 font-serif">Loading...</div>}>
+        <App />
+      </Suspense>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

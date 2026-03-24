@@ -6,16 +6,18 @@
 
 This contains everything you need to run your app locally.
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ZNt7jvcme7sRHAbuCnuF3yNEKLdbGsD-
+View your app in AI Studio: <https://ai.studio/apps/drive/1ZNt7jvcme7sRHAbuCnuF3yNEKLdbGsD->
 
 ## Run Locally
 
 **Prerequisites:**  Node.js
-
 
 1. Install dependencies:
    `npm install`
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
 # ekklesienter
+
+// TODO: Когда импортируешь презентацию, то слайды в ней показывают контент в превью на таймлайне, а на самам превью показывает библейскую ссылку на Бытие 1:1 и больше ничего на экране превью. Нужно чтобы на экране превью показывался контент слайда.

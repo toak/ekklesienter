@@ -115,5 +115,6 @@ export default {
     "template_id": "File Name / ID",
     "category": "Category",
     "background": "Background",
-    "select_block_hint_templates": "Select a block in the left panel to see its templates"
+    "select_block_hint_templates": "Select a block in the left panel to see its templates",
+    "type_here": "Type here..."
 };

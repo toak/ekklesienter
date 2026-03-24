@@ -7,7 +7,8 @@ import DisplaySettings from './DisplaySettings';
 import AboutSettings from './AboutSettings';
 import LogoSettings from './LogoSettings';
 import OverrideSettings from './OverrideSettings';
-import { X, Globe, Database, Monitor, Info, ImageIcon, Layers } from 'lucide-react';
+import ShortcutsSettings from './ShortcutsSettings';
+import { X, Globe, Database, Monitor, Info, ImageIcon, Layers, Command } from 'lucide-react';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -28,6 +29,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             case 'data': return <DataSettings />;
             case 'logo': return <LogoSettings />;
             case 'overrides': return <OverrideSettings />;
+            case 'shortcuts': return <ShortcutsSettings />;
             case 'about': return <AboutSettings />;
             default: return <GeneralSettings />;
         }
@@ -65,6 +67,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'data' && <Database className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'logo' && <ImageIcon className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'overrides' && <Layers className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
+                                    {activeTab === 'shortcuts' && <Command className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'about' && <Info className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                 </div>
                             </div>
@@ -85,6 +88,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'data' && t('bible_translations')}
                                     {activeTab === 'logo' && t('church_logo', 'Church Logo')}
                                     {activeTab === 'overrides' && t('overrides', 'Overrides')}
+                                    {activeTab === 'shortcuts' && t('shortcuts', 'Shortcuts')}
                                     {activeTab === 'about' && t('about_app')}
                                 </h2>
                             </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe, Database, Monitor, Info, ImageIcon, Layers } from 'lucide-react';
+import { Globe, Database, Monitor, Info, ImageIcon, Layers, Command } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 
 interface SettingsSidebarProps {
@@ -16,6 +16,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, setActiveT
         { id: 'data', label: t('data'), icon: Database, description: t('bible_translations') },
         { id: 'logo', label: t('church_logo', 'Church Logo'), icon: ImageIcon, description: t('logo_description', 'Manage church logos') },
         { id: 'overrides', label: t('overrides', 'Overrides'), icon: Layers, description: t('overrides_description', 'Black, white & logo screens') },
+        { id: 'shortcuts', label: t('shortcuts', 'Shortcuts'), icon: Command, description: t('hotkeys_overview', 'App keyboard shortcuts') },
         { id: 'about', label: t('about_app'), icon: Info, description: t('about_description') },
     ];
 

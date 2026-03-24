@@ -133,3 +133,114 @@ export const getUniqueSelectionStyles = (
         return (typePriority[a.type] || 99) - (typePriority[b.type] || 99);
     });
 };
+/**
+ * Calculates updates for multiple canvas items based on a style transition.
+ */
+export const calculateStyleUpdates = (
+    selectedIds: string[],
+    localItems: ICanvasItem[],
+    oldLayer: IStyleLayer,
+    updates: Partial<IStyleLayer>
+): Array<{ id: string; updates: Partial<ICanvasItem> }> => {
+    const oldHash = getStyleHash(oldLayer);
+    const allUpdates: Array<{ id: string; updates: Partial<ICanvasItem> }> = [];
+
+    selectedIds.forEach(id => {
+        const item = localItems.find(i => i.id === id);
+        if (!item) return;
+
+        const newItem: Partial<ICanvasItem> = {};
+        let changed = false;
+
+        // 1. Update Fills
+        if (item.fills) {
+            const newFills = item.fills.map(f => {
+                if (getStyleHash(f) === oldHash) {
+                    changed = true;
+                    return { ...f, ...updates };
+                }
+                return f;
+            });
+            if (changed) newItem.fills = newFills;
+        }
+
+        // 2. Update Strokes
+        if (item.strokes) {
+            let sc = false;
+            const ns = item.strokes.map(s => {
+                if (getStyleHash(s) === oldHash) {
+                    sc = true;
+                    changed = true;
+                    return { ...s, ...updates };
+                }
+                return s;
+            });
+            if (sc) {
+                newItem.strokes = ns;
+                changed = true;
+            }
+        }
+
+        // 3. Update Text Styles
+        if (item.type === 'text' && item.text) {
+            const tu: Partial<ICanvasItemText> = {};
+            let tc = false;
+
+            // 3.1 Text Fills
+            if (item.text.textFills) {
+                const nf = item.text.textFills.map(f => {
+                    if (getStyleHash(f) === oldHash) {
+                        tc = true;
+                        changed = true;
+                        return { ...f, ...updates };
+                    }
+                    return f;
+                });
+                if (tc) tu.textFills = nf;
+            }
+
+            // 3.2 Legacy Color
+            if (oldLayer.type === 'color' && updates.color && item.text.color && 
+                normalizeColor(item.text.color) === oldHash.replace('color|', '')) {
+                tu.color = updates.color;
+                tc = true;
+                changed = true;
+            }
+
+            // 3.3 HTML Content Color Replacement
+            if (oldLayer.type === 'color' && updates.color && oldLayer.color) {
+                const oe = oldLayer.color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                let nc = item.text.content || '';
+                let cc = false;
+
+                const sr = new RegExp(`(color\\s*:\\s*)${oe}`, 'gi');
+                const ar = new RegExp(`(color\\s*=\\s*["']?)${oe}(["']?)`, 'gi');
+
+                if (sr.test(nc)) {
+                    nc = nc.replace(sr, `$1${updates.color}`);
+                    cc = true;
+                }
+                if (ar.test(nc)) {
+                    nc = nc.replace(ar, `$1${updates.color}$2`);
+                    cc = true;
+                }
+
+                if (cc) {
+                    tu.content = nc;
+                    tc = true;
+                    changed = true;
+                }
+            }
+
+            if (tc) {
+                newItem.text = { ...item.text, ...tu };
+            }
+        }
+
+        if (changed) {
+            allUpdates.push({ id, updates: newItem });
+        }
+    });
+
+    return allUpdates;
+};

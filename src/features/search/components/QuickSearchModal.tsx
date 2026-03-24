@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Search, CornerDownLeft, BookOpen, Clock } from 'lucide-react';
-import { useBibleStore } from '@/core/store/bibleStore';
+import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { useHistoryStore } from '@/core/store/historyStore';
 import { db } from '@/core/db';
 import { getBookName, BOOK_ORDER } from '@/core/data/bookData';

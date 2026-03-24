@@ -4,12 +4,13 @@ import {
     Image as ImageIcon, Plus, FolderOpen, Trash2, CheckCircle2,
     ChevronDown, ChevronRight, FolderPlus, ArrowRightLeft, Group, RefreshCw, AlertCircle
 } from 'lucide-react';
-import { usePresenterStore } from '@/core/store/presenterStore';
+import { usePresenterStore } from '@/features/presenter/store/presenterStore';
 import { cn } from '@/core/utils/cn';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
 import { ILogo, ILogoGroup, ILogoEntry } from '@/core/types';
 import { db } from '@/core/db';
 import { useLogoUrl } from '@/core/hooks/useLogoUrl';
+import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
 
 // ─── Create Group Dialog ────────────────────────────────────────────────────
 interface CreateGroupDialogProps {
@@ -230,23 +231,25 @@ const LogoSettings: React.FC = () => {
 
     // ── Handlers ───────────────────────────────────────────────────────────
     const handleSelectFile = async (groupId?: string) => {
-        console.log('LogoSettings: handleSelectFile clicked', { groupId, electron: !!window.electron });
         if (!window.electron) {
             console.error('LogoSettings: window.electron is missing');
             return;
         }
         try {
-            console.log('LogoSettings: invoking selectFile...');
-            const filePath = await (window.electron.ipcRenderer as any).selectFile({
+            let filePath = await (window.electron.ipcRenderer as any).selectFile({
                 title: t('select_logo_title', 'Select Church Logo'),
             });
-            console.log('LogoSettings: selectFile result:', filePath);
 
             if (filePath) {
-                const fileName = filePath.split('/').pop() || 'Logo';
+                // If it's an array, take the first one
+                if (Array.isArray(filePath)) {
+                    filePath = filePath[0];
+                }
+                if (!filePath) return;
+
+                const fileName = filePath.split(/[/\\]/).pop() || 'Logo';
                 const logoId = crypto.randomUUID();
 
-                console.log('LogoSettings: Reading file data via IPC:', filePath);
                 const result = await (window.electron.ipcRenderer as any).readFileData(filePath);
                 if (!result) return;
                 const blob = new Blob([result.data], { type: result.mimeType });
@@ -262,7 +265,7 @@ const LogoSettings: React.FC = () => {
                 const newLogo: ILogo = {
                     id: logoId,
                     name: fileName,
-                    url: `local-resource://${filePath.startsWith('/') ? '' : '/'}${filePath}`, // Keep path as fallback
+                    url: getLocalResourceUrl(filePath), // Keep path as fallback
                     isFromDb: true,
                     groupId: groupId || undefined
                 };
@@ -278,13 +281,11 @@ const LogoSettings: React.FC = () => {
     };
 
     const handleImportFolder = async (groupId?: string) => {
-        console.log('LogoSettings: handleImportFolder clicked', { groupId, electron: !!window.electron });
         if (!window.electron) return;
         setIsImporting(true);
         setImportTargetGroupId(groupId ?? null);
         try {
             const folderPath = await (window.electron.ipcRenderer as any).selectFolder();
-            console.log('LogoSettings: selectFolder result:', folderPath);
             if (folderPath) {
                 const results: ILogo[] = await (window.electron.ipcRenderer as any).readDirectoryRecursive(folderPath);
 
@@ -295,9 +296,8 @@ const LogoSettings: React.FC = () => {
 
                 const dbLogos: ILogo[] = await Promise.all(results.map(async (l) => {
                     try {
-                        console.log('LogoSettings: Reading folder file data via IPC:', l.name);
-                        // Extract path from local-resource://...
-                        const originalPath = l.url.replace('local-resource://', '');
+                        // Extract path from local-resource://[host]/path
+                        const originalPath = l.url.replace(/^local-resource:\/\/(localhost)?/, '');
                         const result = await (window.electron.ipcRenderer as any).readFileData(originalPath);
 
                         if (!result) throw new Error('Failed to read file data');

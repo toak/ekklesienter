@@ -1,11 +1,12 @@
 import React, { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@/core/utils/cn';
-import { IAudioScope, ISlide } from '@/core/types';
-import { usePresentationStore } from '@/core/store/presentationStore';
+import { IAudioScope, ISlide, ICanvasSlide, ITimerSlide } from '@/core/types';
+import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { Music, Plus } from 'lucide-react';
 import AudioScopeBlock from './AudioScopeBlock';
+import TimerAudioClip from './TimerAudioClip';
 import { findOverlappingScopes } from '../../utils/timelineUtils';
 
 /** Width of each slide tile in the timeline (matches SlideTimeline w-32 = 128px) */
@@ -48,16 +49,19 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
         const seenScopeIds = new Set<string>();
 
         visualTimeline.forEach((item, idx) => {
-            if (item.slide?.audioScopes) {
-                for (const scope of item.slide.audioScopes) {
-                    if (seenScopeIds.has(scope.id)) continue;
+            if (item.slide?.type === 'normal') {
+                const canvasSlide = item.slide as ICanvasSlide;
+                if (canvasSlide.audioScopes) {
+                    for (const scope of canvasSlide.audioScopes) {
+                        if (seenScopeIds.has(scope.id)) continue;
 
-                    const sIdx = slideToIndexMap.get(scope.startSlideId);
-                    const eIdx = slideToIndexMap.get(scope.endSlideId);
+                        const sIdx = slideToIndexMap.get(scope.startSlideId);
+                        const eIdx = slideToIndexMap.get(scope.endSlideId);
 
-                    if (sIdx !== undefined && eIdx !== undefined) {
-                        scopes.push({ scope, startIdx: sIdx, endIdx: eIdx });
-                        seenScopeIds.add(scope.id);
+                        if (sIdx !== undefined && eIdx !== undefined) {
+                            scopes.push({ scope, startIdx: sIdx, endIdx: eIdx });
+                            seenScopeIds.add(scope.id);
+                        }
                     }
                 }
             }
@@ -230,7 +234,8 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
                 hoveredSlotIdx !== null &&
                 visualTimeline[hoveredSlotIdx]?.type === 'slide' &&
                 visualTimeline[hoveredSlotIdx]?.slide &&
-                !allScopes.some(s => s.startIdx <= (hoveredSlotIdx || -1) && s.endIdx >= (hoveredSlotIdx || -1)) && (
+                !allScopes.some(s => s.startIdx <= (hoveredSlotIdx || -1) && s.endIdx >= (hoveredSlotIdx || -1)) &&
+                !((visualTimeline[hoveredSlotIdx]?.slide as ITimerSlide)?.playlist?.length) && (
                     <div
                         className="absolute top-1 bottom-1 border-2 border-dashed border-purple-500/30 rounded-xl pointer-events-none z-10 flex items-center justify-center transition-all animate-in fade-in duration-200"
                         style={{
@@ -253,6 +258,20 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
                         </button>
                     </div>
                 )}
+
+            {visualTimeline.map((item) => {
+                if (item.type === 'slide' && item.slide?.type === 'timer' && (item.slide as ITimerSlide).playlist?.length) {
+                    return (
+                        <TimerAudioClip
+                            key={`timer-audio-${item.slide.id}`}
+                            slide={item.slide}
+                            x={item.x}
+                            width={item.width}
+                        />
+                    );
+                }
+                return null;
+            })}
 
             {allScopes.map(({ scope, startIdx, endIdx }) => (
                 <AudioScopeBlock
