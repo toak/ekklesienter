@@ -1,0 +1,173 @@
+import React from 'react';
+import { 
+    SidebarClose, SidebarOpen, Clock, Undo2, Redo2, 
+    MonitorPlay, Palette, Square, Image as ImageIcon 
+} from 'lucide-react';
+import { cn } from '@/core/utils/cn';
+import { useTranslation } from 'react-i18next';
+import { ModalType } from '@/core/store/modalStore';
+import { OverrideType } from '@/core/store/uiAtoms';
+
+interface AppToolbarProps {
+    sidebarOpen: boolean;
+    setSidebarOpen: (open: boolean) => void;
+    historyOpen: boolean;
+    setHistoryOpen: (open: boolean) => void;
+    designPanelOpen: boolean;
+    setDesignPanelOpen: (open: boolean) => void;
+    appMode: 'scripture' | 'presentation';
+    activeOverride: OverrideType | null;
+    toggleOverride: (type: OverrideType) => void;
+    activeLogoUrl: string | null;
+    activeLogoName?: string;
+    undo: () => void;
+    redo: () => void;
+    openProjector: () => void;
+    openGlobalModal: (type: ModalType) => void;
+}
+
+export const AppToolbar: React.FC<AppToolbarProps> = ({
+    sidebarOpen,
+    setSidebarOpen,
+    historyOpen,
+    setHistoryOpen,
+    designPanelOpen,
+    setDesignPanelOpen,
+    appMode,
+    activeOverride,
+    toggleOverride,
+    activeLogoUrl,
+    activeLogoName,
+    undo,
+    redo,
+    openProjector,
+    openGlobalModal
+}) => {
+    const { t } = useTranslation();
+
+    return (
+        <div className="absolute top-4 left-4 z-50 flex gap-2">
+            <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="p-2 bg-stone-900/80 text-stone-400 rounded-md hover:text-amber-400 hover:bg-stone-800 border border-stone-800 backdrop-blur-md transition-colors"
+                title={sidebarOpen ? t('hide_controls') : t('show_controls')}
+            >
+                {sidebarOpen ? <SidebarClose className="w-5 h-5" /> : <SidebarOpen className="w-5 h-5" />}
+            </button>
+
+            <button
+                onClick={() => setHistoryOpen(!historyOpen)}
+                className={cn(
+                    "p-2 rounded-md border backdrop-blur-md transition-colors",
+                    historyOpen
+                        ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                        : "bg-stone-900/80 text-stone-400 hover:text-amber-400 hover:bg-stone-800 border-stone-800"
+                )}
+                title={t('history')}
+            >
+                <Clock className="w-5 h-5" />
+            </button>
+
+            <div className="h-9 w-px bg-white/5 mx-1" />
+
+            <button
+                onClick={undo}
+                className="p-2 rounded-md bg-stone-900/80 text-stone-400 hover:text-accent hover:bg-stone-800 border border-stone-800 backdrop-blur-md transition-colors"
+                title={`${t('undo', 'Undo')} (Cmd+Z)`}
+            >
+                <Undo2 className="w-5 h-5" />
+            </button>
+
+            <button
+                onClick={redo}
+                className="p-2 rounded-md bg-stone-900/80 text-stone-400 hover:text-accent hover:bg-stone-800 border border-stone-800 backdrop-blur-md transition-colors"
+                title={`${t('redo', 'Redo')} (Cmd+Shift+Z)`}
+            >
+                <Redo2 className="w-5 h-5" />
+            </button>
+
+            <div className="h-9 w-px bg-white/5 mx-1" />
+
+            <button
+                onClick={openProjector}
+                className="p-2 bg-stone-900/80 text-stone-400 rounded-md hover:text-accent hover:bg-stone-800 border border-stone-800 backdrop-blur-md transition-colors"
+                title={t('open_projector')}
+            >
+                <MonitorPlay className="w-5 h-5" />
+            </button>
+
+            <button
+                onClick={() => {
+                    if (appMode === 'presentation') {
+                        // Logic moved to caller or handled by store
+                        setDesignPanelOpen(!designPanelOpen);
+                    } else {
+                        openGlobalModal(ModalType.CUSTOMIZATION);
+                    }
+                }}
+                className={cn(
+                    "p-2 rounded-md border backdrop-blur-md transition-colors",
+                    designPanelOpen && appMode === 'presentation'
+                        ? "bg-accent/20 text-accent border-accent/50"
+                        : "bg-stone-900/80 text-stone-400 hover:text-accent hover:bg-stone-800 border-stone-800"
+                )}
+                title={t('customization')}
+            >
+                <Palette className="w-5 h-5" />
+            </button>
+
+            {/* Emergency Modes Controls */}
+            <div className="h-9 w-px bg-white/5 mx-1" />
+
+            <button
+                onClick={() => toggleOverride('blackout')}
+                className={cn(
+                    "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden",
+                    activeOverride === 'blackout'
+                        ? "bg-red-500/20 text-red-500 border-red-500/50 shadow-lg shadow-red-500/10"
+                        : "bg-stone-900/80 text-stone-400 hover:text-white hover:bg-stone-800 border-stone-800"
+                )}
+                title={`${t('blackout', 'Black Out')} (B)`}
+            >
+                <Square className={cn("w-5 h-5 fill-current transition-transform", activeOverride === 'blackout' ? "scale-110" : "scale-90 opacity-10")} />
+                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black uppercase tracking-tighter">{t('blackout_short')}</div>
+            </button>
+
+            <button
+                onClick={() => toggleOverride('whiteout')}
+                className={cn(
+                    "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden",
+                    activeOverride === 'whiteout'
+                        ? "bg-stone-100 text-black border-white shadow-lg shadow-white/10"
+                        : "bg-stone-900/80 text-stone-400 hover:text-white hover:bg-stone-800 border-stone-800"
+                )}
+                title={`${t('whiteout', 'White Out')} (W)`}
+            >
+                <Square className={cn("w-5 h-5 fill-current transition-transform", activeOverride === 'whiteout' ? "scale-110" : "scale-90 opacity-10")} />
+                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black uppercase tracking-tighter">{t('whiteout_short')}</div>
+            </button>
+
+            <button
+                onClick={() => toggleOverride('logo')}
+                className={cn(
+                    "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden min-w-[38px] min-h-[38px]",
+                    activeOverride === 'logo'
+                        ? "bg-accent/20 text-accent border-accent/50 shadow-lg shadow-accent/10"
+                        : "bg-stone-900/80 text-stone-400 hover:text-white hover:bg-stone-800 border-stone-800"
+                )}
+                title={`${t('logo_mode', 'Show Logo')} (L)`}
+            >
+                {activeLogoUrl ? (
+                    <div className="w-5 h-5 rounded-sm overflow-hidden flex items-center justify-center">
+                        <img src={activeLogoUrl} alt={activeLogoName || 'Logo'} className="w-full h-full object-contain" />
+                    </div>
+                ) : (
+                    <>
+                        <ImageIcon className={cn("w-5 h-5 transition-transform", activeOverride === 'logo' ? "scale-110" : "scale-90")} />
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold opacity-0 group-hover:opacity-100 bg-black/40">L</div>
+                    </>
+                )}
+            </button>
+        </div>
+    );
+};
