@@ -2,6 +2,7 @@ import { IAudioScope, ISlide, ICanvasSlide } from '@/core/types';
 import { generateWaveformPoints } from '@/core/utils/audioUtils';
 import { db } from '@/core/db';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
+import { extractPathFromLocalResource } from './mediaPackingUtils';
 import { IpcService } from '@/core/services/IpcService';
 
 class AudioService {
@@ -56,14 +57,45 @@ class AudioService {
         if (cached) return cached;
         
         // Check if we already have this in DB (e.g. imported media)
-        const dbItem = await db.mediaPool.get(fileId) || await db.backgrounds.get(fileId);
+        let dbItem = await db.mediaPool.get(fileId) || await db.backgrounds.get(fileId);
+        
+        if (!dbItem) {
+            // Fallback 1: check by exact path match
+            const path = extractPathFromLocalResource(fileId) || fileId;
+            dbItem = await db.mediaPool.where('path').equals(path).first();
+            
+            if (!dbItem) {
+                // Fallback 2: check by filename only (useful for presentations from other machines)
+                const filename = path.split(/[/\\]/).pop();
+                if (filename && filename.includes('.')) {
+                    dbItem = await db.mediaPool.where('name').equals(filename).first();
+                    
+                    // Final sanity check: try normalized name fallback
+                    if (!dbItem) {
+                        const normalized = filename.normalize('NFC');
+                        dbItem = await db.mediaPool.where('name').equals(normalized).first();
+                    }
+                }
+            }
+        }
+
         if (dbItem?.data) {
             const blobUrl = URL.createObjectURL(dbItem.data);
+            console.log(`[AudioService] Created Blob URL: ${blobUrl} (Origin: ${window.location.origin}, ID: ${fileId})`);
             this.blobUrlCache.set(fileId, blobUrl);
             return blobUrl;
         }
+
+        const dbPath = dbItem && 'path' in dbItem ? dbItem.path as string : undefined;
+        const pathToCheck = dbPath || extractPathFromLocalResource(fileId) || fileId;
+        const stats = await this.getFileStats(pathToCheck);
         
-        return this.resolveUrl(fileId);
+        if (!stats) {
+            console.warn(`[AudioService] File not found on disk or DB: ${pathToCheck}`);
+            return '';
+        }
+        
+        return this.resolveUrl(pathToCheck);
     }
 
     public async getWaveform(fileId: string, samples: number = 100): Promise<number[] | null> {
@@ -92,6 +124,7 @@ class AudioService {
     private async loadAudio(url: string): Promise<AudioBuffer | null> {
         if (!url) return null;
         let resolvedUrl = await this.resolveEffectiveUrl(url);
+        if (!resolvedUrl) return null;
 
         if (this.bufferCache.has(resolvedUrl)) return this.bufferCache.get(resolvedUrl)!;
 
@@ -154,6 +187,7 @@ class AudioService {
     private async getDuration(url: string): Promise<number> {
         if (!url) return 0;
         let resolvedUrl = await this.resolveEffectiveUrl(url);
+        if (!resolvedUrl) return 0;
 
         if (this.durationCache.has(resolvedUrl)) return this.durationCache.get(resolvedUrl)!;
 
@@ -196,14 +230,14 @@ class AudioService {
         return probePromise;
     }
 
-    public async sync(liveSlideId: string | null, slides: ISlide[]) {
+    public async sync(liveSlideId: string | null, slides: ISlide[], presentationScopes?: IAudioScope[]) {
         if (!liveSlideId) {
             this.targetScopeId = null;
             this.stopAll(0.5);
             return;
         }
 
-        const activeScope = this.findActiveScope(liveSlideId, slides);
+        const activeScope = this.findActiveScope(liveSlideId, slides, presentationScopes);
         if (!activeScope) {
             this.targetScopeId = null;
             this.stopAll(1.0);
@@ -237,11 +271,18 @@ class AudioService {
         await this.playScope(activeScope);
     }
 
-    private findActiveScope(slideId: string, slides: ISlide[]): IAudioScope | null {
+    private findActiveScope(slideId: string, slides: ISlide[], presentationScopes?: IAudioScope[]): IAudioScope | null {
         const slideIndex = slides.findIndex(s => s.id === slideId);
         if (slideIndex === -1) return null;
 
         const allScopes: IAudioScope[] = [];
+        
+        // 1. Root-level/Relational Scopes
+        if (presentationScopes && Array.isArray(presentationScopes)) {
+            allScopes.push(...presentationScopes);
+        }
+
+        // 2. Slide-level Scopes (Legacy nesting)
         slides.forEach(s => { 
             if (s.type === 'normal') {
                 const cs = s as ICanvasSlide;
@@ -264,6 +305,7 @@ class AudioService {
 
         const ctx = this.ensureContext();
         const resolvedUrl = await this.resolveEffectiveUrl(scope.fileId);
+        if (!resolvedUrl) return null;
 
         // AI Fix (Proactive Guard): Check duration FIRST with a metadata probe
         // This avoids fetching the whole 2GB file if it's just meant for streaming.
@@ -342,18 +384,43 @@ class AudioService {
         let source: AudioBufferSourceNode | MediaElementAudioSourceNode;
 
         if (audio) {
-            audio.loop = scope.loop;
+            // Disable native loop for HTMLAudioElement so we can handle it manually with trimming
+            audio.loop = false;
             audio.currentTime = offset;
             source = ctx.createMediaElementSource(audio);
+            
+            // Boundary enforcement for streaming audio
+            const trimEnd = scope.trimEnd || 0;
+            const onTimeUpdate = () => {
+                if (trimEnd > 0 && audio.currentTime >= trimEnd - 0.05) {
+                    if (scope.loop) {
+                        audio.currentTime = offset;
+                        audio.play().catch(() => {});
+                    } else {
+                        audio.pause();
+                        audio.currentTime = trimEnd;
+                    }
+                }
+            };
+            audio.addEventListener('timeupdate', onTimeUpdate);
+            
             // AI Fix: Ensure we don't start multiple times
             audio.play().catch(e => console.error('AudioService: Playback failed', e));
         } else {
             const bufSource = ctx.createBufferSource();
             bufSource.buffer = buffer!;
-            bufSource.loop = scope.loop;
+            
+            if (scope.loop) {
+                bufSource.loop = true;
+                bufSource.loopStart = offset;
+                bufSource.loopEnd = scope.trimEnd || buffer!.duration;
+            } else {
+                bufSource.loop = false;
+            }
+            
             source = bufSource;
             const playDuration = (scope.trimEnd && scope.trimEnd > offset) ? (scope.trimEnd - offset) : buffer!.duration - offset;
-            bufSource.start(now, offset, Math.max(0, playDuration));
+            bufSource.start(now, offset, scope.loop ? undefined : Math.max(0, playDuration));
         }
 
         const gainNode = ctx.createGain();

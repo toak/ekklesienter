@@ -102,6 +102,15 @@ export default {
     "lock_aspect_ratio": "Lock Aspect Ratio",
     "pivot_point": "Pivot Point",
     "add_element": "Add Element",
+    "select_tool": "Select",
+    "hand_tool": "Hand (Pan)",
+    "add_text": "Text",
+    "add_image": "Image",
+    "add_video": "Video",
+    "add_line": "Line",
+    "zoom_out": "Zoom Out",
+    "reset_zoom": "Reset Zoom",
+    "zoom_in": "Zoom In",
     "shapes": "Shapes",
     "hide": "Hide",
     "lock": "Lock",
@@ -162,5 +171,6 @@ export default {
     "transition_name.zoom": "Zoom",
     "transition_desc.zoom": "Scaling in/out",
     "transition_name.pan": "Pan",
-    "transition_desc.pan": "Panoramic shift"
+    "transition_desc.pan": "Panoramic shift",
+    "recent_backgrounds": "Recent"
 };

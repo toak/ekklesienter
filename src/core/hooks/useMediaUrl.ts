@@ -6,8 +6,8 @@ import { db } from '../db';
  * Robustly constructs a local-resource URL for a given path.
  * Handles absolute paths and ensures dummy 'localhost' host to avoid host-parsing traps.
  */
-export const getLocalResourceUrl = (path: string) => {
-    if (!path) return '';
+export const getLocalResourceUrl = (path: string | null | undefined) => {
+    if (!path) return null;
     if (path.startsWith('blob:') || path.startsWith('http') || path.startsWith('local-resource:')) return path;
     
     // Normalize slashes
@@ -45,6 +45,7 @@ export function useMediaUrl(item: IMediaItem | null | undefined) {
                 const dbItem = await db.mediaPool.get(item.id);
                 if (dbItem?.data) {
                     const blobUrl = URL.createObjectURL(dbItem.data);
+                    console.log(`[useMediaUrl] Created Blob URL: ${blobUrl} (Origin: ${window.location.origin}, ID: ${item.id})`);
                     currentUrl = blobUrl;
                     setUrl(blobUrl);
                     return;

@@ -10,6 +10,7 @@ import { cn } from '@/core/utils/cn';
 import { IMediaItem, IAudioScope, ISlide } from '@/core/types';
 import { findOverlappingScopes } from '../../utils/timelineUtils';
 import { IpcService } from '@/core/services/IpcService';
+import { MediaPersistenceService } from '../../services/MediaPersistenceService';
 
 const AudioPickerModal: React.FC = () => {
     const { t } = useTranslation();
@@ -56,6 +57,9 @@ const AudioPickerModal: React.FC = () => {
         }
 
         if (targetSlideId) {
+            const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+            const stableId = await MediaPersistenceService.ensureMediaInDb(item);
+
             const { activePresentation } = usePresentationStore.getState();
             if (activePresentation) {
                 const slides = activePresentation.slides;
@@ -70,11 +74,11 @@ const AudioPickerModal: React.FC = () => {
                     const { openModal } = useModalStore.getState();
                     openModal(ModalType.AUDIO_CONFLICT, {
                         targetSlideId,
-                        fileId: item.path,
+                        fileId: stableId,
                         overlappingScopes: overlaps
                     });
                 } else {
-                    await addAudioScope(targetSlideId, item.path, item.name);
+                    await addAudioScope(targetSlideId, stableId, item.name);
                     closeModal(ModalType.AUDIO_PICKER);
                 }
             }
@@ -136,17 +140,10 @@ const AudioPickerModal: React.FC = () => {
 
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
-                // In Electron, .path is often available on File objects from <input>
-                const path = (file as any).path || URL.createObjectURL(file);
-
-                const item: IMediaItem = {
-                    id: crypto.randomUUID(),
-                    name: file.name,
-                    path: path,
-                    type: 'audio',
-                    createdAt: Date.now()
-                };
-                await db.mediaPool.add(item);
+                // Use path if available (Electron) to allow local-resource:// resolution, 
+                // otherwise let importMediaBlob handle it as a naked Blob which is safer than a temporary blob: URL.
+                const path = (file as any).path || null;
+                await MediaPersistenceService.importMediaBlob(file, path, 'audio');
             }
         };
 

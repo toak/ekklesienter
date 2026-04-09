@@ -6,6 +6,9 @@ import { ISlide, ICanvasSlide, INestedSlide, IBlock, ITemplate, IPresentationFil
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import SlideContentRenderer from '../slide-editor/SlideContentRenderer';
 import SmartBadge from './SmartBadge';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/core/db';
+import type { DraggableSyntheticListeners, DraggableAttributes } from '@dnd-kit/core';
 
 export interface SlideTileProps {
     slide: ISlide;
@@ -27,7 +30,8 @@ export interface SlideTileProps {
     isMultiDragHidden?: boolean;
     presentationsMap: Map<string, IPresentationFile>;
     navigationParentSlideId: string | null;
-    listeners?: any;
+    listeners?: DraggableSyntheticListeners;
+    attributes?: DraggableAttributes;
 }
 
 /**
@@ -54,7 +58,8 @@ export const SlideTile: React.FC<SlideTileProps> = ({
     isMultiDragHidden,
     presentationsMap,
     navigationParentSlideId,
-    listeners
+    listeners,
+    attributes
 }) => {
     const { t } = useTranslation();
     const { syncNestedPresentation } = usePresentationStore();
@@ -68,7 +73,6 @@ export const SlideTile: React.FC<SlideTileProps> = ({
         ? (nestedPres.slides.find(s => s.id === previewSlideId) || nestedPres.slides[0]) 
         : null;
     
-    // @ts-ignore - masterPresentationId is checked by type guard if needed, but here we just need types to match
     const displaySlide = activeNestedSlide || slide;
     const displayBlock = blocksMap.get(displaySlide.blockId);
     const displayTemplate = templatesMap.get(displaySlide.templateId);
@@ -77,17 +81,35 @@ export const SlideTile: React.FC<SlideTileProps> = ({
     const isEffectivelyPreviewed = isPreview || isNestedActive;
     const isLive = liveSlideId === slide.id;
 
+    const mediaId = displaySlide.type === 'video' ? (displaySlide as any).videoSettings?.mediaId : null;
+    const mediaMetadata = useLiveQuery(async () => {
+        if (!mediaId) return null;
+        const item = await db.mediaPool.get(mediaId);
+        if (item) return { name: item.name };
+        const bg = await db.backgrounds.get(mediaId);
+        if (bg) return { name: bg.name };
+        return null;
+    }, [mediaId]);
+
     return (
         <div
             data-slide-id={slide.id}
+            {...listeners}
+            {...attributes}
             onClick={(e) => {
                 e.stopPropagation();
                 onSelect(slide.id, e);
             }}
             onDoubleClick={() => onLive(slide.id)}
             onContextMenu={(e) => onContextMenu(e, slide.id)}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    // Prevent dnd-kit KeyboardSensor from capturing this
+                    e.stopPropagation();
+                }
+            }}
             className={cn(
-                "group relative shrink-0 w-32 aspect-video rounded-xl border-2 cursor-pointer overflow-hidden leading-none transition-all duration-300",
+                "group relative shrink-0 w-32 aspect-video rounded-xl border-2 cursor-grab active:cursor-grabbing overflow-hidden leading-none transition-all duration-300 touch-none bg-stone-900",
                 isSelected && isEffectivelyPreviewed && isMultiSelect && "ring-2 ring-accent ring-offset-2 ring-offset-stone-900 border-accent",
                 isSelected && (!isEffectivelyPreviewed || !isMultiSelect) && "ring-2 ring-accent border-transparent",
                 isMultiDragHidden && "opacity-0 pointer-events-none transition-opacity",
@@ -96,23 +118,48 @@ export const SlideTile: React.FC<SlideTileProps> = ({
                 isLive && !isEffectivelyPreviewed && "border-red-500 ring-2 ring-red-500/20 scale-105 z-10 shadow-lg shadow-red-500/10",
                 isEffectivelyPreviewed && isLive && !isSubItemSelected && "border-emerald-500 ring-2 ring-emerald-500/30 scale-105 z-10 shadow-lg shadow-emerald-500/10",
                 isEffectivelyPreviewed && isLive && isSubItemSelected && "border-emerald-500/50 ring-1 ring-emerald-500/10 scale-[1.02] z-10 shadow-md",
-                !isEffectivelyPreviewed && !isLive && !isSelected && "border-white/5 hover:border-white/20 bg-stone-900",
+                !isEffectivelyPreviewed && !isLive && !isSelected && "border-white/5 hover:border-white/20",
                 isMaster && !isEffectivelyPreviewed && !isLive && !isSelected && "border-orange-500/30"
             )}
         >
-            <div className="absolute inset-0 z-0 pointer-events-none isolate">
-                <SlideContentRenderer
-                    template={displayTemplate}
-                    block={displayBlock}
-                    variables={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.variables : undefined}
-                    lang={lang}
-                    isPreview={true}
-                    scale={128 / 1920}
-                    backgroundOverride={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).backgroundOverride : undefined}
-                    canvasItems={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.canvasItems : []}
-                    slide={displaySlide}
-                    slideId={displaySlide.id}
-                />
+            <div 
+                className="absolute top-0 left-0 w-[1920px] h-[1080px] z-0 pointer-events-none isolate origin-top-left"
+                style={{ transform: `scale(${128 / 1920})` }}
+            >
+                {displaySlide.type === 'video' ? (
+                    <div className="w-full h-full bg-stone-950 flex items-center justify-center relative">
+                        {((displaySlide as any).videoSettings?.posterFrame) ? (
+                            <img src={(displaySlide as any).videoSettings.posterFrame} className="w-full h-full object-cover" alt="Video poster" />
+                        ) : (
+                            <div className="w-[1920px] h-[1080px] flex items-center justify-center bg-stone-900 border border-white/5">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-700"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M7 3v18" /><path d="M17 3v18" /><path d="M3 7.5h4" /><path d="M3 12h18" /><path d="M3 16.5h4" /><path d="M17 7.5h4" /><path d="M17 16.5h4" /></svg>
+                            </div>
+                        )}
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                           <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white/80 drop-shadow-xl"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                        </div>
+                        {mediaMetadata?.name && (
+                            <div className="absolute bottom-0 inset-x-0 h-[400px] bg-linear-to-t from-black/95 via-black/70 to-transparent flex items-end px-16 pb-32 z-10">
+                                <span className="text-[120px] font-black text-white truncate drop-shadow-2xl tracking-tighter uppercase font-mono leading-none">
+                                    {mediaMetadata.name}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <SlideContentRenderer
+                        template={displayTemplate}
+                        block={displayBlock}
+                        variables={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.variables : undefined}
+                        lang={lang}
+                        isPreview={true}
+                        scale={1}
+                        backgroundOverride={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).backgroundOverride : undefined}
+                        canvasItems={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.canvasItems : []}
+                        slide={displaySlide}
+                        slideId={displaySlide.id}
+                    />
+                )}
             </div>
             <div className="absolute inset-x-0 top-0 h-8 bg-linear-to-b from-black/60 to-transparent z-10 pointer-events-none" />
             <div className="absolute z-20"><SmartBadge slide={slide} /></div>
@@ -125,9 +172,7 @@ export const SlideTile: React.FC<SlideTileProps> = ({
                 </button>
             )}
             <div 
-                {...listeners}
-                className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 backdrop-blur-md border border-white/5 text-[8px] font-black text-stone-400 z-20 cursor-grab active:cursor-grabbing hover:bg-black/60 transition-colors"
-                title={t('drag_to_reorder', 'Drag to reorder')}
+                className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md bg-black/40 backdrop-blur-md border border-white/5 text-[8px] font-black text-stone-400 z-50 pointer-events-none"
             >
                 {slide.order + 1}
             </div>

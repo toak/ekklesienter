@@ -123,15 +123,14 @@ export const PptxImportService = {
                     if (!mediaFile) return;
 
                     const blob = await mediaFile.async('blob');
-                    const mediaId = `pptx-media-${crypto.randomUUID()}`;
+                    const fileName = mediaPath.split('/').pop() || 'image';
 
-                    const { db } = await import('@/core/db');
-                    await db.backgrounds.add({
-                        id: mediaId,
-                        name: `PPTX Image (${mediaPath.split('/').pop()})`,
-                        data: blob,
-                        mimeType: blob.type
-                    });
+                    const { MediaPersistenceService } = await import('./MediaPersistenceService');
+                    const mediaId = await MediaPersistenceService.importMediaBlob(blob, fileName, 'image', { forceBackground: true });
+                    if (!mediaId) return;
+
+                    const url = URL.createObjectURL(blob);
+                    objectUrls.push(url);
 
                     const spPr = pic.getElementsByTagName('p:spPr')[0];
                     const xfrmEl = spPr?.getElementsByTagName('a:xfrm')[0];
@@ -145,15 +144,13 @@ export const PptxImportService = {
                     const rot = parseInt(xfrmEl?.getAttribute('rot') || '0');
                     const rotation = rot / 60000;
 
-                    const url = URL.createObjectURL(blob);
-                    objectUrls.push(url);
-
                     const xPct = emuToPercentX(x);
                     const yPct = emuToPercentY(y);
                     const wPct = emuToPercentX(w);
                     const hPct = emuToPercentY(h);
 
-                    slide.content.canvasItems!.push({
+                    slide.content.canvasItems = slide.content.canvasItems || [];
+                    slide.content.canvasItems.push({
                         id: crypto.randomUUID(),
                         type: 'image',
                         x: xPct + wPct / 2,
@@ -297,7 +294,8 @@ export const PptxImportService = {
                         const wPct = emuToPercentX(w);
                         const hPct = emuToPercentY(h);
 
-                        slide.content.canvasItems!.push({
+                        slide.content.canvasItems = slide.content.canvasItems || [];
+                        slide.content.canvasItems.push({
                             id: crypto.randomUUID(),
                             type: 'text',
                             x: xPct + wPct / 2,
@@ -340,14 +338,17 @@ export const PptxImportService = {
 
                             if (mediaFile) {
                                 const blob = await mediaFile.async('blob');
-                                const mediaId = `pptx-bg-${crypto.randomUUID()}`;
-                                const { db } = await import('@/core/db');
-                                await db.backgrounds.add({ id: mediaId, name: `PPTX Background`, data: blob, mimeType: blob.type });
+                                const fileName = target.split('/').pop() || 'background';
+                                
+                                const { MediaPersistenceService } = await import('./MediaPersistenceService');
+                                const mediaId = await MediaPersistenceService.importMediaBlob(blob, fileName, 'image', { forceBackground: true });
+                                if (!mediaId) continue;
 
                                 const url = URL.createObjectURL(blob);
                                 objectUrls.push(url);
 
-                                slide.content.canvasItems!.unshift({
+                                slide.content.canvasItems = slide.content.canvasItems || [];
+                                slide.content.canvasItems.unshift({
                                     id: crypto.randomUUID(),
                                     type: 'image',
                                     x: 50, y: 50, // Center of the slide

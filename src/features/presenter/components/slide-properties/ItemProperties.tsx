@@ -8,8 +8,8 @@ import {
     MoveHorizontal, MoveVertical
 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import { ICanvasItem, IStyleLayer } from '@/core/types';
-import { ensureLayers } from '@/core/utils/styleMigration';
+import { ICanvasItem, IStyleLayer, ICanvasEffect, CanvasEffectType } from '@/core/types';
+import { ensureLayers, ensureEffects } from '@/core/utils/styleMigration';
 import { ScrubbableInput } from './ScrubbableInput';
 import { InlineBackgroundPicker } from './InlineBackgroundPicker';
 import { AlignmentTools, PropertySection } from './PropertySection';
@@ -17,6 +17,11 @@ import { CornerTL, CornerTR, CornerBL, CornerBR } from './helpers';
 import { RotationDial } from '@/features/presenter/components/slide-editor/RotationDial';
 import { TypographySection } from './TypographySection';
 import { isEqual } from '@/core/utils/isEqual';
+import { FloatingPopover } from '@/components/FloatingPopover';
+import { CompactColorPicker } from '@/components/CompactColorPicker';
+import { 
+    EyeOff, Settings, Hash, MoveRight 
+} from 'lucide-react';
 
 interface IItemPropertiesProps {
     selectedIds: string[];
@@ -27,12 +32,22 @@ interface IItemPropertiesProps {
 }
 
 export const ItemProperties: React.FC<IItemPropertiesProps> = ({
-    selectedIds, canvasItems, updateCanvasItems, t
+    selectedIds,
+    canvasItems,
+    updateCanvasItems,
+    isPreview,
+    t
 }) => {
-    const baseItem = canvasItems.find(i => i.id === selectedIds[selectedIds.length - 1]);
     const { previewSlideId, updateCanvasItems: batchUpdateCanvasItems, takeSnapshot } = usePresentationStore();
     const [editingId] = useAtom(editingCanvasItemIdAtom);
     const setTextCommand = useSetAtom(textCommandAtom);
+
+    const lastSelectedId = selectedIds[selectedIds.length - 1];
+    const baseItem = React.useMemo(() => 
+        canvasItems.find(i => i.id === lastSelectedId), 
+    [canvasItems, lastSelectedId]);
+
+    const effects = React.useMemo(() => baseItem ? ensureEffects(baseItem) : [], [baseItem]);
 
     // Safe fallback if item is deleted but selection hasn't updated yet
     if (!baseItem) return null;
@@ -190,45 +205,45 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
                 </div>
             </PropertySection>
 
-            {/* ═══ Effects Section ═══ */}
-            <PropertySection title="Effects" icon={Wand2} defaultOpen={false}>
-                <div className="space-y-4">
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1 mb-1 group">
-                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">Drop Shadow</span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {baseItem.dropShadow ? (
-                                    <button onClick={() => updateCanvasItems(selectedIds, { dropShadow: undefined })} className="p-1 hover:bg-red-500/20 text-stone-500 hover:text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3 h-3" /></button>
-                                ) : (
-                                    <button onClick={() => updateCanvasItems(selectedIds, { dropShadow: { x: 0, y: 10, blur: 20, color: 'rgba(0,0,0,0.5)' } })} className="p-1 hover:bg-white/10 rounded-lg text-stone-500 hover:text-stone-300 cursor-pointer"><Plus className="w-3 h-3" /></button>
-                                )}
-                            </div>
+        {/* ═══ Effects Section ═══ */}
+            <PropertySection 
+                title="Effects" 
+                icon={Wand2} 
+                defaultOpen={false}
+                extra={
+                    <AddEffectButton onAdd={(type) => {
+                        const newEffect: ICanvasEffect = {
+                            id: crypto.randomUUID(),
+                            type,
+                            visible: true,
+                            ...(type.includes('shadow') ? { x: 0, y: 10, blur: 20, color: 'rgba(0,0,0,0.5)', spread: 0 } : { blur: 20 })
+                        };
+                        const currentEffects = ensureEffects(baseItem);
+                        updateCanvasItems(selectedIds, { effects: [...currentEffects, newEffect] });
+                    }} />
+                }
+            >
+                <div className="space-y-1 -mx-1">
+                    {effects.map((fx, idx) => (
+                        <EffectRow 
+                            key={fx.id}
+                            effect={fx}
+                            onUpdate={(updates) => {
+                                const newEffects = [...effects];
+                                newEffects[idx] = { ...fx, ...updates };
+                                updateCanvasItems(selectedIds, { effects: newEffects });
+                            }}
+                            onRemove={() => {
+                                updateCanvasItems(selectedIds, { effects: effects.filter((_, i) => i !== idx) });
+                            }}
+                        />
+                    ))}
+                    {effects.length === 0 && (
+                        <div className="py-8 flex flex-col items-center justify-center gap-2 opacity-20 group">
+                            <Wand2 className="w-6 h-6 group-hover:rotate-12 transition-transform duration-500" />
+                            <span className="text-[9px] font-black uppercase tracking-widest">No Effects Applied</span>
                         </div>
-                        {baseItem.dropShadow && (
-                            <div className="grid grid-cols-2 gap-2 p-2 bg-black/20 rounded-xl border border-white/5">
-                                <ScrubbableInput label="X" name="ShadowX" value={getSelectionValue(i => i.dropShadow?.x ?? 0)} onChange={(v: number) => updateCanvasItems(selectedIds, { dropShadow: { ...baseItem.dropShadow!, x: v } })} />
-                                <ScrubbableInput label="Y" name="ShadowY" value={getSelectionValue(i => i.dropShadow?.y ?? 10)} onChange={(v: number) => updateCanvasItems(selectedIds, { dropShadow: { ...baseItem.dropShadow!, y: v } })} />
-                                <div className="col-span-2"><ScrubbableInput label="Blur" name="ShadowBlur" value={getSelectionValue(i => i.dropShadow?.blur ?? 20)} min={0} onChange={(v: number) => updateCanvasItems(selectedIds, { dropShadow: { ...baseItem.dropShadow!, blur: v } })} /></div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between px-1 mb-1 group">
-                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">Background Blur</span>
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {baseItem.backdropBlur !== undefined ? (
-                                    <button onClick={() => updateCanvasItems(selectedIds, { backdropBlur: undefined })} className="p-1 hover:bg-red-500/20 text-stone-500 hover:text-red-400 rounded-lg cursor-pointer"><Trash2 className="w-3 h-3" /></button>
-                                ) : (
-                                    <button onClick={() => updateCanvasItems(selectedIds, { backdropBlur: 20 })} className="p-1 hover:bg-white/10 rounded-lg text-stone-500 hover:text-stone-300 cursor-pointer"><Plus className="w-3 h-3" /></button>
-                                )}
-                            </div>
-                        </div>
-                        {baseItem.backdropBlur !== undefined && (
-                            <div className="p-2 bg-black/20 rounded-xl border border-white/5">
-                                <ScrubbableInput label="Blur" name="BackdropBlur" value={getSelectionValue(i => i.backdropBlur ?? 0)} min={0} onChange={(v: number) => updateCanvasItems(selectedIds, { backdropBlur: v })} />
-                            </div>
-                        )}
-                    </div>
+                    )}
                 </div>
             </PropertySection>
 
@@ -309,6 +324,122 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
             {getSelectionValue(i => i.type) === 'text' && (
                 <TypographySection selectedIds={selectedIds} canvasItems={canvasItems} updateCanvasItems={updateCanvasItems} t={t} />
             )}
+        </div>
+    );
+};
+
+// ─── Local Components ──────────────────────────────────────────────────
+
+const AddEffectButton: React.FC<{ onAdd: (type: CanvasEffectType) => void }> = ({ onAdd }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const buttonRef = useRef<HTMLButtonElement>(null);
+
+    const effectTypes: { type: CanvasEffectType; label: string }[] = [
+        { type: 'drop-shadow', label: 'Drop Shadow' },
+        { type: 'inner-shadow', label: 'Inner Shadow' },
+        { type: 'layer-blur', label: 'Layer Blur' },
+        { type: 'background-blur', label: 'Background Blur' },
+    ];
+
+    return (
+        <>
+            <button
+                ref={buttonRef}
+                onClick={(e) => { e.stopPropagation(); setIsOpen(true); }}
+                className="p-1 hover:bg-white/10 rounded-md text-stone-500 hover:text-stone-200 transition-colors cursor-pointer"
+            >
+                <Plus className="w-3.5 h-3.5" />
+            </button>
+            <FloatingPopover isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={buttonRef} title="Add Effect" width={180}>
+                <div className="p-1 flex flex-col gap-0.5">
+                    {effectTypes.map(({ type, label }) => (
+                        <button
+                            key={type}
+                            onClick={() => { onAdd(type); setIsOpen(false); }}
+                            className="w-full px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest text-stone-400 hover:text-stone-100 hover:bg-white/5 rounded-lg transition-all cursor-pointer flex items-center justify-between group"
+                        >
+                            {label}
+                            <Plus className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                    ))}
+                </div>
+            </FloatingPopover>
+        </>
+    );
+};
+
+const EffectRow: React.FC<{ 
+    effect: ICanvasEffect; 
+    onUpdate: (updates: Partial<ICanvasEffect>) => void;
+    onRemove: () => void;
+}> = ({ effect, onUpdate, onRemove }) => {
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const settingsButtonRef = useRef<HTMLButtonElement>(null);
+
+    const Icon = effect.type.includes('shadow') ? MoveRight : effect.type === 'layer-blur' ? Layers : Sun;
+
+    return (
+        <div className={cn(
+            "group flex items-center gap-2 px-2 py-1.5 rounded-xl transition-all duration-200",
+            effect.visible ? "bg-white/2 hover:bg-white/5" : "opacity-40"
+        )}>
+            <button 
+                ref={settingsButtonRef}
+                onClick={() => setIsSettingsOpen(true)}
+                className="w-4 h-4 flex items-center justify-center text-stone-500 hover:text-accent transition-colors cursor-pointer"
+            >
+                <Icon className={cn("w-3 h-3", effect.type.includes('shadow') && "rotate-45")} />
+            </button>
+            
+            <span className="flex-1 text-[10px] font-bold text-stone-300 uppercase tracking-widest truncate select-none">
+                {effect.type.replace('-', ' ')}
+            </span>
+
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button 
+                    onClick={() => onUpdate({ visible: !effect.visible })}
+                    className="p-1 hover:bg-white/10 rounded-md text-stone-500 hover:text-stone-200 cursor-pointer"
+                >
+                    {effect.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-red-500/50" />}
+                </button>
+                <button 
+                    onClick={onRemove}
+                    className="p-1 hover:bg-red-500/20 rounded-md text-stone-500 hover:text-red-400 cursor-pointer"
+                >
+                    <Trash2 className="w-3 h-3" />
+                </button>
+            </div>
+
+            <FloatingPopover 
+                isOpen={isSettingsOpen} 
+                onClose={() => setIsSettingsOpen(false)} 
+                anchorRef={settingsButtonRef} 
+                title={`${effect.type.replace('-', ' ')} Settings `}
+                width={220}
+            >
+                <div className="p-3 space-y-4">
+                    {effect.type.includes('shadow') ? (
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-2 gap-3">
+                                <ScrubbableInput label="X" name="fx-x" value={effect.x ?? 0} onChange={(v) => onUpdate({ x: v })} />
+                                <ScrubbableInput label="Y" name="fx-y" value={effect.y ?? 0} onChange={(v) => onUpdate({ y: v })} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <ScrubbableInput label="Blur" name="fx-blur" value={effect.blur ?? 0} min={0} onChange={(v) => onUpdate({ blur: v })} />
+                                <ScrubbableInput label="Spread" name="fx-spread" value={effect.spread ?? 0} onChange={(v) => onUpdate({ spread: v })} />
+                            </div>
+                            <div className="flex items-center justify-between p-2 bg-black/40 rounded-xl border border-white/5">
+                                <span className="text-[9px] font-black uppercase tracking-widest text-stone-500">Color</span>
+                                <CompactColorPicker color={effect.color || '#000000'} onChange={(c) => onUpdate({ color: c })} />
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <ScrubbableInput label="Radius" name="fx-blur-only" value={effect.blur ?? 0} min={0} onChange={(v) => onUpdate({ blur: v })} />
+                        </div>
+                    )}
+                </div>
+            </FloatingPopover>
         </div>
     );
 };

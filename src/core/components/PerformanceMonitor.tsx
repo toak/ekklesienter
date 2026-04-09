@@ -9,12 +9,15 @@ import { useEffect } from 'react';
 export const PerformanceMonitor = () => {
     useEffect(() => {
         if (import.meta.env.DEV) {
+            // Disabled as diagnostic for blob:file:/// errors
+            /*
             scan({
-                enabled: false, // Turn off outlines by default
-                showToolbar: true, // Keep the widget available
-                showFPS: true, // Show FPS in the toolbar
-                log: true, // Log renders to console
+                enabled: false,
+                showToolbar: true,
+                showFPS: true,
+                log: true,
             });
+            */
         }
     }, []);
 

@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Verse, ISlide } from '@/core/types';
 import { useTranslation } from 'react-i18next';
-import SlideDisplay from '../display/SlideDisplay';
-import { SlideBackground } from '../display/SlideBackground';
+import SlideDisplay from './SlideDisplay';
+import { SlideBackground } from './SlideBackground';
 import { PresenterSettings } from '@/core/types';
 import { DEFAULT_SETTINGS } from '@/features/presenter/store/presenterStore';
 import { db } from '@/core/db';
@@ -20,9 +20,15 @@ const ProjectorView: React.FC = () => {
     const [multiVerses, setMultiVerses] = useState<Verse[] | null>(null);
     const [isMultiVerseMode, setIsMultiVerseMode] = useState(false);
     const [slide, setSlide] = useState<ISlide | null>(null);
+    const [previewSlide, setPreviewSlide] = useState<ISlide | null>(null);
     const [appMode, setAppMode] = useState<'scripture' | 'presentation'>('scripture');
     const [secondTranslationId, setSecondTranslationId] = useState<string | null>(null);
     const [settings, setSettings] = useState<PresenterSettings>(DEFAULT_SETTINGS);
+    const settingsRef = React.useRef(settings);
+
+    useEffect(() => {
+        settingsRef.current = settings;
+    }, [settings]);
 
     // Live Overrides
     const [activeOverride, setActiveOverride] = useState<'blackout' | 'whiteout' | 'logo' | null>(null);
@@ -76,6 +82,19 @@ const ProjectorView: React.FC = () => {
             }
         };
 
+        const findLogo = (id: string | null, logoSettings: PresenterSettings['logo']) => {
+            if (!id) return null;
+            
+            const allLogos = [
+                ...(logoSettings.customLogos || []),
+                ...(logoSettings.customGroups?.flatMap((g: any) => g.logos) || []),
+                ...(logoSettings.logoGroups?.flatMap((g: any) => g.logos) || []),
+                ...PRELOADED_LOGOS.flatMap(g => g.logos)
+            ];
+            
+            return allLogos.find(l => l.id === id) || null;
+        };
+
         const handleCommand = (command: string, payload: any) => {
             switch (command) {
                 case 'show-verse':
@@ -97,32 +116,41 @@ const ProjectorView: React.FC = () => {
                     setVerse(null);
                     setMultiVerses(null);
                     setIsMultiVerseMode(false);
+                    // When a slide goes live, it might have been the preview slide.
+                    // We don't cleared previewSlide here to avoid unmounting it if it's the same,
+                    // but usually the master will send a new preview slide anyway.
+                    break;
+                case 'show-preview-slide':
+                    setPreviewSlide(payload.slide);
                     break;
                 case 'set-app-mode':
                     setAppMode(payload);
                     break;
                 case 'set-override':
                     setActiveOverride(payload.type);
-                    if (payload.logo) {
-                        setActiveLogo(payload.logo);
+                    if (payload.type === 'logo') {
+                        if (payload.logo) {
+                            setActiveLogo(payload.logo);
+                        } else {
+                            // Try to resolve from ID if payload.logo is missing
+                            const active = findLogo(settingsRef.current.logo.activeLogoId, settingsRef.current.logo);
+                            setActiveLogo(active);
+                        }
                     } else if (payload.url) {
                         setActiveLogo({ id: 'legacy', name: 'Legacy', url: payload.url });
-                    } else if (!payload.type) {
+                    } else {
                         setActiveLogo(null);
                     }
                     break;
                 case 'update-theme':
                     document.documentElement.setAttribute('data-theme', payload);
                     break;
+                case 'sync-state':
                 case 'update-settings':
-                    if (payload.logo?.activeLogoId) {
-                        const allLogos = [
-                            ...(payload.logo.customLogos || []),
-                            ...(payload.logo.customGroups?.flatMap((g: any) => g.logos) || []),
-                            ...(payload.logo.logoGroups?.flatMap((g: any) => g.logos) || []),
-                            ...PRELOADED_LOGOS.flatMap(g => g.logos)
-                        ];
-                        const active = allLogos.find((l: any) => l.id === payload.logo.activeLogoId);
+                    console.log('[Projector] Received settings update:', payload);
+                    const logoId = payload.logo?.activeLogoId;
+                    if (logoId) {
+                        const active = findLogo(logoId, payload.logo);
                         if (active) {
                             setActiveLogo(active);
                         }
@@ -173,6 +201,19 @@ const ProjectorView: React.FC = () => {
                 />
             </div>
 
+            {/* Preload Layer (Hidden) */}
+            {previewSlide && (
+                <div className="fixed inset-0 pointer-events-none opacity-0 invisible" aria-hidden="true">
+                    <SlideDisplay
+                        isProjector={true}
+                        isPreloading={true}
+                        appMode={appMode}
+                        selectedSlide={previewSlide}
+                        settings={settings}
+                    />
+                </div>
+            )}
+
             {/* Blackout Overlay */}
             <div className={cn(
                 "absolute inset-0 z-100 transition-opacity duration-700 pointer-events-none",
@@ -191,21 +232,23 @@ const ProjectorView: React.FC = () => {
 
             {/* Logo Overlay */}
             <div className={cn(
-                "absolute inset-0 z-102 transition-opacity duration-700 pointer-events-none flex items-center justify-center p-24",
-                activeOverride === 'logo' ? "opacity-100" : "opacity-0"
+                "absolute inset-0 z-102 transition-opacity duration-700 pointer-events-none",
+                activeOverride === 'logo' ? "opacity-100" : "opacity-0 invisible"
             )}>
                 <SlideBackground background={settings.overrides.logo.background} />
-                <div className="relative z-10 w-full h-full flex items-center justify-center font-serif">
-                    {logoUrl ? (
-                        <img src={logoUrl} alt="Church Logo" className="max-w-[70%] max-h-[70%] object-contain" />
-                    ) : (
-                        <div className="text-stone-700 flex flex-col items-center gap-6">
-                            <div className="w-32 h-32 rounded-full border-4 border-stone-800 flex items-center justify-center opacity-20">
-                                <span className="text-4xl font-black">E</span>
+                <div className="absolute inset-0 flex items-center justify-center p-24">
+                    <div className="relative z-10 w-full h-full flex items-center justify-center font-serif">
+                        {logoUrl ? (
+                            <img src={logoUrl} alt="Church Logo" className="max-w-[70%] max-h-[70%] object-contain" />
+                        ) : (
+                            <div className="text-stone-700 flex flex-col items-center gap-6">
+                                <div className="w-32 h-32 rounded-full border-4 border-stone-800 flex items-center justify-center opacity-20">
+                                    <span className="text-4xl font-black">E</span>
+                                </div>
+                                <h1 className="text-2xl font-black uppercase tracking-[0.3em] opacity-20">Ekklesienter</h1>
                             </div>
-                            <h1 className="text-2xl font-black uppercase tracking-[0.3em] opacity-20">Ekklesienter</h1>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

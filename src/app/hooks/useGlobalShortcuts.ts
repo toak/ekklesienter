@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { db } from '@/core/db';
 import { OverrideType } from '@/core/store/uiAtoms';
+import { createCanvasItem } from '@/features/presenter/components/slide-properties/helpers';
 
 interface IGlobalShortcutsProps {
     appMode: 'scripture' | 'presentation';
@@ -121,7 +122,7 @@ export function useGlobalShortcuts({
         }
 
         // Arrow Right or Down: Next
-        if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ' || e.key === 'Spacebar') {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
             e.preventDefault?.();
             await handleNext(isMod);
         }
@@ -181,7 +182,7 @@ export function useGlobalShortcuts({
             toggleOverride('logo');
         }
 
-        // Undo/Redo Shortcuts
+        // Undo/Redo Shortcuts (Global)
         if (isMod && (e.code === 'KeyZ' || e.key.toLowerCase() === 'z')) {
             e.preventDefault?.();
             if (e.shiftKey) {
@@ -197,23 +198,50 @@ export function useGlobalShortcuts({
 
         // Slide Management Shortcuts
         if (appMode === 'presentation') {
+            const uiState = await import('@/core/store/uiAtoms');
+            const defaultStoreContext = await import('jotai/vanilla');
+            const store = defaultStoreContext.getDefaultStore();
+            const area = store.get(uiState.latestInteractionAreaAtom);
+
             const { 
                 previewSlideId, 
                 selectedPresentationId, 
                 duplicateSlide, 
+                duplicateSlides,
+                duplicateCanvasItems,
+                duplicateAudioScope,
                 moveSlide, 
                 removeSlide, 
+                removeSlides,
+                removeCanvasItem,
+                selectedSlideIds,
                 selectedAudioScopeId, 
-                removeAudioScope 
+                removeAudioScope,
+                addCanvasItem 
             } = usePresentationStore.getState();
 
+            // ── DUPLICATE (⌘D) ───────────────────────────────────────────
             if (isMod && (e.code === 'KeyD' || e.key.toLowerCase() === 'd')) {
-                if (previewSlideId && selectedPresentationId) {
-                    e.preventDefault?.();
-                    await duplicateSlide(selectedPresentationId, previewSlideId);
+                e.preventDefault?.();
+                
+                if (area === 'canvas' && previewSlideId && selectedCanvasItemIds.length > 0) {
+                    const newIds = await duplicateCanvasItems(previewSlideId, selectedCanvasItemIds);
+                    store.set(uiState.selectedCanvasItemIdsAtom, newIds);
+                } 
+                else if (area === 'audio' && selectedAudioScopeId) {
+                    const newId = await duplicateAudioScope(selectedAudioScopeId);
+                    if (newId) usePresentationStore.getState().selectAudioScope(newId);
+                }
+                else if (area === 'timeline' && selectedPresentationId) {
+                    if (selectedSlideIds.length > 0) {
+                        await duplicateSlides(selectedPresentationId, selectedSlideIds);
+                    } else if (previewSlideId) {
+                        await duplicateSlide(selectedPresentationId, previewSlideId);
+                    }
                 }
             }
 
+            // ── NAVIGATION ([, ]) ────────────────────────────────────────
             if (isMod && previewSlideId && selectedPresentationId) {
                 if (e.key === '[' || e.code === 'BracketLeft') {
                     e.preventDefault?.();
@@ -224,15 +252,67 @@ export function useGlobalShortcuts({
                 }
             }
 
+            // ── DELETE (Del/Backspace) ───────────────────────────────────
             if (e.key === 'Delete' || e.key === 'Backspace') {
-                const canDeleteSlide = isTimelineHovered && selectedCanvasItemIds.length === 0 && !selectedAudioScopeId;
-
-                if (selectedAudioScopeId) {
+                if (area === 'canvas' && previewSlideId && selectedCanvasItemIds.length > 0) {
+                    e.preventDefault?.();
+                    for (const id of selectedCanvasItemIds) {
+                        await removeCanvasItem(previewSlideId, id);
+                    }
+                    store.set(uiState.selectedCanvasItemIdsAtom, []);
+                }
+                else if (area === 'audio' && selectedAudioScopeId) {
                     e.preventDefault?.();
                     await removeAudioScope(selectedAudioScopeId);
-                } else if (canDeleteSlide && previewSlideId && selectedPresentationId) {
+                } 
+                else if (area === 'timeline' && selectedPresentationId) {
                     e.preventDefault?.();
-                    await removeSlide(selectedPresentationId, previewSlideId);
+                    if (selectedSlideIds.length > 0) {
+                        await removeSlides(selectedPresentationId, selectedSlideIds);
+                    } else if (previewSlideId) {
+                        await removeSlide(selectedPresentationId, previewSlideId);
+                    }
+                }
+            }
+
+            // ── TOOL SWITCHING (V, H, Esc) ──────────────────────────────
+            if (!isMod) {
+                if (e.key.toLowerCase() === 'v') {
+                    e.preventDefault?.();
+                    store.set(uiState.canvasToolAtom, 'select');
+                } else if (e.key.toLowerCase() === 'h') {
+                    e.preventDefault?.();
+                    store.set(uiState.canvasToolAtom, 'pan');
+                }
+            }
+
+            // ── ELEMENT CREATION (T, R, O, L) ─────────────────────────────
+            if (!isMod && area === 'canvas' && previewSlideId) {
+                const addElement = (type: string, shapeType?: string) => {
+                    const item = createCanvasItem(type as any);
+                    if (shapeType && item.shape) item.shape.shapeType = shapeType as any;
+                    item.x = 50; item.y = 50; // Center
+                    addCanvasItem(previewSlideId, item);
+                    store.set(uiState.selectedCanvasItemIdsAtom, [item.id]);
+                };
+
+                if (e.key.toLowerCase() === 't') { e.preventDefault?.(); addElement('text'); }
+                else if (e.key.toLowerCase() === 'r') { e.preventDefault?.(); addElement('shape', 'rect'); }
+                else if (e.key.toLowerCase() === 'o') { e.preventDefault?.(); addElement('shape', 'circle'); }
+                else if (e.key.toLowerCase() === 'l') { e.preventDefault?.(); addElement('stroke'); }
+            }
+
+            // ── ZOOM CONTROLS (⌘+, ⌘-, ⌘0) ────────────────────────────────
+            if (isMod && area === 'canvas') {
+                if (e.key === '=' || e.key === '+') {
+                    e.preventDefault?.();
+                    store.set(uiState.canvasZoomAtom as any, (prev: number) => Math.min(prev + 0.1, 4));
+                } else if (e.key === '-') {
+                    e.preventDefault?.();
+                    store.set(uiState.canvasZoomAtom as any, (prev: number) => Math.max(prev - 0.1, 0.1));
+                } else if (e.key === '0') {
+                    e.preventDefault?.();
+                    store.set(uiState.canvasZoomAtom as any, 1.0);
                 }
             }
         }

@@ -51,6 +51,10 @@ export const EktpService = {
         });
 
         // 3. Extract and deduplicate Media
+        // Fetch audio scopes from relational table for this presentation
+        const dbScopes = await db.audioScopes.where('presentationId').equals(presentationId).toArray();
+        presentation.audioScopes = dbScopes;
+
         const mediaRefs = await collectMediaRefs(presentation.slides, [], presentation.audioScopes);
         const manifest: MediaManifest = {};
         const localIdToHash = new Map<string, string>();
@@ -340,19 +344,40 @@ export const EktpService = {
                 hashToLocalId.set(hash, localId);
 
                 const type = meta.mimeType;
+                const mediaName = meta.originalName || `Imported Media (${localId})`;
+
+                // Determine organized path based on presentation name and media type
+                const presName = presentation.name || 'Imported';
+                const mediaCategory = type.startsWith('audio/') ? 'audio'
+                    : type.startsWith('video/') ? 'video'
+                    : 'images';
+                const organizedPath = `${presName}/${mediaCategory}`;
 
                 if (type.startsWith('image/') && !type.includes('svg')) {
-                    const existing = await db.backgrounds.get(localId);
-                    if (!existing) {
-                        await db.backgrounds.add({ id: localId, name: meta.originalName || `Imported Media (${localId})`, data, mimeType: type });
+                    // Store in backgrounds table (used by SlideBackground renderer)
+                    const existingBg = await db.backgrounds.get(localId);
+                    if (!existingBg) {
+                        await db.backgrounds.add({ id: localId, name: mediaName, data, mimeType: type });
                     }
-                } else {
-                    const existing = await db.mediaPool.get(localId);
-                    if (!existing) {
+                    // Also store in mediaPool for reusability in the media pool UI
+                    const existingPool = await db.mediaPool.get(localId);
+                    if (!existingPool) {
                         await db.mediaPool.add({
                             id: localId,
-                            name: meta.originalName || `Imported Media (${localId})`,
-                            path: localId, // Using path as virtual DB signature representation
+                            name: mediaName,
+                            path: organizedPath,
+                            type: 'image',
+                            data,
+                            createdAt: Date.now()
+                        });
+                    }
+                } else {
+                    const existingPool = await db.mediaPool.get(localId);
+                    if (!existingPool) {
+                        await db.mediaPool.add({
+                            id: localId,
+                            name: mediaName,
+                            path: organizedPath,
                             type: type.startsWith('audio/') ? 'audio' : (type.startsWith('video/') ? 'video' : 'image'),
                             data,
                             createdAt: Date.now()
@@ -375,6 +400,7 @@ export const EktpService = {
 
     download(blob: Blob, filename: string) {
         const url = URL.createObjectURL(blob);
+        console.log(`[EktpService] Created download URL: ${url} (Origin: ${window.location.origin})`);
         const link = document.createElement('a');
         link.href = url;
         link.download = filename.endsWith('.ektp') ? filename : `${filename}.ektp`;

@@ -111,6 +111,17 @@ describe('EktpService', () => {
       expect(target.content.canvasItems[0].fills[0].video.id).toBe('new-video-hash');
       expect(target.content.canvasItems[0].fills[0].video.isFromDb).toBe(true);
     });
+
+    it('should hydrate missing media IDs from URLs when patching', () => {
+      const target: any = {
+        image: { url: 'old-path/image.png' }
+      };
+      const map = new Map([['old-path/image.png', 'new-hash']]);
+      patchMediaIds(target, map);
+      expect(target.image.id).toBe('new-hash');
+      expect(target.image.url).toBe('new-hash');
+      expect(target.image.isFromDb).toBe(true);
+    });
   });
 
   describe('pack', () => {

@@ -5,6 +5,13 @@ export interface SystemFontData {
     style: string;
 }
 
+declare global {
+    interface Window {
+        queryLocalFonts?: () => Promise<SystemFontData[]>;
+    }
+}
+
+
 /**
  * Normalizes font styles into standard weights/slants.
  */
@@ -35,9 +42,8 @@ export const getSystemFontData = async (): Promise<SystemFontData[]> => {
         return [];
     }
     try {
-        // @ts-ignore
         const fonts = await window.queryLocalFonts();
-        return fonts.map((f: any) => ({
+        return fonts.map((f: SystemFontData) => ({
             family: f.family,
             fullName: f.fullName,
             postscriptName: f.postscriptName,

@@ -26,8 +26,8 @@ export function useCanvasInteraction(
 ) {
     const { updateCanvasItem, takeSnapshot } = usePresentationStore();
     const [selectedIds, setSelectedIds] = useAtom(selectedCanvasItemIdsAtom);
-    const [editingId, setEditingId] = useAtom(editingCanvasItemIdAtom) as unknown as [string | null, (v: string | null) => void];
-    const [tool, setTool] = useAtom(canvasToolAtom) as unknown as [string, (v: string) => void];
+    const [editingId, setEditingId] = useAtom(editingCanvasItemIdAtom) as [string | null, (v: string | null) => void];
+    const [tool, setTool] = useAtom(canvasToolAtom) as [string, (v: string) => void];
     const setDragActive = useSetAtom(slideEditorDragActiveAtom);
     const setPendingUpdate = useSetAtom(slideEditorPendingUpdateAtom);
 

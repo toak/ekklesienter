@@ -8,9 +8,13 @@ import { stripInlineStyles } from '@/core/utils/stripInlineStyles';
 import { sanitizePasteHtml } from '@/core/utils/sanitizePaste';
 import { useTextFit } from '@/features/presenter/hooks/useTextFit';
 import { textCommandAtom, fontPreviewFamilyAtom, fontPreviewWeightAtom } from '@/core/store/uiAtoms';
+import { normalizeHtml } from '@/features/presenter/utils/normalizeContentEditableHtml';
 
 interface InlineTextEditorProps {
     item: ICanvasItem;
+    fittedFontSize: number;
+    activeFontFamily: string;
+    activeFontWeight: string | number;
     onSave: (id: string, newContent: string) => void;
     onInput?: (id: string, newContent: string) => void;
     onCancel: () => void;
@@ -21,7 +25,15 @@ interface InlineTextEditorProps {
  * of a text layer while matching its slide design properties exactly.
  * Matches the layout of the static div to prevent "jumping".
  */
-const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ item, onSave, onInput, onCancel }) => {
+const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ 
+    item, 
+    fittedFontSize,
+    activeFontFamily,
+    activeFontWeight,
+    onSave, 
+    onInput, 
+    onCancel 
+}) => {
     const textData = item.text;
     if (!textData) return null;
 
@@ -32,32 +44,6 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ item, onSave, onInp
     const isAutoWidth = resizingMode === 'auto-width';
     const isAutoHeight = resizingMode === 'auto-height';
     const isFlowMode = isAutoWidth || isAutoHeight;
-
-    // Preview font handling
-    const previewFontFamily = useAtomValue(fontPreviewFamilyAtom);
-    const previewFontWeight = useAtomValue(fontPreviewWeightAtom);
-    const rawFontFamily = previewFontFamily || textData.fontFamily;
-
-    const activeFontFamily = React.useMemo(() => {
-        if (!rawFontFamily) return 'Inter, sans-serif';
-        const needsQuotes = rawFontFamily.includes(' ') && !rawFontFamily.includes(',') && !rawFontFamily.startsWith('"');
-        const family = needsQuotes ? `"${rawFontFamily}"` : rawFontFamily;
-        if (family.includes(',')) return family;
-        const lower = rawFontFamily.toLowerCase();
-        if (lower.includes('serif')) return `${family}, serif`;
-        if (lower.includes('mono')) return `${family}, monospace`;
-        return `${family}, sans-serif`;
-    }, [rawFontFamily]);
-
-    const activeFontWeight = previewFontWeight || textData.fontWeight;
-
-    const fittedFontSize = useTextFit({
-        containerRef: editorRef,
-        textRef: editorRef,
-        resizingMode,
-        originalFontSize: textData.fontSize,
-        content: textData.content,
-    });
 
     const isShiftPressed = useRef(false);
 
@@ -230,7 +216,25 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ item, onSave, onInp
         e.stopPropagation();
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            onSave(item.id, editorRef.current?.innerHTML || '');
+            onSave(item.id, normalizeHtml(editorRef.current?.innerHTML || ''));
+            return;
+        }
+
+        // Chrome adds <div><br></div> which breaks layouts. Force <br> insertion.
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                const br = document.createElement('br');
+                range.insertNode(br);
+                range.setStartAfter(br);
+                range.setEndAfter(br);
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+            return;
         }
         if (e.key === 'Escape') {
             e.preventDefault();
@@ -273,8 +277,14 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ item, onSave, onInp
         document.execCommand('insertHTML', false, sanitizedHtml);
     };
 
-    const handleBlur = () => {
-        onSave(item.id, editorRef.current?.innerHTML || '');
+    const handleBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+        // If we click inside the SlideDesignPanel (color picker, font size), DO NOT close the editor
+        if (e.relatedTarget instanceof Element) {
+            const isClickInsidePanel = e.relatedTarget.closest('[data-slide-design-panel="true"]');
+            if (isClickInsidePanel) return;
+        }
+
+        onSave(item.id, normalizeHtml(editorRef.current?.innerHTML || ''));
     };
 
     const vAlignCss = (textData.alignVertical || 'middle') === 'top' ? 'flex-start'
@@ -282,52 +292,63 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({ item, onSave, onInp
 
     return (
         <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
             className={cn(
-                isFlowMode ? (isAutoHeight ? 'w-full' : '') : 'w-full h-full',
-                "bg-transparent border-none outline-hidden p-0 m-0 relative",
-                "caret-accent flex flex-col",
-                "[&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside [&_ul]:pl-2 [&_ol]:pl-2",
+                isFlowMode ? (isAutoHeight ? 'w-full relative' : 'relative') : 'w-full h-full relative',
+                "flex flex-col"
             )}
             style={{
-                fontFamily: activeFontFamily,
-                fontSize: `${fittedFontSize}px`,
-                fontWeight: activeFontWeight,
-                // If rich fill is behind, we make text transparent so user sees the fill but still has a cursor
-                color: isRichFill ? 'transparent' : textData.color,
-                textAlign: (textData.alignHorizontal || textData.textAlign || 'center') as React.CSSProperties['textAlign'],
                 justifyContent: vAlignCss,
-                lineHeight: textData.lineHeight || 1.3,
-                letterSpacing: typeof textData.letterSpacing === 'number' && textData.letterSpacing !== 0
-                    ? `${textData.letterSpacing}px` : undefined,
-                fontStyle: textData.isItalic ? 'italic' : 'normal',
-                textDecorationLine: [textData.isStrikethrough ? 'line-through' : '', textData.isUnderline ? 'underline' : ''].filter(Boolean).join(' ') || 'none',
-                textDecorationStyle: textData.underlineStyle === 'wavy' ? 'wavy' : 'solid',
-                textDecorationSkipInk: textData.underlineSkipInk === 'none' ? 'none' : 'auto',
-                textTransform: textData.textCase === 'uppercase' ? 'uppercase' : textData.textCase === 'lowercase' ? 'lowercase' : textData.textCase === 'titlecase' ? 'capitalize' : 'none',
-                whiteSpace: resizingMode === 'auto-width' ? 'pre' : 'pre-wrap',
-                wordBreak: resizingMode === 'auto-width' ? 'normal' : 'break-word',
-                overflowX: 'visible',
-                overflowY: 'visible',
-                // Faux bold: simulate bold via text-shadow (avoids conflict with strokes)
-                ...(needsFauxBold(textData.isBold, activeFontWeight) ? {
-                    textShadow: `0 0 ${Math.max(0.3, fittedFontSize * 0.015)}px currentColor`,
-                    paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'],
-                } : {}),
-                // Paragraph spacing
-                ...(textData.paragraphSpacing ? { paddingBottom: `${textData.paragraphSpacing}px` } : {}),
-                minWidth: '1px',
-                minHeight: '1px',
                 height: isFlowMode ? undefined : '100%',
+                pointerEvents: 'none',
             }}
-            onInput={handleInput}
-            onKeyDown={handleKeyDown}
-            onPaste={handlePaste}
-            onBlur={handleBlur}
-            onMouseDown={(e) => e.stopPropagation()}
-        />
+        >
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                className={cn(
+                    isAutoWidth ? '' : 'w-full',
+                    "bg-transparent border-none outline-none p-0 m-0 relative",
+                    "caret-accent pointer-events-auto",
+                    "[&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside [&_ul]:pl-2 [&_ol]:pl-2",
+                )}
+                style={{
+                    fontFamily: activeFontFamily,
+                    fontSize: `${fittedFontSize}px`,
+                    fontWeight: activeFontWeight,
+                    // If rich fill is behind, we make text transparent so user sees the fill but still has a cursor
+                    color: isRichFill ? 'transparent' : textData.color,
+                    textAlign: (textData.alignHorizontal || textData.textAlign || 'center') as React.CSSProperties['textAlign'],
+                    lineHeight: textData.lineHeight || 1.3,
+                    letterSpacing: typeof textData.letterSpacing === 'number' && textData.letterSpacing !== 0
+                        ? `${textData.letterSpacing}px` : undefined,
+                    fontStyle: textData.isItalic ? 'italic' : 'normal',
+                    textDecorationLine: [textData.isStrikethrough ? 'line-through' : '', textData.isUnderline ? 'underline' : ''].filter(Boolean).join(' ') || 'none',
+                    textDecorationStyle: textData.underlineStyle === 'wavy' ? 'wavy' : 'solid',
+                    textDecorationSkipInk: textData.underlineSkipInk === 'none' ? 'none' : 'auto',
+                    textTransform: textData.textCase === 'uppercase' ? 'uppercase' : textData.textCase === 'lowercase' ? 'lowercase' : textData.textCase === 'titlecase' ? 'capitalize' : 'none',
+                    whiteSpace: resizingMode === 'auto-width' ? 'pre' : 'pre-wrap',
+                    wordBreak: resizingMode === 'auto-width' ? 'normal' : 'break-word',
+                    overflowWrap: 'break-word',
+                    overflowX: 'visible',
+                    overflowY: 'visible',
+                    // Faux bold
+                    ...(needsFauxBold(textData.isBold, activeFontWeight) ? {
+                        textShadow: `0 0 ${Math.max(0.3, fittedFontSize * 0.015)}px currentColor`,
+                        paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'],
+                    } : {}),
+                    // Paragraph spacing
+                    ...(textData.paragraphSpacing ? { paddingBottom: `${textData.paragraphSpacing}px` } : {}),
+                    minWidth: '1px',
+                    minHeight: '1px',
+                }}
+                onInput={handleInput}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                onBlur={handleBlur}
+                onMouseDown={(e) => e.stopPropagation()}
+            />
+        </div>
     );
 };
 

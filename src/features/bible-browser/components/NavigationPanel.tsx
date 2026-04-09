@@ -15,6 +15,8 @@ import { BookList } from './navigation/BookList';
 import { ChapterGrid } from './navigation/ChapterGrid';
 import { GraceLibPanel } from './navigation/GraceLibPanel';
 import { NavigationFooter } from './navigation/NavigationFooter';
+import ServicePicker from '@/features/presenter/components/library/ServicePicker';
+import TranslationPicker from '@/shared/ui/TranslationPicker';
 
 // Hooks
 import { useNavigationSearch } from '../hooks/useNavigationSearch';
@@ -39,11 +41,10 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
     currentTranslationId 
   } = useBibleStore();
 
-  const {
-    activeService,
-    graceLibSection,
-    setGraceLibSection
-  } = usePresentationStore();
+  const activeService = usePresentationStore(s => s.activeService);
+  const activeServiceId = usePresentationStore(s => s.activeServiceId);
+  const graceLibSection = usePresentationStore(s => s.graceLibSection);
+  const setGraceLibSection = usePresentationStore(s => s.setGraceLibSection);
 
   // 1. Logic Hooks
   const { 
@@ -61,6 +62,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
     toggleModePicker,
     closeModePicker,
     isPickerOpen,
+    setIsPickerOpen,
     triggerRect,
     handleTranslationBadgeClick
   } = useNavigationState();
@@ -211,6 +213,24 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
         lang={lang}
         isRu={isRu}
       />
+
+      {isPickerOpen && appMode === 'presentation' && (
+        <ServicePicker
+          currentServiceId={activeServiceId}
+          onSelect={(id) => usePresentationStore.getState().setActiveService(id)}
+          onClose={() => setIsPickerOpen(false)}
+          triggerRect={triggerRect}
+        />
+      )}
+
+      {isPickerOpen && appMode === 'scripture' && (
+        <TranslationPicker
+          currentTranslationId={currentTranslationId}
+          onSelect={(id) => useBibleStore.getState().setTranslation(id)}
+          onClose={() => setIsPickerOpen(false)}
+          triggerRect={triggerRect}
+        />
+      )}
     </div>
   );
 };

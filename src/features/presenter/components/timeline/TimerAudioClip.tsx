@@ -13,7 +13,8 @@ interface TimerAudioClipProps {
 
 const TimerAudioClip: React.FC<TimerAudioClipProps> = ({ slide, x, width }) => {
     const timerSlide = slide.type === 'timer' ? slide as ITimerSlide : null;
-    const playlist = timerSlide?.playlist || [];
+    const canvasSlideSettings = slide.type === 'normal' ? (slide as any).timerSettings : null;
+    const playlist = timerSlide?.playlist || canvasSlideSettings?.playlist || [];
 
     const playlistItems = useLiveQuery(
         async () => {

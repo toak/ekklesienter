@@ -14,6 +14,7 @@ interface UseTimelineShortcutsProps {
     removeSlides: (id: string, ids: string[]) => void;
     removeSlide: (id: string, sid: string) => void;
     setSelectedSlideIds: (ids: string[]) => void;
+    setLiveSlide: (id: string) => void;
     clearSelection: () => void;
 }
 
@@ -33,6 +34,7 @@ export const useTimelineShortcuts = ({
     removeSlides,
     removeSlide,
     setSelectedSlideIds,
+    setLiveSlide,
     clearSelection
 }: UseTimelineShortcutsProps) => {
     // Keep a ref to the latest state to avoid re-binding the event listener too frequently
@@ -61,19 +63,15 @@ export const useTimelineShortcuts = ({
                 if (state.activePresentationId) pasteSlides(state.activePresentationId);
             } else if (isMod && e.key === 'x') {
                 if (state.selectedSlideIds.length > 0) copySlides(state.activePresentationId!, state.selectedSlideIds, true);
-            } else if (isMod && e.key === 'd') {
-                e.preventDefault();
-                if (state.selectedSlideIds.length > 0) duplicateSlides(state.activePresentationId!, state.selectedSlideIds);
-                else if (state.previewSlideId) duplicateSlide(state.activePresentationId!, state.previewSlideId);
-            } else if (e.key === 'Delete' || e.key === 'Backspace') {
-                if (state.selectedSlideIds.length > 0) {
-                    removeSlides(state.activePresentationId!, state.selectedSlideIds);
-                } else if (state.previewSlideId) {
-                    removeSlide(state.activePresentationId!, state.previewSlideId);
-                }
             } else if (isMod && e.key === 'a') {
                 e.preventDefault();
                 setSelectedSlideIds(state.slides.map(s => s.id));
+            } else if (e.key === 'Enter') {
+                if (state.previewSlideId) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setLiveSlide(state.previewSlideId);
+                }
             } else if (e.altKey && e.key === 'd') {
                 // Only deselect when timeline is hovered
                 if (isTimelineHoveredRef.current) {

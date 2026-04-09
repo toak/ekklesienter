@@ -81,13 +81,15 @@ vi.mock('@/core/store/uiAtoms', () => ({
 
 vi.mock('dexie-react-hooks', () => ({
   useLiveQuery: vi.fn((fn) => {
-    try {
-      const res = fn();
-      if (res && typeof res.then === 'function') return [];
-      return res || [];
-    } catch {
-      return [];
+    // If it's the presentations query, return the mocked data
+    const str = fn.toString();
+    if (str.includes('presentationFiles')) {
+      if (str.includes('anyOf')) return [{ id: 'lib-p1', updatedAt: Date.now(), slides: [] }];
+      return { id: 'p1', slides: [] };
     }
+    if (str.includes('blocks')) return [];
+    if (str.includes('templates')) return [];
+    return [];
   }),
 }));
 
@@ -111,6 +113,7 @@ vi.mock('@dnd-kit/core', () => ({
   useSensor: vi.fn(),
   useSensors: vi.fn(() => []),
   PointerSensor: {},
+  KeyboardSensor: {},
   DragOverlay: ({ children }: any) => <div>{children}</div>,
   useDroppable: vi.fn(() => ({ isOver: false, setNodeRef: vi.fn() })),
   closestCenter: vi.fn(),
@@ -130,6 +133,8 @@ vi.mock('@dnd-kit/sortable', () => ({
     isDragging: false,
   })),
   horizontalListSortingStrategy: {},
+  arrayMove: vi.fn((array) => array),
+  sortableKeyboardCoordinates: vi.fn(),
 }));
 
 vi.mock('../slide-editor/SlideContentRenderer', () => ({
@@ -213,7 +218,7 @@ describe('SlideTimeline', () => {
     
     // The first child of data-timeline-root is the TimelineDroppableZone
     const root = container.querySelector('[data-timeline-root]');
-    const droppable = root?.querySelector('.absolute.inset-0.z-40'); // Selector for TimelineDroppableZone
+    const droppable = screen.getByTestId('timeline-droppable-zone');
     
     if (!droppable) throw new Error('Droppable zone not found');
 
@@ -244,9 +249,10 @@ describe('SlideTimeline', () => {
       templateId: 't1', 
       type: 'normal',
       content: { variables: {} },
-      masterPresentationId: 'snap-p1',
+      masterPresentationId: 'lib-p1', // Match the library ID so it gets fetched
       linkedPresentationId: 'lib-p1',
-      lastSyncedAt
+      lastSyncedAt,
+      isExpanded: true // Must be expanded to fetch nested/linked presentations
     };
 
     Object.assign(mockPresentationStore, {

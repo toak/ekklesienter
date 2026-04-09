@@ -65,6 +65,7 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
                     return (
                         <div
                             key={nestedSlide.id}
+                            data-slide-id={nestedSlide.id}
                             onClick={() => setPreviewSlide(nestedSlide.id, nestedPresentation.id)}
                             onContextMenu={(e) => {
                                 e.preventDefault();
@@ -86,17 +87,17 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
                                     : 'border-white/5 hover:border-white/20 bg-stone-900/50'
                             )}
                         >
-                            {/* Nested slide — mini preview */}
-                            <SlideContentRenderer
-                                template={nt}
-                                block={nb}
-                                variables={(nestedSlide as ICanvasSlide).content?.variables || {}}
-                                lang={lang}
-                                isPreview={true}
-                                scale={96 / 1920}
-                                slide={nestedSlide}
-                                slideId={nestedSlide.id}
-                            />
+                                <SlideContentRenderer
+                                    template={nt}
+                                    block={nb}
+                                    variables={(nestedSlide as ICanvasSlide).content?.variables || {}}
+                                    lang={lang}
+                                    isPreview={true}
+                                    scale={96 / 1920}
+                                    canvasItems={(nestedSlide as ICanvasSlide).content?.canvasItems || []}
+                                    slide={nestedSlide}
+                                    slideId={nestedSlide.id}
+                                />
 
                             {/* Slide number badge */}
                             <div className="absolute top-0.5 left-0.5 px-1 py-0.5 rounded bg-black/40 text-[6px] font-black text-stone-500">

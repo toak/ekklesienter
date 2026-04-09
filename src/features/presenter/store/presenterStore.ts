@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { PresenterSettings, ILogo, ILogoGroup, IStyleLayer, BackgroundSettings } from '@/core/types';
 import { ensureLayers } from '@/core/utils/styleMigration';
 import { PresenterService } from '../services/presenterService';
+import { LiveSyncService } from '@/core/services/liveSyncService';
 
 interface PresenterStore {
     settings: PresenterSettings;
@@ -157,7 +158,7 @@ export const usePresenterStore = create<PresenterStore>()(
             draftSettings: null,
 
             startEditing: () => {
-                set({ draftSettings: JSON.parse(JSON.stringify(get().settings)) });
+                set({ draftSettings: structuredClone(get().settings) });
             },
 
             updateDraft: (update) => {
@@ -430,10 +431,7 @@ export const usePresenterStore = create<PresenterStore>()(
                 get().syncSettings();
             },
             syncSettings: () => {
-                PresenterService.sendCommand({
-                    type: 'sync-state',
-                    payload: get().settings
-                });
+                LiveSyncService.syncSettings(get().settings);
             }
         }),
         {

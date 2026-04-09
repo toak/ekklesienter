@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { ISlide, ICanvasSlide, IVerseSlide, ITimerSlide, ICanvasItem, IPresentationFile, IServiceFile, IPresentationSummary, IStyleLayer, BackgroundSettings, IAudioScope, ITimerSettings, ITemplate, IPresentationBin, ISlideTransition } from '@/core/types';
+import { ISlide, ICanvasSlide, IVerseSlide, ITimerSlide, ICanvasItem, IPresentationFile, IServiceFile, IPresentationSummary, IStyleLayer, BackgroundSettings, IAudioScope, ITimerSettings, IVideoSettings, ITemplate, IPresentationBin, ISlideTransition } from '@/core/types';
 
 export interface PresentationState {
     activeServiceId: string | null;
@@ -68,6 +68,7 @@ export interface PresentationState {
     updateAudioScopeBoundary: (scopeId: string, startSlideId: string, endSlideId: string) => Promise<void>;
     updateAudioScope: (scopeId: string, updates: Partial<IAudioScope>) => Promise<void>;
     removeAudioScope: (scopeId: string) => Promise<void>;
+    duplicateAudioScope: (scopeId: string) => Promise<string | undefined>;
     selectAudioScope: (id: string | null) => void;
     resolveAudioConflict: (action: 'replace' | 'shift', params: { targetSlideId: string, fileId: string, overlappingScopes: IAudioScope[] }) => Promise<void>;
 
@@ -108,11 +109,15 @@ export interface PresentationState {
     updateCanvasItemsOrder: (slideId: string, items: ICanvasItem[]) => Promise<void>;
     removeCanvasItem: (slideId: string, itemId: string) => Promise<void>;
     reorderCanvasItem: (slideId: string, itemId: string, direction: 'up' | 'down') => Promise<void>;
+    duplicateCanvasItems: (slideId: string, itemIds: string[]) => Promise<string[]>;
     setMediaBackground: (slideId: string, mediaItem: any) => Promise<void>;
     addMediaLayer: (slideId: string, mediaItem: any, position?: { x: number, y: number }) => Promise<void>;
 
     // Timer Actions
     updateTimerSettings: (slideId: string, settings: Partial<ITimerSettings>) => Promise<void>;
+
+    // Video Actions
+    updateVideoSettings: (slideId: string, settings: Partial<IVideoSettings>, presentationId?: string) => Promise<void>;
 
     // History Actions
     undo: () => Promise<void>;

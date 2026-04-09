@@ -1,6 +1,7 @@
 export type CanvasItemType = 'text' | 'image' | 'video' | 'shape' | 'stroke' | 'effect';
 export type ShapeType = 'rect' | 'circle' | 'triangle' | 'star' | 'diamond';
 export type EffectType = 'glow' | 'shadow' | 'blur' | 'vignette';
+export type CanvasEffectType = 'drop-shadow' | 'inner-shadow' | 'layer-blur' | 'background-blur';
 
 export type TextResizingMode = 'auto-width' | 'auto-height' | 'fixed' | 'shrink-to-fit';
 export type TextAlignHorizontal = 'left' | 'center' | 'right' | 'justify';
@@ -73,6 +74,17 @@ export interface ICanvasItemEffect {
   intensity: number;
 }
 
+export interface ICanvasEffect {
+  id: string;
+  type: CanvasEffectType;
+  visible: boolean;
+  x?: number;
+  y?: number;
+  blur?: number;
+  spread?: number;
+  color?: string;
+}
+
 export interface ICanvasItem {
   id: string;
   type: CanvasItemType;
@@ -103,6 +115,7 @@ export interface ICanvasItem {
   pivotY?: number; // 0-100%, default 50
   backdropBlur?: number;
   dropShadow?: { x: number; y: number; blur: number; color: string };
+  effects?: ICanvasEffect[];
   // Type-specific data
   text?: ICanvasItemText;
   shape?: ICanvasItemShape;

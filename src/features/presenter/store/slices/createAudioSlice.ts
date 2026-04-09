@@ -41,6 +41,20 @@ export const createAudioSlice: PresentationSliceCreator = (set, get) => ({
         toast.success(i18n.t('audio_removed', 'Audio track removed'));
     },
 
+    duplicateAudioScope: async (scopeId) => {
+        const scope = await db.audioScopes.get(scopeId);
+        if (!scope) return;
+
+        const newScope: IAudioScope = {
+            ...scope,
+            id: crypto.randomUUID()
+        };
+
+        await db.audioScopes.add(newScope);
+        toast.success(i18n.t('audio_duplicated', 'Audio track duplicated'));
+        return newScope.id;
+    },
+
     selectAudioScope: (id) => set({ selectedAudioScopeId: id }),
 
     resolveAudioConflict: async (action, params) => {

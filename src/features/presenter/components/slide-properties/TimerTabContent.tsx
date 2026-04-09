@@ -12,6 +12,7 @@ import { BackgroundPicker } from '../slide-properties/BackgroundPicker';
 import { FloatingPopover } from '@/components/FloatingPopover';
 import { ensureLayers } from '@/core/utils/styleMigration';
 import { SlideBackground } from '../display/SlideBackground';
+import { MediaPersistenceService } from '../../services/MediaPersistenceService';
 import {
     DndContext,
     closestCenter,
@@ -144,16 +145,11 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                 const newIds: string[] = [];
 
                 for (const file of audioFiles) {
-                    const path = (file as any).path || URL.createObjectURL(file);
-                    const id = crypto.randomUUID();
-                    await db.mediaPool.add({
-                        id,
-                        name: file.name,
-                        path: path,
-                        type: 'audio',
-                        createdAt: Date.now()
-                    });
-                    newIds.push(id);
+                    // Use path if available (Electron) to allow local-resource:// resolution, 
+                    // otherwise let importMediaBlob handle it as a naked Blob which is safer than a temporary blob: URL.
+                    const path = (file as any).path || null;
+                    const id = await MediaPersistenceService.importMediaBlob(file, path, 'audio');
+                    if (id) newIds.push(id);
                 }
 
                 if (newIds.length > 0) {
@@ -193,11 +189,36 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                 <div className="grid grid-cols-2 gap-3">
                     <div className="bg-black/20 p-4 rounded-2xl border border-white/5 space-y-2 group hover:border-white/10 transition-colors">
                         <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block group-hover:text-stone-400 transition-colors">{t('minutes', 'Minutes')}</span>
-                        <input type="number" min="0" value={Math.floor((ts?.duration || 0) / 60)} onChange={(e) => { const mins = parseInt(e.target.value) || 0; const secs = (ts?.duration || 0) % 60; updateTimerSettings(selectedSlide.id, { duration: mins * 60 + secs }); }} className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none" />
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={Math.floor((ts?.duration || 0) / 60) === 0 ? '' : Math.floor((ts?.duration || 0) / 60)}
+                            placeholder="0"
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                const mins = parseInt(val) || 0;
+                                const secs = (ts?.duration || 0) % 60;
+                                updateTimerSettings(selectedSlide.id, { duration: mins * 60 + secs });
+                            }}
+                            className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none placeholder:text-white/10"
+                        />
                     </div>
                     <div className="bg-black/20 p-4 rounded-2xl border border-white/5 space-y-2 group hover:border-white/10 transition-colors">
                         <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block group-hover:text-stone-400 transition-colors">{t('seconds', 'Seconds')}</span>
-                        <input type="number" min="0" max="59" value={(ts?.duration || 0) % 60} onChange={(e) => { const mins = Math.floor((ts?.duration || 0) / 60); const secs = parseInt(e.target.value) || 0; updateTimerSettings(selectedSlide.id, { duration: mins * 60 + secs }); }} className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none" />
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={(ts?.duration || 0) % 60 === 0 ? '' : (ts?.duration || 0) % 60}
+                            placeholder="0"
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                let secs = parseInt(val) || 0;
+                                if (secs > 59) secs = 59;
+                                const mins = Math.floor((ts?.duration || 0) / 60);
+                                updateTimerSettings(selectedSlide.id, { duration: mins * 60 + secs });
+                            }}
+                            className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none placeholder:text-white/10"
+                        />
                     </div>
                 </div>
             </div>
@@ -366,7 +387,7 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                         <div className="p-8 text-center">
                             <Music className="w-8 h-8 text-stone-800 mx-auto mb-3 opacity-50" strokeWidth={1.5} />
                             <p className="text-[10px] text-stone-600 font-bold uppercase tracking-widest">{t('playlist_empty', 'Playlist Empty')}</p>
-                            <p className="text-[9px] text-stone-700 mt-1 uppercase tracking-tighter">{t('dnd_hint', 'Drop audio from Media Pool')}</p>
+                            <p className="text-[9px] text-stone-700 mt-1 uppercase tracking-tighter">{t('dnd_audio_hint', 'Drop audio from Media Pool or System')}</p>
                         </div>
                     )}
                 </div>

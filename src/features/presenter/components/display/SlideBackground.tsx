@@ -28,15 +28,24 @@ export const SlideBackground: React.FC<SlideBackgroundProps> = ({ background, cl
     );
 };
 
+import { useLiveQuery } from 'dexie-react-hooks';
+
 const LayerRenderer: React.FC<{ layer: IStyleLayer; zIndex: number }> = ({ layer, zIndex }) => {
     const [dbUrl, setDbUrl] = useState<string | null>(null);
+    
+    const mediaId = layer.type === 'image' ? layer.image?.id : layer.video?.id;
+    const isFromDb = layer.type === 'image' ? layer.image?.isFromDb : layer.video?.isFromDb;
+
+    // Use live query to reactively wait for the media to appear in DB
+    const bgEntry = useLiveQuery(
+        async () => (isFromDb && mediaId) ? await db.backgrounds.get(mediaId) : null,
+        [mediaId, isFromDb]
+    );
 
     useEffect(() => {
-        const loadFromDb = async () => {
-            const mediaId = layer.type === 'image' ? layer.image?.id : layer.video?.id;
-            const isFromDb = layer.type === 'image' ? layer.image?.isFromDb : layer.video?.isFromDb;
-
+        const updateUrl = async () => {
             if (isFromDb && mediaId) {
+                // getBackgroundUrl will fetch from DB and put in cache if missing
                 const url = await mediaCache.getBackgroundUrl(mediaId);
                 setDbUrl(url);
             } else {
@@ -44,12 +53,8 @@ const LayerRenderer: React.FC<{ layer: IStyleLayer; zIndex: number }> = ({ layer
             }
         };
 
-        loadFromDb();
-
-        return () => {
-            // mediaCache handles lifecycle, we don't revoke here to allow reuse
-        };
-    }, [layer.type, layer.image?.id, layer.image?.isFromDb, layer.video?.id, layer.video?.isFromDb]);
+        updateUrl();
+    }, [mediaId, isFromDb, !!bgEntry]);
 
     if (!layer.visible) return null;
 
@@ -86,7 +91,11 @@ const LayerRenderer: React.FC<{ layer: IStyleLayer; zIndex: number }> = ({ layer
         
         // If the media is from DB, we ONLY want to use the dbUrl (blob created from the DB blob).
         // Using a persistent 'blob:' URL is always wrong because it's session-specific.
-        const displayUrl = dbUrl || (persistentUrl.startsWith('blob:') ? null : persistentUrl);
+        const displayUrl = dbUrl || (persistentUrl && !persistentUrl.startsWith('blob:') ? persistentUrl : null) || null;
+        
+        if (displayUrl && (displayUrl as string).startsWith('blob:file:')) {
+            console.warn(`[SlideBackground] Detected blob:file: URL in ${window.location.origin} context!`, { displayUrl });
+        }
 
         switch (layer.type) {
             case 'color':

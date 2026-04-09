@@ -22,6 +22,9 @@ interface HistoryState {
     undo: () => IHistorySnapshot | null;
     redo: () => IHistorySnapshot | null;
     clear: () => void;
+    // Background history
+    recentBackgrounds: Partial<IStyleLayer>[];
+    addRecentBackground: (bg: Partial<IStyleLayer>) => void;
 
     // Verse history actions
     addToHistory: (verse: Verse) => void;
@@ -32,8 +35,9 @@ interface HistoryState {
 export const useHistoryStore = create<HistoryState>((set, get) => ({
     past: [],
     future: [],
-    limit: 64,
+    limit: 256,
     history: [],
+    recentBackgrounds: [],
 
     setLimit: (limit) => set({ limit }),
 
@@ -105,4 +109,22 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     },
 
     clearHistory: () => set({ history: [] }),
+
+    addRecentBackground: (bg) => {
+        const { recentBackgrounds } = get();
+        if (bg.type !== 'image' && bg.type !== 'video') return;
+
+        // Extract identifying URL/ID
+        const getUrl = (b: Partial<IStyleLayer>) => 
+            b.type === 'image' ? (b.image?.id || b.image?.url) : (b.video?.id || b.video?.url);
+        
+        const newUrl = getUrl(bg);
+        if (!newUrl) return;
+
+        // Filter out existing occurrence of the same background
+        const filtered = recentBackgrounds.filter(b => getUrl(b) !== newUrl);
+        
+        // Add to front and limit to 5
+        set({ recentBackgrounds: [bg, ...filtered].slice(0, 5) });
+    },
 }));

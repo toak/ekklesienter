@@ -156,10 +156,10 @@ const ShortcutsSettings: React.FC = () => {
                 <ShortcutItem label={t('save', 'Save')} keys={[mod, 'S']} />
                 <ShortcutItem label={t('undo', 'Undo')} keys={[mod, 'Z']} />
                 <ShortcutItem label={t('redo', 'Redo')} keys={[mod, 'Shift', 'Z', '/', mod, 'Y']} />
-                <ShortcutItem label={t('duplicate', 'Duplicate Slide')} keys={[mod, 'D']} />
+                <ShortcutItem label={t('duplicate', 'Duplicate')} keys={[mod, 'D']} description={t('last_interaction', 'Context: Last interaction')} />
                 <ShortcutItem label={t('move_back', 'Move Back')} keys={[mod, '[']} />
                 <ShortcutItem label={t('move_forth', 'Move Forth')} keys={[mod, ']']} />
-                <ShortcutItem label={t('delete', 'Delete')} keys={['Del', '/', '⌫']} description={t('timeline_hover', 'Timeline Hovered')} />
+                <ShortcutItem label={t('delete', 'Delete')} keys={['Del', '/', '⌫']} description={t('last_interaction', 'Context: Last interaction')} />
             </div>
 
             {/* Timeline */}
@@ -175,7 +175,18 @@ const ShortcutsSettings: React.FC = () => {
             {/* Canvas Editor */}
             <CategoryHeader title={t('shortcuts_canvas', 'Canvas Editor')} icon={MousePointer2} />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                <ShortcutItem label={t('delete_element', 'Delete Element')} keys={['Del', '/', '⌫']} />
+                <ShortcutItem label={t('select_tool', 'Select Tool')} keys={['V']} />
+                <ShortcutItem label={t('hand_tool', 'Hand (Pan) Tool')} keys={['H']} />
+                <ShortcutItem label={t('add_text', 'Add Text')} keys={['T']} />
+                <ShortcutItem label={t('add_rectangle', 'Add Rectangle')} keys={['R']} />
+                <ShortcutItem label={t('add_circle', 'Add Circle')} keys={['O']} />
+                <ShortcutItem label={t('add_line', 'Add Line')} keys={['L']} />
+                <ShortcutItem label={t('copy_element', 'Copy Element')} keys={[mod, 'C']} />
+                <ShortcutItem label={t('paste_element', 'Paste Element')} keys={[mod, 'V']} />
+                <ShortcutItem label={t('delete_element', 'Delete Element')} keys={['Del', '/', '⌫']} description={t('viewport_hover', 'Viewport Hovered')} />
+                <ShortcutItem label={t('zoom_in', 'Zoom In')} keys={[mod, '+']} />
+                <ShortcutItem label={t('zoom_out', 'Zoom Out')} keys={[mod, '-']} />
+                <ShortcutItem label={t('reset_zoom', 'Reset Zoom (Fit)')} keys={[mod, '0']} />
                 <ShortcutItem label={t('exit_editing', 'Exit Editing')} keys={['Esc']} />
                 <ShortcutItem label={t('multi_select', 'Multi-select')} keys={['Shift', 'Click', '/', mod, 'Click']} />
                 <ShortcutItem label={t('direct_edit', 'Direct Edit')} keys={['Double Click']} />

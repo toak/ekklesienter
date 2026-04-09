@@ -150,15 +150,25 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: 'image' | 'video') => {
         const file = e.target.files?.[0];
         if (!file) return;
-        const id = crypto.randomUUID();
+
         try {
-            await db.backgrounds.put({ id, name: file.name, data: file, mimeType: file.type });
-            // Do not pass temporary blob URL to persistent state, as it becomes invalid after refresh.
-            // Component is responsible for loading from DB using the ID.
-            if (type === 'image') updateLayer(activeLayer.id, { type: 'image', image: { url: '', source: 'local', id, isFromDb: true } });
-            else updateLayer(activeLayer.id, { type: 'video', video: { url: '', source: 'local', id, isMuted: true, isLooping: true, isFromDb: true } });
+            // Use MediaPersistenceService to ensure stable ID, deduplication and immediate cache injection
+            const { MediaPersistenceService } = await import('@/features/presenter/services/MediaPersistenceService');
+            const stableId = await MediaPersistenceService.importMediaBlob(file, file.name, type, { forceBackground: true });
+            
+            if (type === 'image') {
+                updateLayer(activeLayer.id, {
+                    type: 'image',
+                    image: { url: null, source: 'local', id: stableId, isFromDb: true }
+                });
+            } else {
+                updateLayer(activeLayer.id, {
+                    type: 'video',
+                    video: { url: null, source: 'local', id: stableId, isMuted: true, isLooping: true, isFromDb: true }
+                });
+            }
         } catch (error) {
-            console.error('Failed to save background to DB:', error);
+            console.error('Failed to save background via MediaPersistenceService:', error);
         }
     };
 
@@ -189,7 +199,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
                                 <div className="w-8 h-8 rounded-lg overflow-hidden border border-white/10 shrink-0 bg-stone-800">
                                     {layer.type === 'color' && <div className="w-full h-full" style={{ backgroundColor: layer.color }} />}
                                     {layer.type === 'gradient' && <div className="w-full h-full" style={{ background: `linear-gradient(${layer.gradient?.angle}deg, ${layer.gradient?.from}, ${layer.gradient?.to})` }} />}
-                                    {layer.type === 'image' && <img src={layer.image?.url} className="w-full h-full object-cover" />}
+                                    {layer.type === 'image' && layer.image?.url && <img src={layer.image.url} className="w-full h-full object-cover" />}
                                     {layer.type === 'video' && <div className="w-full h-full bg-black flex items-center justify-center"><Video className="w-3 h-3 text-white/50" /></div>}
                                     {layer.type === 'noise' && <div className="w-full h-full bg-neutral-900 overflow-hidden"><div className="w-full h-full opacity-50" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} /></div>}
                                 </div>
@@ -331,7 +341,13 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
                                             }
                                             className="aspect-video rounded-lg overflow-hidden border border-white/5 hover:border-accent/40 bg-stone-900 group relative"
                                         >
-                                            <img src={r.thumb} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                            {r.thumb ? (
+                                                <img src={r.thumb} className="w-full h-full object-cover group-hover:scale-110 transition-transform" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center">
+                                                    <ImageIcon className="w-4 h-4 text-stone-800" />
+                                                </div>
+                                            )}
                                             {((activeLayer.image?.url === r.url) || (activeLayer.video?.url === r.url)) && <div className="absolute inset-0 bg-accent/20 flex items-center justify-center"><Check className="w-4 h-4 text-white" /></div>}
                                         </button>
                                     ))}

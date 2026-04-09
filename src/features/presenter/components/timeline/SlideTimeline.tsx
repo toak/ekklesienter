@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { 
@@ -11,14 +13,21 @@ import { ICanvasSlide, INestedSlide, ISlide } from '@/core/types';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { useAtom, useSetAtom } from 'jotai';
-import { appModeAtom, isTimelineHoveredAtom, selectedTransitionSlideIdAtom } from '@/core/store/uiAtoms';
+import { appModeAtom, isTimelineHoveredAtom, latestInteractionAreaAtom, selectedTransitionSlideIdAtom, slideDesignPanelOpenAtom } from '@/core/store/uiAtoms';
 import { LiveSyncService } from '@/core/services/liveSyncService';
+import { 
+    DndContext, 
+    DragOverlay, 
+    closestCorners, 
+    MeasuringStrategy 
+} from '@dnd-kit/core';
 import { IpcService } from '@/core/services/IpcService';
 import { TrackContainerHandle } from './TrackContainer';
 
 // Modularized Components & Hooks
 import { useTimelineLayout } from './hooks/useTimelineLayout';
 import { useTimelineOperations } from './hooks/useTimelineOperations';
+import { useMetadata } from '@/features/presenter/hooks/useMetadata';
 import { useTimelineDragAndDrop } from './hooks/useTimelineDragAndDrop';
 import { useTimelineShortcuts } from './hooks/useTimelineShortcuts';
 import { TimelineToolbar } from './TimelineToolbar';
@@ -26,13 +35,13 @@ import { TimelineTrackHeaders } from './TimelineTrackHeaders';
 import { TimelineSlideTrack } from './TimelineSlideTrack';
 import { TimelineDragOverlayContent } from './TimelineDragOverlayContent';
 import AudioTrack from './AudioTrack';
+import { LiveMediaToolbar } from '../display/LiveMediaToolbar';
 
-/**
- * SlideTimeline - Orchestrator component for the presentation timeline.
- * Manages state, layout, drag-and-drop, and keyboard shortcuts by coordinating 
- * specialized hooks and sub-components.
- */
-const SlideTimeline: React.FC = () => {
+interface SlideTimelineProps {
+    openProjector?: () => Promise<void>;
+}
+
+const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.language?.substring(0, 2) || 'en';
     
@@ -64,7 +73,34 @@ const SlideTimeline: React.FC = () => {
         detachNestedInstance,
         clipboard,
         activePresentation
-    } = usePresentationStore();
+    } = usePresentationStore(useShallow(s => ({
+        activePresentationId: s.activePresentationId,
+        previewSlideId: s.previewSlideId,
+        liveSlideId: s.liveSlideId,
+        setPreviewSlide: s.setPreviewSlide,
+        setLiveSlide: s.setLiveSlide,
+        updatePresentationSlides: s.updatePresentationSlides,
+        updateSlideBackground: s.updateSlideBackground,
+        toggleSlideExpansion: s.toggleSlideExpansion,
+        duplicateSlide: s.duplicateSlide,
+        duplicateSlides: s.duplicateSlides,
+        moveSlide: s.moveSlide,
+        removeSlide: s.removeSlide,
+        removeSlides: s.removeSlides,
+        addPresentationToTimeline: s.addPresentationToTimeline,
+        selectedSlideIds: s.selectedSlideIds,
+        setSelectedSlideIds: s.setSelectedSlideIds,
+        toggleSlideSelection: s.toggleSlideSelection,
+        clearSelection: s.clearSelection,
+        copySlides: s.copySlides,
+        pasteSlides: s.pasteSlides,
+        selectedPresentationId: s.selectedPresentationId,
+        navigationParentSlideId: s.navigationParentSlideId,
+        selectAudioScope: s.selectAudioScope,
+        detachNestedInstance: s.detachNestedInstance,
+        clipboard: s.clipboard,
+        activePresentation: s.activePresentation
+    })));
 
     const { openModal } = useModalStore();
     const trackRef = useRef<TrackContainerHandle>(null);
@@ -75,6 +111,8 @@ const SlideTimeline: React.FC = () => {
     const isTimelineHoveredRef = useRef(false);
     const [selectedTransId, setTransEditId] = useAtom(selectedTransitionSlideIdAtom);
     const selectedAudioId = usePresentationStore(s => s.selectedAudioScopeId);
+    const [designPanelOpen] = useAtom(slideDesignPanelOpenAtom);
+    const setLatestArea = useSetAtom(latestInteractionAreaAtom);
 
     // Local State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; slideId: string; presentationId: string } | null>(null);
@@ -136,11 +174,8 @@ const SlideTimeline: React.FC = () => {
         return new Map(expandedPresentations.map(p => [p.id, p]));
     }, [expandedPresentations]);
 
-    const blocks = useLiveQuery(() => db.blocks.toArray()) || [];
-    const blocksMap = useMemo(() => new Map(blocks.map(b => [b.id, b])), [blocks]);
-
-    const templates = useLiveQuery(() => db.templates.toArray()) || [];
-    const templatesMap = useMemo(() => new Map(templates.map(t => [t.id, t])), [templates]);
+    // Metadata
+    const { blocksMap, templatesMap, templates } = useMetadata();
 
     // Custom Hooks Logic Extraction
     const { visualTimeline } = useTimelineLayout({
@@ -152,6 +187,7 @@ const SlideTimeline: React.FC = () => {
     const {
         handleAddSlide,
         handleAddTimer,
+        handleAddVideo,
         handleRestoreTemplateBg,
         handleApplyBgToAll
     } = useTimelineOperations({
@@ -173,7 +209,6 @@ const SlideTimeline: React.FC = () => {
         activeId,
         sensors,
         handleDragStart,
-        handleDragMove,
         handleDragOver,
         handleDragEnd,
         handleDragCancel
@@ -203,6 +238,7 @@ const SlideTimeline: React.FC = () => {
         removeSlides,
         removeSlide,
         setSelectedSlideIds,
+        setLiveSlide,
         clearSelection
     });
 
@@ -218,6 +254,18 @@ const SlideTimeline: React.FC = () => {
             LiveSyncService.showSlide(liveItem.slide);
         }
     }, [liveSlideId, visualTimeline, appMode]);
+    
+    // Sync preview slide to projector for preloading
+    useEffect(() => {
+        if (appMode !== 'presentation' || !previewSlideId) {
+            LiveSyncService.showPreviewSlide(null);
+            return;
+        }
+        const previewItem = visualTimeline.find(item => item.id === previewSlideId);
+        if (previewItem?.slide) {
+            LiveSyncService.showPreviewSlide(previewItem.slide);
+        }
+    }, [previewSlideId, visualTimeline, appMode]);
 
     useEffect(() => {
         if (!IpcService.isElectron()) return;
@@ -241,13 +289,22 @@ const SlideTimeline: React.FC = () => {
         selectAudioScope(null);
     }, [toggleSlideSelection, setPreviewSlide, activePresentationId, setTransEditId, selectAudioScope]);
 
+    const handleLive = useCallback(async (id: string) => {
+        setLiveSlide(id);
+        if (openProjector) await openProjector();
+    }, [setLiveSlide, openProjector]);
+
+    const isLiveVideo = !!(liveSlideId && visualTimeline.find(item => item.id === liveSlideId)?.slide?.type === 'video');
+    const timelineHeight = isLiveVideo ? 252 + 48 : 252;
+
     if (!activePresentationId) return null;
 
     return (
         <div
             data-timeline-root
-            className="absolute bottom-0 left-0 right-0 bg-stone-900/60 backdrop-blur-xl border-t border-white/5 flex flex-col z-30 animate-in slide-in-from-bottom duration-500"
-            style={{ height: 236 }}
+            className="absolute bottom-0 left-0 right-0 bg-stone-900/60 backdrop-blur-xl border-t border-white/5 flex flex-col z-30 animate-in slide-in-from-bottom transition-all duration-300"
+            style={{ height: timelineHeight, paddingRight: designPanelOpen ? 320 : 0 }}
+            onPointerDown={() => setLatestArea('timeline')}
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
         >
@@ -257,67 +314,83 @@ const SlideTimeline: React.FC = () => {
                 isDetached={isDetached}
                 handleAddSlide={handleAddSlide}
                 handleAddTimer={handleAddTimer}
+                handleAddVideo={handleAddVideo}
                 openModal={openModal}
             />
 
             <div className="flex bg-stone-950/20 overflow-hidden flex-1 relative">
-                <TimelineTrackHeaders t={t} hasSlides={localSlides.length > 0} />
+                <TimelineTrackHeaders t={t} hasSlides={localSlides.length > 0} type="both" />
                 
-                <TimelineSlideTrack
-                    localSlides={localSlides}
-                    visualTimeline={visualTimeline}
+                <DndContext
                     sensors={sensors}
-                    handleDragStart={handleDragStart}
-                    handleDragOver={handleDragOver}
-                    handleDragEnd={handleDragEnd}
-                    handleDragCancel={handleDragCancel}
-                    handleDragMove={handleDragMove}
-                    handleAddSlide={handleAddSlide}
-                    addPresentationToTimeline={addPresentationToTimeline}
-                    setNativeDropIndex={setNativeDropIndex}
-                    trackRef={trackRef}
-                    activePresentationId={activePresentationId}
-                    previewSlideId={previewSlideId}
-                    liveSlideId={liveSlideId}
-                    selectedSlideIds={selectedSlideIds}
-                    selectedPresentationId={selectedPresentationId}
-                    isDetached={isDetached}
-                    templatesMap={templatesMap}
-                    blocksMap={blocksMap}
-                    presentationsMap={presentationsMap}
-                    navigationParentSlideId={navigationParentSlideId}
-                    lang={lang}
-                    setPreviewSlide={setPreviewSlide}
-                    setLiveSlide={setLiveSlide}
-                    toggleSlideSelection={handleSelect}
-                    toggleSlideExpansion={toggleSlideExpansion}
-                    setContextMenu={setContextMenu}
-                    isSubItemSelected={isSubItemSelected}
-                    dragActiveId={activeId}
+                    collisionDetection={closestCorners}
+                    autoScroll={false}
+                    measuring={{
+                        droppable: {
+                            strategy: MeasuringStrategy.WhileDragging,
+                        },
+                    }}
+                    onDragStart={handleDragStart}
+                    onDragOver={handleDragOver}
+                    onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
                 >
-                    {nativeDropIndex === localSlides.length && (
-                        <div className="w-32 h-[72px] shrink-0 rounded-xl relative overflow-hidden transition-all duration-300 transform animate-in zoom-in-95 opacity-80 outline-dashed outline-2 outline-accent outline-offset-1 flex items-center justify-center bg-accent/20 shadow-[0_0_15px_rgba(var(--accent-rgb, 147, 51, 234),0.2)]">
-                            <Presentation className="w-8 h-8 text-accent animate-pulse" />
-                        </div>
-                    )}
-
-                    <TimelineDragOverlayContent
-                        activeId={activeId}
-                        selectedSlideIds={selectedSlideIds}
+                    <TimelineSlideTrack
                         localSlides={localSlides}
+                        visualTimeline={visualTimeline}
+                        handleDragStart={handleDragStart}
+                        handleDragOver={handleDragOver}
+                        handleDragEnd={handleDragEnd}
+                        handleDragCancel={handleDragCancel}
+                        handleAddSlide={handleAddSlide}
+                        addPresentationToTimeline={addPresentationToTimeline}
+                        setNativeDropIndex={setNativeDropIndex}
+                        trackRef={trackRef}
+                        activePresentationId={activePresentationId}
+                        previewSlideId={previewSlideId}
+                        liveSlideId={liveSlideId}
+                        selectedSlideIds={selectedSlideIds}
+                        selectedPresentationId={selectedPresentationId}
+                        isDetached={isDetached}
                         templatesMap={templatesMap}
                         blocksMap={blocksMap}
+                        presentationsMap={presentationsMap}
+                        navigationParentSlideId={navigationParentSlideId}
                         lang={lang}
-                    />
-                </TimelineSlideTrack>
+                        setPreviewSlide={setPreviewSlide}
+                        setLiveSlide={handleLive}
+                        toggleSlideSelection={handleSelect}
+                        toggleSlideExpansion={toggleSlideExpansion}
+                        setContextMenu={setContextMenu}
+                        isSubItemSelected={isSubItemSelected}
+                        dragActiveId={activeId}
+                        audioTrack={<AudioTrack visualTimeline={visualTimeline} />}
+                    >
+                        {nativeDropIndex === localSlides.length && (
+                            <div className="w-32 h-[72px] shrink-0 rounded-xl relative overflow-hidden transition-all duration-300 transform animate-in zoom-in-95 opacity-80 outline-dashed outline-2 outline-accent outline-offset-1 flex items-center justify-center bg-accent/20 shadow-[0_0_15px_rgba(var(--accent-rgb, 147, 51, 234),0.2)]">
+                                <Presentation className="w-8 h-8 text-accent animate-pulse" />
+                            </div>
+                        )}
+                    </TimelineSlideTrack>
+
+                    {createPortal(
+                        <DragOverlay zIndex={9999} dropAnimation={null}>
+                            <TimelineDragOverlayContent
+                                activeId={activeId}
+                                selectedSlideIds={selectedSlideIds}
+                                localSlides={localSlides}
+                                templatesMap={templatesMap}
+                                blocksMap={blocksMap}
+                                lang={lang}
+                            />
+                        </DragOverlay>,
+                        document.body
+                    )}
+                </DndContext>
             </div>
 
-            {/* Lane 2: Audio (Fixed height container) */}
-            {localSlides.length > 0 && (
-                <div className="flex items-center px-8 pt-[10px] pb-4 shrink-0 overflow-visible h-[98px] border-t border-white/5 bg-stone-950/20">
-                    <AudioTrack visualTimeline={visualTimeline} />
-                </div>
-            )}
+            {/* Lane 3: Live Media Toolbar (Appears seamlessly only when video is live) */}
+            <LiveMediaToolbar />
 
             {localSlides.length === 0 && (
                 <div className="absolute inset-0 top-10 flex items-center justify-center gap-4 text-stone-700 italic pointer-events-none">

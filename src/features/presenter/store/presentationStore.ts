@@ -26,6 +26,7 @@ export const usePresentationStore = create<PresentationState>()(
             name: 'presentation-storage',
             storage: createJSONStorage(() => localStorage),
             partialize: (state) => ({
+                activeServiceId: state.activeServiceId,
                 activePresentationId: state.activePresentationId,
                 selectedPresentationId: state.selectedPresentationId,
                 previewSlideId: state.previewSlideId,

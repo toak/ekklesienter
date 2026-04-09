@@ -2,6 +2,24 @@ export default {
     "changelog": "Changelog",
     "changelog_entries": [
         {
+            "version": "v2.1.0",
+            "title": "Professional Designer",
+            "date": "April 9, 2026",
+            "description": "Dynamic workspace updates with specialized slide support and professional design controls.",
+            "features": [
+                "Slide Design Studio with pixel-perfect layer management",
+                "Specialized support for Video, Bible, and Timer slides",
+                "Live Media Command toolbar for effortless video projection",
+                "Smart .ektp format with automatic asset bundling",
+                "Flexible Audio Timeline for rearranging clips directly",
+                "Premium animations for smooth timeline interactions",
+                "Redesigned Creative Toolbar for faster asset creation",
+                "Unified Override Dashboard for Logos and screen states",
+                "Bible Viewport Interaction Guard to prevent accidental zooming",
+                "Intelligent Canvas Recovery for automatic workspace reset"
+            ]
+        },
+        {
             "version": "v2.0.0",
             "title": "Presentation Engine",
             "date": "February 28, 2026",

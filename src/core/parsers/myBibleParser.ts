@@ -78,17 +78,28 @@ export class MyBibleParser {
     private async getSql() {
         if (!this.sqlPromise) {
             this.sqlPromise = initSqlJs({
-                // Load wasm from Vite-managed URL instead of absolute path
-                // to ensure it works in both dev (localhost) and production (file:// or custom protocol)
-                locateFile: () => wasmUrl
+                // Load wasm from Vite-managed URL
+                locateFile: (file) => {
+                    console.log(`[MyBibleParser] Locating SQL.js file: ${file}, using wasmUrl: ${wasmUrl}`);
+                    return wasmUrl;
+                }
             });
         }
         return this.sqlPromise;
     }
 
     async parse(fileBuffer: ArrayBuffer, fileName: string): Promise<BibleData> {
+        console.log(`[MyBibleParser] Starting parse of "${fileName}" (${fileBuffer.byteLength} bytes)`);
         const SQL = await this.getSql();
-        const db: Database = new SQL.Database(new Uint8Array(fileBuffer));
+        let db: Database;
+        
+        try {
+            db = new SQL.Database(new Uint8Array(fileBuffer));
+            console.log(`[MyBibleParser] Database initialized successfully for ${fileName}`);
+        } catch (e) {
+            console.error(`[MyBibleParser] Failed to initialize SQLite database for ${fileName}:`, e);
+            throw new Error(`Failed to initialize database: ${e instanceof Error ? e.message : String(e)}`);
+        }
 
         try {
             // 1. Get translation info from 'info' table
@@ -129,10 +140,12 @@ export class MyBibleParser {
             // 3. Get all verses
             const versesResult = db.exec("SELECT book_number, chapter, verse, text FROM verses ORDER BY book_number, chapter, verse");
             if (versesResult.length === 0) {
+                console.error(`[MyBibleParser] No verses found in "verses" table for ${fileName}`);
                 throw new Error("No verses found in database");
             }
 
             const rawVerses = versesResult[0].values;
+            console.log(`[MyBibleParser] Found ${rawVerses.length} raw verses.`);
 
             // Detect mapping type
             const bookNumberSet = new Set<number>();

@@ -21,10 +21,26 @@ const TrackContainer = forwardRef<TrackContainerHandle, TrackContainerProps>(
 
         useImperativeHandle(ref, () => ({
             scrollToSlide: (slideId: string) => {
-                if (!scrollRef.current) return;
-                const el = scrollRef.current.querySelector(`[data-slide-id="${slideId}"]`);
+                const container = scrollRef.current;
+                if (!container) return;
+                
+                const el = container.querySelector(`[data-slide-id="${slideId}"]`) as HTMLElement;
                 if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                    const containerRect = container.getBoundingClientRect();
+                    const elRect = el.getBoundingClientRect();
+                    
+                    // Use getBoundingClientRect to calculate position relative to the viewport
+                    // which is more reliable than offsetLeft when nested in relative containers
+                    
+                    // Calculate position relative to container
+                    const relativeLeft = elRect.left - containerRect.left + container.scrollLeft;
+                    
+                    const scrollLeft = relativeLeft - (container.clientWidth / 2) + (elRect.width / 2);
+                    
+                    container.scrollTo({
+                        left: scrollLeft,
+                        behavior: 'smooth'
+                    });
                 }
             },
             getScrollElement: () => scrollRef.current,

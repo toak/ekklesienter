@@ -1,6 +1,6 @@
 import JSZip from 'jszip';
 import { db } from '@/core/db';
-import { IServiceFile, IMediaItem, IMediaBin } from '@/core/types';
+import { IServiceFile, IMediaBin } from '@/core/types';
 import { EktpService } from './ektpService';
 import { sha256, collectMediaRefs, mimeToExt, extToMime, getMediaBlob } from './mediaPackingUtils';
 import { ThumbnailService } from './ThumbnailService';
@@ -78,15 +78,21 @@ export const EktService = {
             }
         }
 
-        // 2. Media pool (bins + items) — без blob данных, они в media/
+        // 2. Hoist all referenced media blobs to root media/ folder.
+        // During EktpService.pack with globalHashSet, media is only bundled in the FIRST
+        // .ektp that references it. We hoist here so prepareImport can pre-load everything.
+        const mediaFolder = zip.folder('media')!;
+        for (const [hash, meta] of Object.entries(manifest_media)) {
+            const media = await getMediaBlob(hash);
+            if (media) {
+                mediaFolder.file(meta.filename, media.blob, { compression: 'STORE' });
+            }
+        }
+
+        // 3. Media pool bins (structural metadata only — blobs are in media/)
         const mediaPoolFolder = zip.folder('media-pool')!;
         const bins  = await db.mediaBins.toArray();
-        const items = await db.mediaPool.toArray();
         mediaPoolFolder.file('bins.json', JSON.stringify(bins, null, 2));
-        mediaPoolFolder.file('items.json', JSON.stringify(
-            items.map(({ data, ...rest }) => rest),
-            null, 2
-        ));
 
         // 4. Манифесты
         const { fileHandle, ...serviceManifest } = service as any;
@@ -156,25 +162,46 @@ export const EktService = {
 
             const alreadyBg    = await db.backgrounds.get(hash);
             const alreadyPool  = await db.mediaPool.get(hash);
-            if (alreadyBg || alreadyPool) continue;
+            if (alreadyBg && alreadyPool) continue;
+
+            const mediaName = meta?.originalName ?? hash;
+            const mediaCategory = mimeType.startsWith('audio/') ? 'audio'
+                : mimeType.startsWith('video/') ? 'video'
+                : 'images';
+            const organizedPath = `${service.name || 'Imported'}/${mediaCategory}`;
 
             if (mimeType.startsWith('image/') && !mimeType.includes('svg')) {
-                await db.backgrounds.add({
-                    id: hash,
-                    name: meta?.originalName ?? hash,
-                    data,
-                    mimeType,
-                });
+                if (!alreadyBg) {
+                    await db.backgrounds.add({
+                        id: hash,
+                        name: mediaName,
+                        data,
+                        mimeType,
+                    });
+                }
+                // Also add to mediaPool for reusability
+                if (!alreadyPool) {
+                    await db.mediaPool.add({
+                        id: hash,
+                        name: mediaName,
+                        path: organizedPath,
+                        type: 'image',
+                        data,
+                        createdAt: Date.now(),
+                    });
+                }
             } else {
-                await db.mediaPool.add({
-                    id: hash,
-                    name: meta?.originalName ?? hash,
-                    path: hash,
-                    type: mimeType.startsWith('audio/') ? 'audio'
-                        : mimeType.startsWith('video/') ? 'video' : 'image',
-                    data,
-                    createdAt: Date.now(),
-                });
+                if (!alreadyPool) {
+                    await db.mediaPool.add({
+                        id: hash,
+                        name: mediaName,
+                        path: organizedPath,
+                        type: mimeType.startsWith('audio/') ? 'audio'
+                            : mimeType.startsWith('video/') ? 'video' : 'image',
+                        data,
+                        createdAt: Date.now(),
+                    });
+                }
             }
         }
 
@@ -241,15 +268,10 @@ export const EktService = {
             }
         }
 
-        const itemsFile = zip.file('media-pool/items.json');
-        if (itemsFile) {
-            const items = JSON.parse(await itemsFile.async('string')) as IMediaItem[];
-            for (const item of items) {
-                if (!(await db.mediaPool.get(item.id))) {
-                    await db.mediaPool.add({ ...item, data: undefined });
-                }
-            }
-        }
+        // NOTE: media-pool/items.json is intentionally NOT imported here.
+        // Previously it created ghost entries with data: undefined, which interfered
+        // with media lookups. All actual blobs are restored from the root media/ folder
+        // above and from individual .ektp files during EktpService.unpack().
 
         return {
             newServiceId,
@@ -301,6 +323,7 @@ export const EktService = {
 
     download(blob: Blob, filename: string) {
         const url = URL.createObjectURL(blob);
+        console.log(`[EktService] Created download URL: ${url} (Origin: ${window.location.origin})`);
         const a = document.createElement('a');
         a.href = url;
         a.download = filename.endsWith('.ekt') ? filename : `${filename}.ekt`;

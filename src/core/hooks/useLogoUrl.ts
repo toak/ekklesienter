@@ -23,6 +23,7 @@ export function useLogoUrl(logo: ILogo | null) {
                     const entry = await db.logos.get(logo.id);
                     if (entry) {
                         const url = URL.createObjectURL(entry.data);
+                        console.log(`[useLogoUrl] Created Blob URL: ${url} (Origin: ${window.location.origin}, ID: ${logo.id})`);
                         currentUrl = url;
                         setLogoUrl(url);
                         return;
@@ -33,7 +34,19 @@ export function useLogoUrl(logo: ILogo | null) {
             }
 
             // Fallback to static URL
-            setLogoUrl(logo.url || null);
+            // SECURITY: Never use a 'blob:' URL from a different context (e.g. passed via IPC)
+            if (logo.url && logo.url !== '') {
+                // If it's a relative path starting with assets/, ensure it's absolute
+                const resolvedUrl = logo.url.startsWith('assets/') ? `/${logo.url}` : logo.url;
+                
+                if (!resolvedUrl.startsWith('blob:')) {
+                    setLogoUrl(resolvedUrl);
+                } else {
+                    setLogoUrl(null);
+                }
+            } else {
+                setLogoUrl(null);
+            }
         };
 
         loadLogo();

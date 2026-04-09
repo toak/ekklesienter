@@ -45,9 +45,12 @@ interface IPropertySectionProps {
     icon: React.ElementType;
     children: React.ReactNode;
     defaultOpen?: boolean;
+    extra?: React.ReactNode;
 }
 
-export const PropertySection: React.FC<IPropertySectionProps> = ({ title, label, icon: Icon, children, defaultOpen = true }) => {
+export const PropertySection: React.FC<IPropertySectionProps> = ({ 
+    title, label, icon: Icon, children, defaultOpen = true, extra 
+}) => {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     const displayTitle = title || label || '';
 
@@ -62,7 +65,10 @@ export const PropertySection: React.FC<IPropertySectionProps> = ({ title, label,
                     <Icon className="w-3.5 h-3.5 text-stone-400 group-hover:text-accent transition-colors" />
                     <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-80">{displayTitle}</span>
                 </div>
-                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", isOpen ? "" : "-rotate-90 opacity-40")} />
+                <div className="flex items-center gap-2">
+                    {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
+                    <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", isOpen ? "" : "-rotate-90 opacity-40")} />
+                </div>
             </button>
             <div className={cn(
                 "px-3 pb-3 transition-all duration-300 origin-top overflow-hidden",

@@ -24,7 +24,7 @@ export interface TemplateItemProps {
  * TemplateItem component for the presentation library.
  * Renders a thumbnail preview of a template with its layout and provides actions.
  */
-export const TemplateItem: React.FC<TemplateItemProps> = ({ 
+export const TemplateItem: React.FC<TemplateItemProps> = React.memo(({ 
     template, 
     selectedBlock, 
     selectedSlide, 
@@ -132,4 +132,4 @@ export const TemplateItem: React.FC<TemplateItemProps> = ({
             )}
         </button>
     );
-};
+});

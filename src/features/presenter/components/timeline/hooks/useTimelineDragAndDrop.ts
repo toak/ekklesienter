@@ -1,14 +1,14 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { 
-    PointerSensor, 
+    PointerSensor,
+    KeyboardSensor,
     useSensor, 
     useSensors, 
     DragStartEvent,
-    DragMoveEvent, 
     DragOverEvent, 
     DragEndEvent 
 } from '@dnd-kit/core';
-import { arrayMove } from '@dnd-kit/sortable';
+import { arrayMove, sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { ISlide } from '@/core/types';
 import { TrackContainerHandle } from '../TrackContainer';
 
@@ -27,6 +27,7 @@ interface UseTimelineDragAndDropProps {
 
 /**
  * Hook to handle all drag-and-drop logic for the timeline, including auto-scroll.
+ * Uses PointerSensor for reliability in Electron/Mac environments.
  */
 export const useTimelineDragAndDrop = ({
     activePresentationId,
@@ -41,16 +42,40 @@ export const useTimelineDragAndDrop = ({
     addPresentationToTimeline
 }: UseTimelineDragAndDropProps) => {
     const [activeId, setActiveId] = useState<string | null>(null);
-    const scrollSpeedRef = useRef(0);
+    
+    // Safety: track current localSlides in a ref to bypass stale closure issues and React 18 async setState pitfalls during handles
+    const localSlidesRef = useRef(localSlides);
+    useEffect(() => {
+        localSlidesRef.current = localSlides;
+    }, [localSlides]);
+
+    
+    // Auto-scroll state
     const autoScrollRafRef = useRef<number | null>(null);
+    const pointerXRef = useRef<number | null>(null);
+
+    /** Tracks the last over-id to skip redundant setLocalSlides when collision hasn't changed */
+    const lastOverIdRef = useRef<string | null>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 8,
+                distance: 5,
             },
+        }),
+        useSensor(KeyboardSensor, {
+            coordinateGetter: sortableKeyboardCoordinates,
         })
     );
+
+    // Track real physical pointer position regardless of scroll or dnd-kit delta
+    useEffect(() => {
+        const handlePointerMove = (e: PointerEvent) => {
+            pointerXRef.current = e.clientX;
+        };
+        window.addEventListener('pointermove', handlePointerMove);
+        return () => window.removeEventListener('pointermove', handlePointerMove);
+    }, []);
 
     const stopAutoScroll = useCallback(() => {
         if (autoScrollRafRef.current !== null) {
@@ -61,53 +86,56 @@ export const useTimelineDragAndDrop = ({
 
     const handleDragStart = useCallback((event: DragStartEvent) => {
         dragActiveRef.current = true;
+        lastOverIdRef.current = null;
         setActiveId(event.active.id as string);
-    }, [dragActiveRef]);
 
-    const handleDragMove = useCallback((event: DragMoveEvent) => {
-        const scrollEl = trackRef.current?.getScrollElement();
-        if (!scrollEl) return;
+        // Start continuous auto-scroll loop
+        if (autoScrollRafRef.current === null) {
+            const tick = () => {
+                if (!dragActiveRef.current) {
+                    autoScrollRafRef.current = null;
+                    return;
+                }
 
-        const rect = scrollEl.getBoundingClientRect();
-        const pointerEvent = event.activatorEvent as PointerEvent;
-        const startX = pointerEvent.clientX;
-        const currentX = startX + event.delta.x;
+                const scrollEl = trackRef.current?.getScrollElement();
+                const pointerX = pointerXRef.current;
+                
+                if (scrollEl && pointerX !== null) {
+                    const rect = scrollEl.getBoundingClientRect();
+                    const EDGE_ZONE = 80;
+                    const MAX_SPEED = 14;
 
-        const EDGE_ZONE = 80;
-        const MAX_SPEED = 14;
+                    const leftEdge = rect.left + EDGE_ZONE;
+                    const rightEdge = rect.right - EDGE_ZONE;
 
-        const leftEdge = rect.left + EDGE_ZONE;
-        const rightEdge = rect.right - EDGE_ZONE;
+                    let scrollSpeed = 0;
 
-        let scrollSpeed = 0;
-
-        if (currentX < leftEdge) {
-            const depth = (leftEdge - currentX) / EDGE_ZONE;
-            scrollSpeed = -Math.round(MAX_SPEED * Math.min(depth, 1));
-        } else if (currentX > rightEdge) {
-            const depth = (currentX - rightEdge) / EDGE_ZONE;
-            scrollSpeed = Math.round(MAX_SPEED * Math.min(depth, 1));
-        }
-
-        scrollSpeedRef.current = scrollSpeed;
-
-        if (scrollSpeed !== 0) {
-            if (autoScrollRafRef.current === null) {
-                const tick = () => {
-                    if (!scrollEl || !dragActiveRef.current || scrollSpeedRef.current === 0) {
-                        autoScrollRafRef.current = null;
-                        return;
+                    if (pointerX < leftEdge && scrollEl.scrollLeft > 0) {
+                        const depth = Math.min((leftEdge - pointerX) / EDGE_ZONE, 1);
+                        scrollSpeed = -Math.round(MAX_SPEED * depth);
+                    } else if (pointerX > rightEdge && scrollEl.scrollLeft < scrollEl.scrollWidth - scrollEl.clientWidth) {
+                        const depth = Math.min((pointerX - rightEdge) / EDGE_ZONE, 1);
+                        scrollSpeed = Math.round(MAX_SPEED * depth);
                     }
-                    scrollEl.scrollLeft += scrollSpeedRef.current;
-                    autoScrollRafRef.current = requestAnimationFrame(tick);
-                };
-                autoScrollRafRef.current = requestAnimationFrame(tick);
-            }
-        } else {
-            stopAutoScroll();
-        }
-    }, [trackRef, dragActiveRef, stopAutoScroll]);
 
+                    if (scrollSpeed !== 0) {
+                        const maxScroll = scrollEl.scrollWidth - scrollEl.clientWidth;
+                        scrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, scrollEl.scrollLeft + scrollSpeed));
+                    }
+                }
+                
+                // Keep ticking until drag ends
+                autoScrollRafRef.current = requestAnimationFrame(tick);
+            };
+            autoScrollRafRef.current = requestAnimationFrame(tick);
+        }
+    }, [dragActiveRef, trackRef]);
+
+    /**
+     * Reorder slides when dragging over a different item.
+     * Uses lastOverIdRef to skip redundant state updates when the collision target
+     * hasn't changed, preventing unnecessary React re-render cascades.
+     */
     const handleDragOver = useCallback((event: DragOverEvent) => {
         const { active, over } = event;
         if (!over || active.id === over.id) return;
@@ -115,13 +143,17 @@ export const useTimelineDragAndDrop = ({
         const activeIdStr = active.id as string;
         const overIdStr = over.id as string;
 
-        if (overIdStr === 'presentation-item-drag') return;
+        if (overIdStr === 'presentation-item-drag' || overIdStr === 'timeline-droppable') return;
+
+        // Skip if we already processed this collision pair
+        if (lastOverIdRef.current === overIdStr) return;
+        lastOverIdRef.current = overIdStr;
 
         setLocalSlides((currentSlides) => {
             const oldIndex = currentSlides.findIndex(s => s.id === activeIdStr);
             const newIndex = currentSlides.findIndex(s => s.id === overIdStr);
 
-            if (oldIndex === -1 || newIndex === -1) return currentSlides;
+            if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return currentSlides;
 
             const isPartOfSelection = selectedSlideIds.includes(activeIdStr);
             const draggedIds = isPartOfSelection ? selectedSlideIds : [activeIdStr];
@@ -155,6 +187,7 @@ export const useTimelineDragAndDrop = ({
     const handleDragEnd = useCallback(async (event: DragEndEvent) => {
         stopAutoScroll();
         dragActiveRef.current = false;
+        lastOverIdRef.current = null;
         setActiveId(null);
         const { active, over } = event;
 
@@ -167,16 +200,15 @@ export const useTimelineDragAndDrop = ({
         }
 
         if (over) {
-            let finalSlidesOrdered: ISlide[] = [];
-            
-            setLocalSlides(current => {
-                finalSlidesOrdered = current.map((s, i) => ({
-                    ...s,
-                    order: i,
-                }));
-                return finalSlidesOrdered;
-            });
+            const finalSlidesOrdered = localSlidesRef.current.map((s, i) => ({
+                ...s,
+                order: i,
+            }));
 
+            // Sync visual state immediately
+            setLocalSlides(finalSlidesOrdered);
+
+            // Persist to store / DB
             if (activePresentationId && finalSlidesOrdered.length > 0) {
                 pendingUpdateRef.current = true;
                 updatePresentationSlides(activePresentationId, finalSlidesOrdered).finally(() => {
@@ -188,8 +220,8 @@ export const useTimelineDragAndDrop = ({
 
     const handleDragCancel = useCallback(() => {
         stopAutoScroll();
-        scrollSpeedRef.current = 0;
         dragActiveRef.current = false;
+        lastOverIdRef.current = null;
         setActiveId(null);
         setLocalSlides([...slides]);
     }, [dragActiveRef, setLocalSlides, slides, stopAutoScroll]);
@@ -198,7 +230,6 @@ export const useTimelineDragAndDrop = ({
         activeId,
         sensors,
         handleDragStart,
-        handleDragMove,
         handleDragOver,
         handleDragEnd,
         handleDragCancel

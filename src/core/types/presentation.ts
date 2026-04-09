@@ -4,6 +4,7 @@ import { IAudioAttachment, IAudioScope } from './audio';
 import { IStyleLayer } from './style';
 import { Verse } from './bible';
 import { PresenterSettings } from './settings';
+import { IVideoSettings } from './video';
 
 export type TransitionDirection = 'top' | 'right' | 'bottom' | 'left' | 'in' | 'out';
 
@@ -18,7 +19,7 @@ export interface ISlideContent {
   canvasItems?: ICanvasItem[];
 }
 
-export type SlideType = 'normal' | 'nested' | 'timer' | 'verse' | 'group';
+export type SlideType = 'normal' | 'nested' | 'timer' | 'verse' | 'group' | 'video';
 
 export interface IBaseSlide {
   id: string;
@@ -75,7 +76,13 @@ export interface IGroupSlide extends IBaseSlide {
   type: 'group';
 }
 
-export type ISlide = ICanvasSlide | IVerseSlide | ITimerSlide | INestedSlide | IGroupSlide;
+export interface IVideoSlide extends IBaseSlide {
+  type: 'video';
+  videoSettings: IVideoSettings;
+  backgroundOverride?: IStyleLayer[];
+}
+
+export type ISlide = ICanvasSlide | IVerseSlide | ITimerSlide | INestedSlide | IGroupSlide | IVideoSlide;
 
 export interface IBlock {
   id: string;
@@ -185,6 +192,7 @@ export interface IPresentationSummary {
 
 export interface SlideDisplayProps {
   isProjector?: boolean;
+  isPreloading?: boolean;
   activeVerse?: Verse | null;
   selectedSlide?: ISlide | null;
   parallelVerse?: Verse | null;

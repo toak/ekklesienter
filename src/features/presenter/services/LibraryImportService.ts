@@ -98,14 +98,8 @@ export class LibraryImportService {
             if (file.type.startsWith('video/')) type = 'video';
             if (file.type.startsWith('audio/')) type = 'audio';
 
-            const path = (file as any).path || URL.createObjectURL(file);
-            await db.mediaPool.add({
-                id: crypto.randomUUID(),
-                name: file.name,
-                path,
-                type,
-                createdAt: Date.now()
-            });
+            const { MediaPersistenceService } = await import('./MediaPersistenceService');
+            await MediaPersistenceService.importMediaBlob(file, (file as any).path || null, type);
             toast.success(t('media_imported', 'Media imported: {{name}}', { name: file.name }));
         }
     }
@@ -166,13 +160,8 @@ export class LibraryImportService {
             if (['mp4', 'webm', 'mov'].includes(ext)) type = 'video';
             if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) type = 'audio';
 
-            await db.mediaPool.add({
-                id: crypto.randomUUID(),
-                name: nameStr,
-                path: path,
-                type,
-                createdAt: Date.now()
-            });
+            const { MediaPersistenceService } = await import('./MediaPersistenceService');
+            await MediaPersistenceService.importMediaFromPath(path, type);
             toast.success(t('media_imported', 'Media imported: {{name}}', { name: nameStr }));
         }
     }

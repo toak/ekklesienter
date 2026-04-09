@@ -5,14 +5,15 @@ export { InlineBackgroundPicker, ColorPickerField } from '@/features/presenter/c
 export { AlignmentTools, PropertySection } from '@/features/presenter/components/slide-properties/PropertySection';
 export { SortableCanvasItem } from '@/features/presenter/components/slide-properties/SortableCanvasItem';
 export { PlaylistItemRow } from '@/features/presenter/components/slide-properties/PlaylistItemRow';
-export { TemplatePicker } from '@/features/presenter/components/slide-properties/TemplatePicker';
+export { SlideColors } from '@/features/presenter/components/slide-properties/SlideColors';
 export { ItemProperties } from '@/features/presenter/components/slide-properties/ItemProperties';
 export { TimerTabContent } from '@/features/presenter/components/slide-properties/TimerTabContent';
 export { AudioTabContent } from '@/features/presenter/components/slide-properties/AudioTabContent';
-export { ElementsTabContent } from '@/features/presenter/components/slide-properties/ElementsTabContent';
+export { LayerRow } from '@/features/presenter/components/slide-properties/LayerRow';
 export { TypographySection } from '@/features/presenter/components/slide-properties/TypographySection';
 export { AdvancedTextSettings } from '@/features/presenter/components/slide-properties/AdvancedTextSettings';
 export { TransitionTabContent } from '@/features/presenter/components/slide-properties/TransitionTabContent';
+export { VideoTabContent } from '@/features/presenter/components/slide-properties/VideoTabContent';
 export {
     type DesignTab,
     createCanvasItem,

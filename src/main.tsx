@@ -1,3 +1,4 @@
+import './core/utils/blobDebugger';
 import React from 'react';
 import { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -7,17 +8,10 @@ import './core/i18n';
 import './core/styles/fonts';
 import { PerformanceMonitor } from './core/components/PerformanceMonitor';
 
-// Global Error Logging for Development
 if (import.meta.env.DEV) {
-  window.addEventListener('error', (event) => {
-    console.error('RENDERER ERROR:', event.message, '\nAt:', event.filename, ':', event.lineno, ':', event.colno);
-    console.error('Stack:', event.error?.stack);
-  });
-
   window.addEventListener('unhandledrejection', (event) => {
     console.error('UNHANDLED RENDERER REJECTION:', event.reason);
   });
-
 }
 
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';

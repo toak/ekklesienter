@@ -1,11 +1,23 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
-import { db } from '../core/db';
+import { db } from '@/core/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Verse, ILogo } from '../core/types';
-import { getBookName } from '../core/data/bookData';
+import { Verse, ILogo } from '@/core/types';
+import { getBookName } from '@/core/data/bookData';
 import { useAtom } from 'jotai';
-import { sidebarOpenAtom, themeAccentAtom, historyOpenAtom, searchOpenAtom, appModeAtom, activeOverrideAtom, liveLogoAtom, slideDesignPanelOpenAtom, isTimelineHoveredAtom, selectedCanvasItemIdsAtom, OverrideType } from '../core/store/uiAtoms';
+import { 
+  sidebarOpenAtom, 
+  themeAccentAtom, 
+  historyOpenAtom, 
+  searchOpenAtom, 
+  appModeAtom, 
+  activeOverrideAtom, 
+  liveLogoAtom, 
+  slideDesignPanelOpenAtom, 
+  isTimelineHoveredAtom, 
+  selectedCanvasItemIdsAtom, 
+  OverrideType 
+} from '@/core/store/uiAtoms';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import {
   Trash2, CheckCircle2
@@ -127,14 +139,25 @@ const ControllerLayout: React.FC = () => {
   }, [settings.logo.activeLogoId, settings.logo.customLogos, settings.logo.customGroups, settings.logo.logoGroups, setActiveLogo]);
 
   const toggleOverride = useCallback((type: OverrideType) => {
-    setActiveOverride((prev: OverrideType | null) => prev === type ? null : type);
+    setActiveOverride((prev: OverrideType | null) => {
+        const next = prev === type ? null : type;
+        // If we are activating an override, ensure the projector has the latest settings first
+        if (next) {
+            LiveSyncService.syncSettings(usePresenterStore.getState().settings);
+        }
+        return next;
+    });
   }, [setActiveOverride]);
 
   useEffect(() => {
-    // Sync latest settings first so projector has correct override backgrounds
-    usePresenterStore.getState().syncSettings();
+    // Sync latest override to projector
     LiveSyncService.setOverride(activeOverride as OverrideType | null, activeOverride === 'logo' ? activeLogo : null);
   }, [activeOverride, activeLogo]);
+
+  useEffect(() => {
+    // Proactively sync settings whenever they change
+    LiveSyncService.syncSettings(settings);
+  }, [settings]);
 
   const openGlobalModal = useCallback((type: ModalType) => {
     useModalStore.getState().openModal(type);
@@ -194,43 +217,57 @@ const ControllerLayout: React.FC = () => {
     const unsub = IpcService.on('projector-ready', (p?: { ratio: number }) => {
       if (p?.ratio) usePresenterStore.getState().updateDisplay({ aspectRatio: p.ratio });
       IpcService.send('projector-command', 'update-theme', themeAccent);
-      LiveSyncService.setOverride(activeOverride as OverrideType | null, activeOverride === 'logo' ? activeLogo : null);
-      if (appMode === 'scripture' && useBibleStore.getState().activeVerse) {
-        LiveSyncService.showVerse(useBibleStore.getState().activeVerse!, useBibleStore.getState().secondTranslationId);
-      }
+      
+      // Sync full settings on startup/handshake
+      LiveSyncService.syncSettings(usePresenterStore.getState().settings);
+      
+      // Delay override sync slightly to ensure settings are processed
+      setTimeout(() => {
+        LiveSyncService.setOverride(activeOverride as OverrideType | null, activeOverride === 'logo' ? activeLogo : null);
+        if (appMode === 'scripture' && useBibleStore.getState().activeVerse) {
+          LiveSyncService.showVerse(useBibleStore.getState().activeVerse!, useBibleStore.getState().secondTranslationId);
+        }
+      }, 100);
     });
     return () => unsub();
   }, [themeAccent, activeOverride, activeLogo, appMode]);
 
-  return (
-    <div className="flex h-screen w-screen overflow-hidden bg-stone-950 text-stone-200">
-      {/* Sidebar Area */}
-      {sidebarOpen && (
-        <AppSidebar
-          appMode={appMode}
-          onOpenSettings={() => setSettingsOpen(true)}
-        />
-      )}
+    const isBibleSlide = React.useMemo(() => {
+        if (!activePresentation || !previewSlideId) return false;
+        const slide = activePresentation.slides.find(s => s.id === previewSlideId);
+        return slide?.blockId === 'bible';
+    }, [activePresentation, previewSlideId]);
 
-      {/* Main Stage (Slide Display) */}
-      <main className="flex-1 h-full relative flex flex-col min-w-0 @container">
-        <AppToolbar
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
-          historyOpen={historyOpen}
-          setHistoryOpen={setHistoryOpen}
-          designPanelOpen={designPanelOpen}
-          setDesignPanelOpen={setDesignPanelOpen}
-          appMode={appMode}
-          activeOverride={activeOverride}
-          toggleOverride={toggleOverride}
-          activeLogoUrl={activeLogoUrl}
-          activeLogoName={activeLogo?.name}
-          undo={() => usePresentationStore.getState().undo()}
-          redo={() => usePresentationStore.getState().redo()}
-          openProjector={openProjector}
-          openGlobalModal={openGlobalModal}
-        />
+    return (
+        <div className="flex h-screen w-screen overflow-hidden bg-stone-950 text-stone-200">
+            {/* Sidebar Area */}
+            {sidebarOpen && (
+                <AppSidebar
+                    appMode={appMode}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                />
+            )}
+
+            {/* Main Stage (Slide Display) */}
+            <main className="flex-1 h-full relative flex flex-col min-w-0 @container">
+                <AppToolbar
+                    sidebarOpen={sidebarOpen}
+                    setSidebarOpen={setSidebarOpen}
+                    historyOpen={historyOpen}
+                    setHistoryOpen={setHistoryOpen}
+                    designPanelOpen={designPanelOpen}
+                    setDesignPanelOpen={setDesignPanelOpen}
+                    appMode={appMode}
+                    activeOverride={activeOverride}
+                    toggleOverride={toggleOverride}
+                    activeLogoUrl={activeLogoUrl}
+                    activeLogoName={activeLogo?.name}
+                    undo={() => usePresentationStore.getState().undo()}
+                    redo={() => usePresentationStore.getState().redo()}
+                    openProjector={openProjector}
+                    openGlobalModal={openGlobalModal}
+                    isBibleSlide={isBibleSlide}
+                />
 
         <StatusOverlay activeOverride={activeOverride} />
 
@@ -261,10 +298,15 @@ const ControllerLayout: React.FC = () => {
         )}
 
         {/* Main Display Area */}
-        <SlideDisplay />
+        <div className="flex-1 min-h-0 relative z-0">
+          <SlideDisplay />
+        </div>
 
         {/* Slide Timeline (Bottom) */}
-        {appMode === 'presentation' && <SlideTimeline />}
+        {appMode === 'presentation' && <SlideTimeline openProjector={openProjector} />}
+
+        {/* Slide Design Panel — self-managed visibility via createPortal */}
+        {appMode === 'presentation' && <SlideDesignPanel />}
 
         {/* Verse Previews (Contextual Bottom Left/Right) */}
         <VersePreviews
@@ -276,14 +318,7 @@ const ControllerLayout: React.FC = () => {
         />
       </main>
 
-      {/* Slide Design Panel (Right Side) — presentation mode only */}
-      {designPanelOpen && appMode === 'presentation' && (
-        <div style={{ width: 460 }} className="h-full shrink-0 animate-in slide-in-from-right duration-300">
-          <SlideDesignPanel />
-        </div>
-      )}
 
-      {/* History Panel (Right Side) */}
       {historyOpen && (
         <div style={{ width: 300 }} className="h-full shrink-0 animate-in slide-in-from-right duration-300">
           <HistoryPanel />

@@ -1,3 +1,4 @@
+import './core/utils/blobDebugger';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ProjectorView from '@/features/presenter/components/display/ProjectorView';

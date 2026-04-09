@@ -31,10 +31,8 @@ export const TextRenderer: React.FC<TextRendererProps> = ({
   const isAutoHeightText = item.text.resizingMode === 'auto-height';
   const isFlowText = isAutoWidthText || isAutoHeightText;
 
-  const isRichTextFill = (item.text.textFills?.length ?? 0) > 0 && 
-    (item.text.textFills!.length > 1 || item.text.textFills![0].type !== 'color');
-  
   const fills = item.text.textFills || [];
+  const isRichTextFill = fills.length > 0 && (fills.length > 1 || fills[0].type !== 'color');
   const maskId = `text-mask-${idPrefix}-${item.id}`;
 
   const hAlign = item.text.alignHorizontal || item.text.textAlign || 'center';
@@ -108,21 +106,20 @@ export const TextRenderer: React.FC<TextRendererProps> = ({
       <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ overflow: 'visible' }}>
         <defs>
           <mask id={maskId} maskUnits="userSpaceOnUse">
-            <text
-              ref={textRef as unknown as React.RefObject<SVGTextElement>}
-              x={textAlignCss === 'center' ? '50%' : textAlignCss === 'right' ? '100%' : '0'}
-              y={vAlign === 'top' ? '0' : vAlign === 'bottom' ? '100%' : '50%'}
-              dominantBaseline={vAlign === 'top' ? 'hanging' : vAlign === 'bottom' ? 'text-after-edge' : 'middle'}
-              textAnchor={textAlignCss === 'center' ? 'middle' : textAlignCss === 'right' ? 'end' : 'start'}
-              style={{
-                fontFamily: activeFontFamily,
-                fontSize: `${fittedFontSize}px`,
-                fontWeight: activeFontWeight,
-                fontStyle: item.text.isItalic ? 'italic' : 'normal',
-                fill: 'white',
-              }}
-              dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-            />
+            <foreignObject x="0" y="0" width="100%" height="100%">
+              <div
+                className={cn(isAutoWidthText ? 'w-max' : 'w-full', '[&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside [&_ul]:pl-2 [&_ol]:pl-2')}
+                style={{
+                  ...commonTextStyle,
+                  color: 'white',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: alignItemsCss,
+                }}
+                dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+              />
+            </foreignObject>
           </mask>
         </defs>
       </svg>

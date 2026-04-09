@@ -27,7 +27,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             case 'general': return <GeneralSettings />;
             case 'displays': return <DisplaySettings />;
             case 'data': return <DataSettings />;
-            case 'logo': return <LogoSettings />;
             case 'overrides': return <OverrideSettings />;
             case 'shortcuts': return <ShortcutsSettings />;
             case 'about': return <AboutSettings />;
@@ -65,7 +64,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'general' && <Globe className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'displays' && <Monitor className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'data' && <Database className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
-                                    {activeTab === 'logo' && <ImageIcon className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'overrides' && <Layers className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'shortcuts' && <Command className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'about' && <Info className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
@@ -86,7 +84,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'general' && t('appearance')}
                                     {activeTab === 'displays' && t('displays')}
                                     {activeTab === 'data' && t('bible_translations')}
-                                    {activeTab === 'logo' && t('church_logo', 'Church Logo')}
                                     {activeTab === 'overrides' && t('overrides', 'Overrides')}
                                     {activeTab === 'shortcuts' && t('shortcuts', 'Shortcuts')}
                                     {activeTab === 'about' && t('about_app')}

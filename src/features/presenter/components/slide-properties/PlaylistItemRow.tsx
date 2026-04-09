@@ -15,7 +15,7 @@ interface IPlaylistItemRowProps {
     t: (key: string, fallback?: string) => string;
 }
 
-export const PlaylistItemRow: React.FC<IPlaylistItemRowProps> = ({ id, index, onRemove, onReplace, t }) => {
+export const PlaylistItemRow: React.FC<IPlaylistItemRowProps> = React.memo(({ id, index, onRemove, onReplace, t }) => {
     const mediaItem = useLiveQuery(() => db.mediaPool.get(id), [id]);
     const [contextMenu, setContextMenu] = React.useState<{ x: number; y: number } | null>(null);
 
@@ -98,4 +98,4 @@ export const PlaylistItemRow: React.FC<IPlaylistItemRowProps> = ({ id, index, on
             )}
         </div>
     );
-};
+});

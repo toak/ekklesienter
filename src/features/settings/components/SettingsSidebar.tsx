@@ -14,7 +14,6 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, setActiveT
         { id: 'general', label: t('general'), icon: Globe, description: t('appearance') },
         { id: 'displays', label: t('displays'), icon: Monitor, description: t('displays_description') },
         { id: 'data', label: t('data'), icon: Database, description: t('bible_translations') },
-        { id: 'logo', label: t('church_logo', 'Church Logo'), icon: ImageIcon, description: t('logo_description', 'Manage church logos') },
         { id: 'overrides', label: t('overrides', 'Overrides'), icon: Layers, description: t('overrides_description', 'Black, white & logo screens') },
         { id: 'shortcuts', label: t('shortcuts', 'Shortcuts'), icon: Command, description: t('hotkeys_overview', 'App keyboard shortcuts') },
         { id: 'about', label: t('about_app'), icon: Info, description: t('about_description') },

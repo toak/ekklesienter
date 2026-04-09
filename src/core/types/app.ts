@@ -8,6 +8,7 @@ export type PresentationMode = 'normal' | 'fullscreen';
 export type ProjectorCommandType = 
   | 'show-verse' 
   | 'show-slide' 
+  | 'show-preview-slide'
   | 'set-override' 
   | 'clear-override' 
   | 'projector-ready' 

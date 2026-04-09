@@ -91,7 +91,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
             const original = pres.slides.find(s => s.id === slideId);
             if (!original) continue;
 
-            const newSlide: ISlide = JSON.parse(JSON.stringify(original));
+            const newSlide: ISlide = structuredClone(original);
             newSlide.id = crypto.randomUUID();
             newSlide.isExpanded = false;
 
@@ -202,7 +202,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         if (slidesToPaste.length === 0) return;
 
         const newSlidesToInsert: ISlide[] = slidesToPaste.map(s => {
-            const cloned: ISlide = JSON.parse(JSON.stringify(s));
+            const cloned: ISlide = structuredClone(s);
             cloned.id = crypto.randomUUID();
             if (cloned.type === 'normal' && cloned.content && cloned.content.canvasItems) {
                 cloned.content.canvasItems = cloned.content.canvasItems.map((item: any) => ({

@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { GripHorizontal, X } from 'lucide-react';
+import { cn } from '@/core/utils/cn';
 
 interface FloatingPopoverProps {
     isOpen: boolean;
@@ -25,8 +26,8 @@ export const FloatingPopover: React.FC<FloatingPopoverProps> = ({
     const dragStartRef = useRef({ x: 0, y: 0, panelX: 0, panelY: 0 });
     const [isInitialized, setIsInitialized] = useState(false);
 
-    // Initial positioning
-    useEffect(() => {
+    // Initial positioning - use layout effect to calculate before paint
+    useLayoutEffect(() => {
         if (isOpen && anchorRef.current && !isInitialized) {
             const anchorRect = anchorRef.current.getBoundingClientRect();
             // Try to position to the left of the anchor, with some gap
@@ -34,9 +35,9 @@ export const FloatingPopover: React.FC<FloatingPopoverProps> = ({
             let newY = anchorRect.top;
 
             // Constrain to screen bounds
-            if (newX < 16) newX = 16; // Don't go off left edge
+            if (newX < 16) newX = 16;
             if (newY < 16) newY = 16;
-            if (newY + 400 > window.innerHeight) newY = Math.max(16, window.innerHeight - 450); // rough height estimate
+            if (newY + 400 > window.innerHeight) newY = Math.max(16, window.innerHeight - 450);
 
             setPosition({ x: newX, y: newY });
             setIsInitialized(true);
@@ -123,7 +124,10 @@ export const FloatingPopover: React.FC<FloatingPopoverProps> = ({
     return createPortal(
         <div
             ref={popoverRef}
-            className="floating-popover fixed z-9999 flex flex-col bg-stone-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            className={cn(
+                "floating-popover fixed z-9999 flex flex-col bg-stone-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden transition-opacity duration-75",
+                isInitialized ? "opacity-100 animate-in fade-in zoom-in-95 duration-200" : "opacity-0 pointer-events-none"
+            )}
             style={{
                 left: position.x,
                 top: position.y,

@@ -2,7 +2,9 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Presentation as PresentationIcon } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import { Verse, ISlide, ICanvasSlide, PresenterSettings } from '@/core/types';
+import { Verse, ISlide, ICanvasSlide, IVideoSlide, PresenterSettings, IBlock, ITemplate, IStyleLayer, ICanvasItem } from '@/core/types';
+import { SlideType } from '@/core/types/presentation';
+import { ISlideTransition } from '@/core/types';
 
 // Display components
 import { VerseDisplay } from '../bible/VerseDisplay';
@@ -26,10 +28,12 @@ interface SlideContentOrchestratorProps {
   activeVerse: Verse | null;
   parallelVerse: Verse | null;
   selectedSlide: ISlide | null;
+  hasActivePresentation?: boolean;
   showRef: boolean;
   previewFontSize: number;
   settings: PresenterSettings;
   isProjector: boolean;
+  isPreloading?: boolean;
   lang: string;
   
   // Transition related
@@ -51,10 +55,12 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
   activeVerse,
   parallelVerse,
   selectedSlide,
+  hasActivePresentation,
   showRef,
   previewFontSize,
   settings,
   isProjector,
+  isPreloading = false,
   lang,
   isTransitioning,
   lastTransitionTrigger,
@@ -114,7 +120,11 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
       return (
         <div className="h-full flex flex-col items-center justify-center text-stone-700 italic gap-4">
           <PresentationIcon className="w-12 h-12 opacity-10" strokeWidth={1} />
-          <p className="text-sm">{t('select_slide_hint', 'Select a slide to preview')}</p>
+          <p className="text-sm">
+            {!hasActivePresentation 
+              ? t('select_presentation_hint', 'Select a presentation to begin') 
+              : t('select_slide_hint', 'Select a slide to preview')}
+          </p>
         </div>
       );
     }
@@ -170,6 +180,29 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
           )}
         </div>
       );
+    } else if (selectedSlide.type === 'video') {
+      // Video slides: render full-screen video via SlideContentRenderer
+      content = (
+        <div className="relative z-10 w-full h-full pointer-events-auto">
+          <SlideContentRenderer
+            slide={selectedSlide}
+            slideId={selectedSlide.id}
+            settings={settings}
+            isPreview={!isProjector}
+            isProjector={isProjector}
+            isPreloading={isPreloading}
+            bibleVerses={bibleVerses}
+            bibleSecondVerse={bibleSecondVerse}
+            isTransitioning={isTransitioning}
+            blocksMap={blocksMap}
+            templatesMap={templatesMap}
+            lang={lang}
+            hideCanvasItems={true}
+            hideOverlays={true}
+            backgroundOverride={(selectedSlide as IVideoSlide).backgroundOverride}
+          />
+        </div>
+      );
     } else {
       content = (
         <div className="relative z-10 w-full h-full pointer-events-auto">
@@ -183,6 +216,7 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
             slide={selectedSlide}
             slideId={selectedSlide.id}
             isPreview={!isProjector}
+            hideCanvasItems={!isProjector}
           />
           {!isProjector && (
             <SlideCanvas slideId={selectedSlide.id} canvasItems={(selectedSlide as ICanvasSlide).content?.canvasItems || []} />

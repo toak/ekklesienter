@@ -34,13 +34,17 @@ export const LogoCard: React.FC<LogoCardProps> = ({ logo, isActive, onSelect, on
                         {logo.name}
                     </span>
                 </div>
-            ) : (
+            ) : displayUrl ? (
                 <img
                     src={displayUrl}
                     alt={logo.name}
                     className="w-full h-full object-contain p-5"
                     onError={() => setImgError(true)}
                 />
+            ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                    <ImageIcon className="w-8 h-8 text-stone-800/20" />
+                </div>
             )}
 
             {/* Hover overlay */}

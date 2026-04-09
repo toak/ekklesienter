@@ -8,6 +8,9 @@
     --animate-flip-down: flip-down 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
     --animate-flip-shine: flip-shine 0.4s ease-in-out forwards;
     --animate-flip-shadow: flip-shadow 0.4s ease-in-out forwards;
+    
+    --animate-panel-in: panel-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    --animate-fade-in: fade-in 0.3s ease-out forwards;
 }
 
 .perspective-1000 {
@@ -62,13 +65,43 @@ body {
     user-select: none;
 }
 
-input,
-textarea,
-[contenteditable="true"] {
-    user-select: text;
+/* --- Premium Custom Scrollbar ("Ether" Design) --- */
+
+/* Root & Global Target */
+* {
+    /* Firefox Support */
+    scrollbar-width: thin;
+    scrollbar-color: rgba(120, 113, 108, 0.2) transparent;
 }
 
-/* Use standard class to ensure override */
+/* Webkit (Chrome/Safari/Edge/Electron) Support */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: rgba(120, 113, 108, 0.15); /* stone-500/15 */
+    border-radius: 20px;
+    border: 1px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(120, 113, 108, 0.4); /* stone-500/40 */
+}
+
+/* Sticky Scroll Enhancement - thumb gets slightly brighter when active */
+::-webkit-scrollbar-thumb:active {
+    background-color: rgba(168, 162, 158, 0.5); /* stone-400/50 */
+}
+
+/* Hidden Scrollbar Utility */
 .no-scrollbar {
     -ms-overflow-style: none !important;
     scrollbar-width: none !important;
@@ -76,6 +109,18 @@ textarea,
 
 .no-scrollbar::-webkit-scrollbar {
     display: none !important;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+    user-select: text;
+}
+
+/* --- Global Custom Utility Classes --- */
+.vertical-text {
+    writing-mode: vertical-lr;
+    transform: rotate(180deg);
 }
 
 /* Flip Clock Keyframes */
@@ -115,6 +160,22 @@ textarea,
     100% {
         opacity: 0.4;
     }
+}
+
+@keyframes panel-in {
+    from {
+        opacity: 0;
+        transform: translateX(40px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) scale(1);
+    }
+}
+
+@keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* --- Presentation Transitions --- */

@@ -181,7 +181,8 @@ function createMainWindow() {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
             contextIsolation: true,
-            sandbox: false
+            sandbox: false,
+            autoplayPolicy: 'no-user-gesture-required'
         },
     });
 
@@ -265,7 +266,8 @@ function createProjectorWindow(displaySettings?: any) {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
             contextIsolation: true,
-            sandbox: false
+            sandbox: false,
+            autoplayPolicy: 'no-user-gesture-required'
         },
     });
 
@@ -397,10 +399,13 @@ app.whenReady().then(() => {
     screen.on('display-metrics-changed', broadcastAspectRatio);
 
     ipcMain.on('projector-command', (event, command, payload) => {
-        // Relay command from Controller to Projector
-        if (projectorWindow && !projectorWindow.isDestroyed()) {
-            projectorWindow.webContents.send('projector-command', command, payload);
-        }
+        // Relay to ALL windows that aren't the sender
+        const windows = BrowserWindow.getAllWindows();
+        windows.forEach(win => {
+            if (win && !win.isDestroyed() && win.webContents !== event.sender) {
+                win.webContents.send('projector-command', command, payload);
+            }
+        });
     });
 
     ipcMain.on('projector-ready', (event, payload) => {

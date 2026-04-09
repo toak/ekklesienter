@@ -15,7 +15,7 @@ export class IpcService {
      */
     static send(channel: string, ...args: any[]): void {
         if (this.isElectron()) {
-            window.electron!.ipcRenderer.send(channel, ...args);
+            window.electron?.ipcRenderer?.send(channel, ...args);
         } else {
             console.warn(`[IpcService] Attempted to send to channel "${channel}" in non-electron environment.`);
         }
@@ -27,7 +27,7 @@ export class IpcService {
      */
     static on(channel: string, func: (...args: any[]) => void): () => void {
         if (this.isElectron()) {
-            return window.electron!.ipcRenderer.on(channel, func);
+            return window.electron?.ipcRenderer?.on(channel, func) || (() => {});
         }
         return () => {};
     }
@@ -37,7 +37,7 @@ export class IpcService {
      */
     static async invoke<T = any>(channel: string, ...args: any[]): Promise<T> {
         if (this.isElectron()) {
-            return window.electron!.ipcRenderer.invoke(channel, ...args);
+            return window.electron?.ipcRenderer?.invoke(channel, ...args) as Promise<T>;
         }
         throw new Error(`[IpcService] Attempted to invoke channel "${channel}" in non-electron environment.`);
     }
@@ -47,7 +47,7 @@ export class IpcService {
      */
     static async selectFile(options: any): Promise<string[] | null> {
         if (this.isElectron()) {
-            return window.electron!.ipcRenderer.selectFile(options);
+            return window.electron?.ipcRenderer?.selectFile(options) || Promise.resolve(null);
         }
         return null;
     }
@@ -57,7 +57,7 @@ export class IpcService {
      */
     static async selectFolder(): Promise<string | null> {
         if (this.isElectron()) {
-            return window.electron!.ipcRenderer.selectFolder();
+            return window.electron?.ipcRenderer?.selectFolder() || Promise.resolve(null);
         }
         return null;
     }
@@ -87,7 +87,7 @@ export class IpcService {
      */
     static onAspectRatioChanged(callback: (ratio: number) => void): () => void {
         if (this.isElectron()) {
-            return window.electron!.ipcRenderer.onAspectRatioChanged(callback);
+            return window.electron?.ipcRenderer?.onAspectRatioChanged(callback) || (() => {});
         }
         return () => {};
     }

@@ -103,12 +103,16 @@ export const useTimelineOperations = ({
 
         const newSlide: ISlide = {
             id: crypto.randomUUID(),
-            type: 'timer',
+            type: 'normal',
             order: 0,
             blockId: 'default',
             templateId: 'blank-dark',
-            durationSec: 300,
-            countDirection: 'down'
+            content: { variables: {} },
+            timerSettings: {
+                duration: 300,
+                style: 'minimal_ring',
+                endAction: 'none',
+            }
         };
 
         try {
@@ -136,6 +140,50 @@ export const useTimelineOperations = ({
         }
     };
 
+    const handleAddVideo = async (e?: React.MouseEvent) => {
+        if (!activePresentationId || !presentation) return;
+
+        const newSlide: any = {
+            id: crypto.randomUUID(),
+            type: 'video',
+            order: 0,
+            blockId: 'default',
+            templateId: 'blank-dark',
+            videoSettings: {
+                strategy: 'manual',
+                scaling: 'contain',
+                speed: 1,
+                volume: 1,
+                loop: false,
+                muted: false
+            }
+        };
+
+        try {
+            const insertBefore = e && (e.metaKey || e.ctrlKey);
+            const selectedIdx = previewSlideId ? slides.findIndex(s => s.id === previewSlideId) : -1;
+            let insertionIndex: number;
+            if (selectedIdx !== -1) {
+                insertionIndex = insertBefore ? selectedIdx : selectedIdx + 1;
+            } else {
+                insertionIndex = slides.length;
+            }
+
+            const newSlides = [
+                ...slides.slice(0, insertionIndex),
+                newSlide,
+                ...slides.slice(insertionIndex),
+            ].map((s, i) => ({ ...s, order: i }));
+
+            await updatePresentationSlides(activePresentationId, newSlides);
+            setPreviewSlide(newSlide.id, activePresentationId);
+            toast.success(t('video_slide_added', 'Video slide added'));
+        } catch (error) {
+            console.error('[SlideTimeline] Failed to add video:', error);
+            toast.error(t('error_add_video_failed', 'Failed to add video slide'));
+        }
+    };
+
     const handleRestoreTemplateBg = async (slideId: string) => {
         await updateSlideBackground(slideId, null);
     };
@@ -157,6 +205,7 @@ export const useTimelineOperations = ({
     return {
         handleAddSlide,
         handleAddTimer,
+        handleAddVideo,
         handleRestoreTemplateBg,
         handleApplyBgToAll
     };

@@ -26,16 +26,37 @@ class MediaCache {
                 entry = await db.mediaPool.get(mediaId);
             }
 
-            if (!entry || !entry.data) return null;
+            if (!entry || !entry.data) {
+                console.warn(`[MediaCache] Media not found in DB: ${mediaId}`);
+                return null;
+            }
 
-            const url = URL.createObjectURL(entry.data);
-            this.urlCache.set(mediaId, { url, count: 1 });
-            this.blobCache.set(mediaId, entry.data);
-            return url;
+            return this.put(mediaId, entry.data);
         } catch (error) {
             console.error(`MediaCache: Failed to load background ${mediaId}`, error);
             return null;
         }
+    }
+
+    /**
+     * Manually injects a blob into the cache. 
+     * Useful for immediate display after import before DB commit is fully propagated.
+     */
+    put(mediaId: string, blob: Blob): string {
+        const existing = this.urlCache.get(mediaId);
+        
+        // If we already have a URL for this ID, just return it
+        // Note: For now we assume blobs for a given ID are immutable.
+        // If they weren't, we'd need a more complex check (e.g. comparing blob size/type)
+        if (existing) {
+            return existing.url;
+        }
+
+        const url = URL.createObjectURL(blob);
+        console.log(`[MediaCache] Cached Blob: ${url} (ID: ${mediaId})`);
+        this.urlCache.set(mediaId, { url, count: 1 });
+        this.blobCache.set(mediaId, blob);
+        return url;
     }
 
     /**

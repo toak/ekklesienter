@@ -4,34 +4,39 @@ import { useAtom } from 'jotai';
 import { db } from '@/core/db';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
+import { useMetadata } from './useMetadata';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { appModeAtom, previewFontSizeAtom, showReferenceAtom, activeOverrideAtom } from '@/core/store/uiAtoms';
-import { Verse, ISlide, ICanvasSlide, PresenterSettings } from '@/core/types';
-
-interface SlideDisplayDataOptions {
-  isProjector?: boolean;
-  propVerse?: Verse | null;
-  propSlide?: ISlide | null;
-  propParallel?: Verse | null;
-  propMultiVerses?: Verse[] | null;
-  propIsMultiVerseMode?: boolean;
-  propAppMode?: 'scripture' | 'presentation';
-  propSettings?: PresenterSettings;
-}
+import { Verse, ISlide, ICanvasSlide, PresenterSettings, SlideDisplayProps } from '@/core/types';
 
 /**
  * Hook to orchestrate all data fetching and store state for SlideDisplay
  */
-export function useSlideDisplayData(options: SlideDisplayDataOptions) {
+export function useSlideDisplayData(options: SlideDisplayProps) {
   const { 
-    isProjector, propVerse, propSlide, propParallel, 
-    propMultiVerses, propIsMultiVerseMode, propAppMode, propSettings 
+    isProjector,
+    activeVerse: propVerse,
+    selectedSlide: propSlide,
+    parallelVerse: propParallel, 
+    multiVerses: propMultiVerses,
+    isMultiVerseMode: propIsMultiVerseMode,
+    appMode: propAppMode,
+    settings: propSettings 
   } = options;
 
   const bibleStore = useBibleStore();
   const { settings: globalSettings } = usePresenterStore();
   
-  const presentationStore = usePresentationStore();
+  const presentationStore = usePresentationStore(useShallow(s => ({
+    selectedPresentationId: s.selectedPresentationId,
+    activePresentationId: s.activePresentationId,
+    selectedPresentation: s.selectedPresentation,
+    activePresentation: s.activePresentation,
+    previewSlideId: s.previewSlideId,
+    lastTransitionTrigger: s.lastTransitionTrigger,
+    navigationDirection: s.navigationDirection
+  })));
   
   const [storeAppMode] = useAtom(appModeAtom);
   const [previewFontSize] = useAtom(previewFontSizeAtom);
@@ -112,11 +117,8 @@ export function useSlideDisplayData(options: SlideDisplayDataOptions) {
       .first() ?? null;
   }, [selectedSlide]);
 
-  // 4. Global Maps
-  const blocks = useLiveQuery(() => db.blocks.toArray()) || [];
-  const blocksMap = useMemo(() => new Map(blocks.map(b => [b.id, b])), [blocks]);
-  const templates = useLiveQuery(() => db.templates.toArray()) || [];
-  const templatesMap = useMemo(() => new Map(templates.map(t => [t.id, t])), [templates]);
+  // 4. Global Metadata
+  const { blocksMap, templatesMap } = useMetadata();
 
   return {
     appMode,

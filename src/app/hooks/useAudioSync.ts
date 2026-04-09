@@ -11,21 +11,26 @@ export function useAudioSync() {
     const { liveSlideId, activePresentationId } = usePresentationStore();
 
     // Audio Sync — use DB data directly for reliability (store's activePresentation can be stale)
-    const audioPresentationSlides = useLiveQuery(
-        () => activePresentationId ? db.presentationFiles.get(activePresentationId).then(p => p?.slides || []) : [],
+    const audioData = useLiveQuery(
+        async () => {
+            if (!activePresentationId) return { slides: [], scopes: [] };
+            const pres = await db.presentationFiles.get(activePresentationId);
+            const scopes = await db.audioScopes.where('presentationId').equals(activePresentationId).toArray();
+            return { slides: pres?.slides || [], scopes };
+        },
         [activePresentationId]
     );
 
     useEffect(() => {
-        if (!activePresentationId || !audioPresentationSlides?.length) {
+        if (!activePresentationId || !audioData?.slides?.length) {
             // Small delay to avoid stopping when switching presentations if the new one is still loading
             const timer = setTimeout(() => {
-                if (!activePresentationId || !audioPresentationSlides?.length) {
+                if (!activePresentationId || !audioData?.slides?.length) {
                     audioService.stopAll(1.0);
                 }
             }, 500);
             return () => clearTimeout(timer);
         }
-        audioService.sync(liveSlideId, audioPresentationSlides);
-    }, [liveSlideId, audioPresentationSlides, activePresentationId]);
+        audioService.sync(liveSlideId, audioData.slides, audioData.scopes);
+    }, [liveSlideId, audioData, activePresentationId]);
 }

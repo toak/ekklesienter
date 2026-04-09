@@ -4,6 +4,10 @@ import { cn } from '@/core/utils/cn';
 import { IAudioScope, ISlide, ICanvasSlide, ITimerSlide } from '@/core/types';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useSetAtom } from 'jotai';
+import { latestInteractionAreaAtom } from '@/core/store/uiAtoms';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/core/db';
 import { Music, Plus } from 'lucide-react';
 import AudioScopeBlock from './AudioScopeBlock';
 import TimerAudioClip from './TimerAudioClip';
@@ -29,7 +33,8 @@ interface AudioTrackProps {
 const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
     const { t } = useTranslation();
     const { openModal } = useModalStore();
-    const { addAudioScope } = usePresentationStore();
+    const { activePresentationId, addAudioScope } = usePresentationStore();
+    const setLatestArea = useSetAtom(latestInteractionAreaAtom);
     const [hoveredSlotIdx, setHoveredSlotIdx] = React.useState<number | null>(null);
 
     // Map slide IDs to their first visual index for scope resolution
@@ -43,32 +48,26 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
         return map;
     }, [visualTimeline]);
 
-    // Collect all audio scopes from all visible slides in the timeline
+    // Live query for all audio scopes in this presentation
+    const dbScopes = useLiveQuery(
+        () => activePresentationId ? db.audioScopes.where('presentationId').equals(activePresentationId).toArray() : [],
+        [activePresentationId]
+    ) || [];
+
+    // Resolve visual indices for each scope
     const allScopes = useMemo(() => {
         const scopes: Array<{ scope: IAudioScope; startIdx: number; endIdx: number }> = [];
-        const seenScopeIds = new Set<string>();
 
-        visualTimeline.forEach((item, idx) => {
-            if (item.slide?.type === 'normal') {
-                const canvasSlide = item.slide as ICanvasSlide;
-                if (canvasSlide.audioScopes) {
-                    for (const scope of canvasSlide.audioScopes) {
-                        if (seenScopeIds.has(scope.id)) continue;
+        dbScopes.forEach(scope => {
+            const sIdx = slideToIndexMap.get(scope.startSlideId);
+            const eIdx = slideToIndexMap.get(scope.endSlideId);
 
-                        const sIdx = slideToIndexMap.get(scope.startSlideId);
-                        const eIdx = slideToIndexMap.get(scope.endSlideId);
-
-                        if (sIdx !== undefined && eIdx !== undefined) {
-                            scopes.push({ scope, startIdx: sIdx, endIdx: eIdx });
-                            seenScopeIds.add(scope.id);
-                        }
-                    }
-                }
+            if (sIdx !== undefined && eIdx !== undefined) {
+                scopes.push({ scope, startIdx: sIdx, endIdx: eIdx });
             }
         });
         return scopes;
-        // AI Fix: Only depend on the identity and count of items in visualTimeline, plus the slideToIndexMap
-    }, [visualTimeline.length, slideToIndexMap]);
+    }, [dbScopes, slideToIndexMap]);
 
     const [isDraggingOver, setIsDraggingOver] = React.useState(false);
 
@@ -212,6 +211,7 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
             onDragLeave={handleMouseLeave}
             onMouseMove={handleMouseMove}
             onMouseLeave={handleMouseLeaveContainer}
+            onPointerDown={() => setLatestArea('audio')}
             onDrop={handleDrop}
             className={cn(
                 'relative shrink-0 transition-all rounded-xl border-2',
@@ -224,7 +224,7 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
             }}
         >
             {isDraggingOver && allScopes.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center gap-2 pointer-events-none text-purple-400">
+                <div className="absolute inset-0 flex items-center justify-center gap-2 text-purple-400">
                     <Music className="w-4 h-4" />
                     <span className="text-[10px] font-black uppercase tracking-widest">{t('drop_audio_here', 'Drop Audio Here')}</span>
                 </div>
@@ -236,7 +236,8 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
                 visualTimeline[hoveredSlotIdx]?.type === 'slide' &&
                 visualTimeline[hoveredSlotIdx]?.slide &&
                 !allScopes.some(s => s.startIdx <= (hoveredSlotIdx || -1) && s.endIdx >= (hoveredSlotIdx || -1)) &&
-                !((visualTimeline[hoveredSlotIdx]?.slide as ITimerSlide)?.playlist?.length) && (
+                !((visualTimeline[hoveredSlotIdx]?.slide as ITimerSlide)?.playlist?.length) &&
+                !((visualTimeline[hoveredSlotIdx]?.slide as any)?.timerSettings?.playlist?.length) && (
                     <div
                         className="absolute top-1 bottom-1 border-2 border-dashed border-purple-500/30 rounded-xl pointer-events-none z-10 flex items-center justify-center transition-all animate-in fade-in duration-200"
                         style={{
@@ -261,7 +262,11 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
                 )}
 
             {visualTimeline.map((item) => {
-                if (item.type === 'slide' && item.slide?.type === 'timer' && (item.slide as ITimerSlide).playlist?.length) {
+                const legacyPlaylist = item.type === 'slide' && item.slide?.type === 'normal' ? (item.slide as any).timerSettings?.playlist : undefined;
+                const newPlaylist = item.type === 'slide' && item.slide?.type === 'timer' ? (item.slide as ITimerSlide).playlist : undefined;
+                const playlistLength = legacyPlaylist?.length || newPlaylist?.length;
+
+                if (item.type === 'slide' && item.slide && playlistLength) {
                     return (
                         <TimerAudioClip
                             key={`timer-audio-${item.slide.id}`}

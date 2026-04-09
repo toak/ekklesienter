@@ -17,7 +17,7 @@ interface ILayerItemProps {
     hideHandle?: boolean;
 }
 
-export const LayerItem: React.FC<ILayerItemProps> = ({
+export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
     layer,
     index,
     total,
@@ -193,7 +193,7 @@ export const LayerItem: React.FC<ILayerItemProps> = ({
                 title="Fill Settings"
                 width={360}
             >
-                <div className="h-[430px]">
+                <div className="h-[560px] max-h-[85vh]">
                     <BackgroundPicker
                         background={[layer]}
                         onChange={(newLayers) => {
@@ -206,4 +206,4 @@ export const LayerItem: React.FC<ILayerItemProps> = ({
             </FloatingPopover>
         </div>
     );
-};
+});

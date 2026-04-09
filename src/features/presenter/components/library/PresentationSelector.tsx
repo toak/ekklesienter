@@ -225,9 +225,9 @@ const PresentationSelector: React.FC<PresentationSelectorProps> = ({ className }
                 <div className="min-w-10 h-8 px-2 rounded-xl bg-stone-800/50 flex items-center justify-center border border-white/5 shrink-0 group-hover:bg-accent/10 group-hover:border-accent/20 transition-all">
                     <Layers className="w-4 h-4 text-stone-600 group-hover:text-accent transition-colors" />
                 </div>
-                <div className="flex flex-col min-w-0 text-left">
+                <div className="flex flex-col min-w-0 text-left" title={activePresentation?.name}>
                     <span className="text-[10px] font-bold text-stone-300 uppercase leading-none truncate group-hover:text-white transition-colors">
-                        {activePresentation ? truncateMiddle(activePresentation.name, 14) : t('select_presentation', 'Select Presentation')}
+                        {activePresentation ? activePresentation.name : t('select_presentation', 'Select Presentation')}
                     </span>
                     <span className="text-[8px] font-bold text-stone-600 uppercase tracking-widest mt-1 truncate group-hover:text-stone-400">
                         {activePresentation ? `${activePresentation.slides.length} ${t('slides', 'slides')}` : t('no_presentation_active', 'None Active')}

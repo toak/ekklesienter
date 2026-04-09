@@ -22,7 +22,7 @@ interface MediaItemCardProps {
   mediaTimes?: { current: number, duration: number };
 }
 
-export const MediaItemCard: React.FC<MediaItemCardProps> = ({
+export const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({
   item, isSelected, onClick, playingItemId, setPlayingItemId, handleDragStart, 
   setContextMenu, togglePlayback, videoRefs, handleTimeUpdate, mediaTimes
 }) => {
@@ -120,7 +120,7 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = ({
       )}
     </div>
   );
-};
+});
 
 export const TypeIcon = ({ type, className }: { type: MediaType; className?: string }) => {
   switch (type) {

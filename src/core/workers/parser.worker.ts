@@ -3,6 +3,8 @@ import { zefaniaParser } from '@/core/parsers/zefaniaParser';
 import { myBibleParser } from '@/core/parsers/myBibleParser';
 
 /* eslint-disable no-restricted-globals */
+console.log('[ParserWorker] Thread started.');
+
 self.onmessage = async (e: MessageEvent) => {
     const { fileType, content, fileName } = e.data;
 
@@ -18,10 +20,11 @@ self.onmessage = async (e: MessageEvent) => {
         }
 
         self.postMessage({ type: 'success', data });
-    } catch (err) {
+    } catch (err: any) {
+        console.error('[ParserWorker] Error:', err);
         self.postMessage({
             type: 'error',
-            error: err instanceof Error ? err.message : 'Unknown Parsing Error'
+            error: err instanceof Error ? err.message : (typeof err === 'string' ? err : 'Unknown Parsing Error')
         });
     }
 };

@@ -1,5 +1,9 @@
 import React, { useMemo } from 'react';
-import { ISlide, IBlock, ITemplate, ITemplateTextStyle, ICanvasItem, IStyleLayer, ICanvasSlide, ITimerSlide } from '@/core/types';
+import { ISlide, IBlock, ICanvasSlide, ITimerSlide, IVideoSlide } from '@/core/types/presentation';
+import { ITemplate, ITemplateTextStyle } from '@/core/types/template';
+import { ICanvasItem } from '@/core/types/canvas';
+import { IStyleLayer } from '@/core/types/style';
+import { PresenterSettings } from '@/core/types/settings';
 import CanvasItemView from './CanvasItemView';
 import {
     Monitor, Music, Coins, Baby, Mic2, Megaphone,
@@ -7,12 +11,15 @@ import {
 } from 'lucide-react';
 import { VerseDisplay } from '@/features/presenter/components/bible/VerseDisplay';
 import { ParallelVerseDisplay } from '@/features/presenter/components/bible/ParallelVerseDisplay';
-import { Verse } from '@/core/types';
+import { Verse } from '@/core/types/bible';
 import { cn } from '@/core/utils/cn';
 
 import { SlideBackground } from '@/features/presenter/components/display/SlideBackground';
 import TimerSlideRenderer from '@/features/presenter/components/display/TimerSlideRenderer';
+import VideoSlideRenderer from '@/features/presenter/components/display/VideoSlideRenderer';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
+import { db } from '@/core/db';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string; strokeWidth?: number }>> = {
     Monitor, Music, Coins, Baby, Mic2, Megaphone, BookOpen, Plus, Presentation: PresentationIcon,
@@ -41,6 +48,8 @@ interface SlideContentRendererProps {
     lang?: string;
     /** Whether this is a miniature preview (scales text down) */
     isPreview?: boolean;
+    /** Whether this is being preloaded (hidden warm-up) */
+    isPreloading?: boolean;
     /** Optional extra className */
     className?: string;
     /** Show lock badge for prebuilt templates */
@@ -55,8 +64,23 @@ interface SlideContentRendererProps {
     hideOverlays?: boolean;
     /** Slide ID for live/preview detection */
     slideId?: string;
-    /** Current slide data for type detection */
-    slide?: ISlide;
+    /** Current slide data for type detection / propagation */
+    slide?: ISlide | null;
+    /** Skip rendering canvas items (used when interactive SlideCanvas is present) */
+    hideCanvasItems?: boolean;
+    /** Whether this is for the projector window */
+    isProjector?: boolean;
+    /** Presenter settings for reference/labels */
+    settings?: PresenterSettings;
+    /** Bible verses for scripture slides */
+    bibleVerses?: Verse[] | null;
+    /** Second translation for parallel view */
+    bibleSecondVerse?: Verse | null;
+    /** Transition state */
+    isTransitioning?: boolean;
+    /** Data maps for resolving references */
+    blocksMap?: Map<string, any>;
+    templatesMap?: Map<string, any>;
 }
 
 const BASE_WIDTH = 1920;
@@ -68,8 +92,8 @@ const BASE_HEIGHT = 1080;
  * Renders in a fixed 1920x1080 logical coordinate system and scales via CSS.
  */
 const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
-    template,
-    block,
+    template: propTemplate,
+    block: propBlock,
     variables = {},
     lang = 'en',
     isPreview = false,
@@ -80,19 +104,43 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
     scale = 1,
     hideOverlays = false,
     slideId,
-    slide,
+    slide: propSlide,
+    hideCanvasItems = false,
+    isPreloading = false,
+    settings: propSettings,
+    bibleVerses,
+    bibleSecondVerse,
+    isTransitioning,
+    blocksMap,
+    templatesMap
 }) => {
+    const { settings: globalSettings } = usePresenterStore();
+    const settings = propSettings || globalSettings;
+    const slide = propSlide;
+
+    // Resolve missing block/template data directly from DB if props are missing
+    const dbBlock = useLiveQuery(
+        () => (!propBlock && slide?.blockId) ? db.blocks.get(slide.blockId) : undefined,
+        [propBlock, slide?.blockId]
+    );
+    const dbTemplate = useLiveQuery(
+        () => (!propTemplate && slide?.templateId) ? db.templates.get(slide.templateId) : undefined,
+        [propTemplate, slide?.templateId]
+    );
+
+    const block = propBlock || dbBlock;
+    const template = propTemplate || dbTemplate;
+
     const isRu = lang === 'ru';
     const ts = template?.textStyle;
     const bg = backgroundOverride || template?.background;
 
     const isTimer = slide?.type === 'timer';
-    const { settings } = usePresenterStore();
 
     const BlockIcon = block ? (ICON_MAP[block.icon] || PresentationIcon) : PresentationIcon;
-    const title = variables.title || (isRu ? block?.nameRu : block?.name) || '';
-    const subtitle = variables.subtitle ? String(variables.subtitle) : '';
-    const content = variables.content ? String(variables.content) : '';
+    const title = variables.title || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.title : undefined) || (isRu ? block?.nameRu : block?.name) || '';
+    const subtitle = variables.subtitle ? String(variables.subtitle) : (slide?.type === 'normal' ? String((slide as ICanvasSlide).content?.variables?.subtitle || '') : '');
+    const content = variables.content ? String(variables.content) : (slide?.type === 'normal' ? String((slide as ICanvasSlide).content?.variables?.content || '') : '');
 
     // Standard sizes (formerly "full sizes")
     // All scaling is now handled by CSS transform: scale()
@@ -118,7 +166,10 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                 {bg ? (
                     <SlideBackground background={bg} />
                 ) : (
-                    <div className="absolute inset-0 bg-stone-900" />
+                    <div 
+                        className="absolute inset-0 transition-colors duration-500" 
+                        style={{ backgroundColor: block?.color || '#1c1917' }} 
+                    />
                 )}
             </div>
 
@@ -196,11 +247,11 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                         const hasParallel = !!variables.secondTranslationId && !!variables.secondVerseText;
                         const primaryVerse: Verse = {
                             id: (slideId || slide?.id || 'thumbnail') as unknown as number,
-                            bookId: (variables.bookId as string) || 'GEN',
-                            chapter: Number(variables.chapter) || 1,
-                            verseNumber: Number(variables.verseStart) || 1,
-                            text: (variables.content as string) || '',
-                            translationId: (variables.translationId as string) || 'KJV'
+                            bookId: (variables.bookId as string) || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.bookId as string : undefined) || 'GEN',
+                            chapter: Number(variables.chapter || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.chapter : 1)),
+                            verseNumber: Number(variables.verseStart || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.verseStart : 1)),
+                            text: (variables.content as string) || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.content as string : ''),
+                            translationId: (variables.translationId as string) || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.translationId as string : 'KJV')
                         };
 
                         if (hasParallel) {
@@ -234,13 +285,26 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
             )}
 
             {/* Timer Renderer */}
-            {isTimer && (slide as unknown as ICanvasSlide).timerSettings && (
+            {slide?.type === 'normal' && (slide as ICanvasSlide).timerSettings && (
                 <div className="absolute inset-0 z-12">
                     <TimerSlideRenderer
-                        id={slide!!.id}
-                        settings={(slide as unknown as ICanvasSlide).timerSettings!}
+                        id={slide.id}
+                        settings={(slide as ICanvasSlide).timerSettings!}
                         isPreview={isPreview}
                         isLive={!isPreview && !!slideId}
+                    />
+                </div>
+            )}
+
+            {/* Video Slide Renderer */}
+            {slide?.type === 'video' && (
+                <div className="absolute inset-0 z-12">
+                    <VideoSlideRenderer
+                        slideId={slide.id}
+                        settings={(slide as IVideoSlide).videoSettings}
+                        isPreview={isPreview}
+                        isLive={!isPreview && !isPreloading}
+                        isPreloading={isPreloading}
                     />
                 </div>
             )}
@@ -253,9 +317,18 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
             )}
 
             {/* Canvas Items Overlay */}
-            {canvasItems.length > 0 && (
-                <div className="absolute inset-0 z-15 pointer-events-none">
-                    {canvasItems.filter((ci: ICanvasItem) => ci.visible).map((item: ICanvasItem) => {
+            {(() => {
+                const items = (canvasItems && canvasItems.length > 0) 
+                    ? canvasItems 
+                    : (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.canvasItems : []);
+                
+                if (hideCanvasItems || !items || items.length === 0) return null;
+                
+                const sortedItems = [...items].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+                return (
+                    <div className="absolute inset-0 z-20 pointer-events-none">
+                        {sortedItems.filter((ci: ICanvasItem) => ci.visible).map((item: ICanvasItem) => {
                         const isAutoWidth = item.type === 'text' && item.text?.resizingMode === 'auto-width';
                         const isAutoHeight = item.type === 'text' && item.text?.resizingMode === 'auto-height';
 
@@ -277,8 +350,9 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                             </div>
                         );
                     })}
-                </div>
-            )}
+                    </div>
+                );
+            })()}
         </div>
     );
 };

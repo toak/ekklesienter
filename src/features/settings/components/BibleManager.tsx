@@ -170,6 +170,11 @@ const BibleManager: React.FC = () => {
                 importedCount++;
             }
         } catch (err) {
+            console.error('[BibleManager] Full Import error context:', {
+                error: err,
+                message: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : 'N/A'
+            });
             setError(err instanceof Error ? err.message : t('import_failed', 'Import failed'));
         } finally {
             setImporting(false);

@@ -1,11 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { cn } from '@/core/utils/cn';
+import { FloatingPopover } from './FloatingPopover';
 
 interface CompactColorPickerProps {
     color: string;
     onChange: (color: string) => void;
     label?: string;
     className?: string;
+}
+
+interface ColorPickerPanelProps {
+    color: string;
+    onChange: (color: string) => void;
 }
 
 // Reuse HSV conversion helpers
@@ -64,6 +70,48 @@ export const CompactColorPicker: React.FC<CompactColorPickerProps> = ({
     onChange,
     label,
     className
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+
+    return (
+        <div className={cn("flex flex-col gap-1.5", className)}>
+            {label && (
+                <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest px-1">
+                    {label}
+                </label>
+            )}
+
+            <button
+                ref={triggerRef}
+                onClick={() => setIsOpen(!isOpen)}
+                className={cn(
+                    "w-6 h-6 rounded-full border-2 transition-all hover:scale-110 active:scale-95 shadow-sm relative group",
+                    isOpen ? "border-accent ring-4 ring-accent/20" : "border-white/20 hover:border-white/40"
+                )}
+                style={{ backgroundColor: color }}
+            >
+                <div className="absolute inset-0 rounded-full bg-linear-to-tr from-black/20 to-transparent pointer-events-none" />
+            </button>
+
+            <FloatingPopover
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                anchorRef={triggerRef}
+                title="Pick Color"
+                width={280}
+            >
+                <div className="p-1">
+                    <ColorPickerPanel color={color} onChange={onChange} />
+                </div>
+            </FloatingPopover>
+        </div>
+    );
+};
+
+const ColorPickerPanel: React.FC<ColorPickerPanelProps> = ({
+    color,
+    onChange
 }) => {
     const [hsv, setHsv] = useState(hexToHsv(color || '#FFFFFF'));
     const [isDraggingWheel, setIsDraggingWheel] = useState(false);
@@ -132,12 +180,6 @@ export const CompactColorPicker: React.FC<CompactColorPickerProps> = ({
         };
     }, [isDraggingValue, handleValueMove]);
 
-    const handleWheelDoubleClick = () => {
-        const newHsv = { ...hsv, h: 0, s: 0 };
-        setHsv(newHsv);
-        onChange(hsvToHex(newHsv.h, newHsv.s, newHsv.v));
-    };
-
     const PRESET_UI_COLORS = [
         '#FFFFFF', '#A8A29E', '#44403C', '#000000',
         '#F87171', '#FB923C', '#FBBF24', '#34D399',
@@ -145,102 +187,77 @@ export const CompactColorPicker: React.FC<CompactColorPickerProps> = ({
     ];
 
     return (
-        <div className={cn("space-y-3", className)}>
-            {label && (
-                <div className="flex items-center justify-between px-1">
-                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">{label}</label>
-                    <span className="text-[10px] font-mono text-accent/80">{color.toUpperCase()}</span>
-                </div>
-            )}
-
-            <div className="bg-black/20 rounded-xl p-3 border border-white/5 shadow-lg space-y-4">
-                <div className="flex gap-4">
-                    {/* Color Wheel (Hue + Saturation) */}
+        <div className="bg-stone-900/40 rounded-xl p-3 border border-white/5 shadow-inner space-y-4">
+            <div className="flex gap-4">
+                {/* Color Wheel (Hue + Saturation) */}
+                <div
+                    ref={wheelRef}
+                    className="relative w-28 h-28 rounded-full cursor-crosshair select-none touch-none group ring-1 ring-white/10"
+                    style={{
+                        background: 'conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)',
+                    }}
+                    onPointerDown={(e) => {
+                        setIsDraggingWheel(true);
+                        handleWheelMove(e);
+                        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                >
+                    <div className="absolute inset-0 rounded-full bg-radial-at-center from-white to-transparent opacity-100" />
                     <div
-                        ref={wheelRef}
-                        className="relative w-24 h-24 rounded-full cursor-crosshair select-none touch-none group"
+                        className="absolute w-3.5 h-3.5 border-2 border-white rounded-full shadow-lg -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-[left,top] duration-75"
                         style={{
-                            background: 'conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)',
-                            boxShadow: 'inset 0 0 10px rgba(0,0,0,0.5)'
+                            left: `${50 + (hsv.s / 2) * Math.cos((hsv.h - 90) * (Math.PI / 180))}%`,
+                            top: `${50 + (hsv.s / 2) * Math.sin((hsv.h - 90) * (Math.PI / 180))}%`,
                         }}
-                        onPointerDown={(e) => {
-                            setIsDraggingWheel(true);
-                            handleWheelMove(e);
-                            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                        }}
-                        onDoubleClick={handleWheelDoubleClick}
-                        title="Double-click to reset"
-                    >
-                        {/* Saturation Gradient Overlay */}
-                        <div className="absolute inset-0 rounded-full bg-radial-at-center from-white to-transparent opacity-100" />
+                    />
+                </div>
 
-                        {/* Dial Indicator */}
-                        <div
-                            className="absolute w-3 h-3 border-2 border-white rounded-full shadow-lg -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-all duration-75"
-                            style={{
-                                left: `${50 + (hsv.s / 2) * Math.cos((hsv.h - 90) * (Math.PI / 180))}%`,
-                                top: `${50 + (hsv.s / 2) * Math.sin((hsv.h - 90) * (Math.PI / 180))}%`,
-                            }}
-                        />
-                    </div>
-
-                    {/* Value/Brightness Slider */}
+                {/* Value/Brightness Slider */}
+                <div
+                    ref={valueRef}
+                    className="relative w-5 h-28 rounded-full cursor-pointer select-none touch-none overflow-hidden ring-1 ring-white/10"
+                    style={{
+                        background: `linear-gradient(to top, #000, ${hsvToHex(hsv.h, hsv.s, 100)})`,
+                    }}
+                    onPointerDown={(e) => {
+                        setIsDraggingValue(true);
+                        handleValueMove(e);
+                        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                    }}
+                >
                     <div
-                        ref={valueRef}
-                        className="relative w-4 h-24 rounded-full cursor-pointer select-none touch-none overflow-hidden"
-                        style={{
-                            background: `linear-gradient(to top, #000, ${hsvToHex(hsv.h, hsv.s, 100)})`,
-                            border: '1px solid rgba(255,255,255,0.05)'
-                        }}
-                        onPointerDown={(e) => {
-                            setIsDraggingValue(true);
-                            handleValueMove(e);
-                            (e.target as HTMLElement).setPointerCapture(e.pointerId);
-                        }}
-                    >
-                        {/* Handle */}
-                        <div
-                            className="absolute left-0 right-0 h-1.5 bg-white border border-black/20 shadow-md -translate-y-1/2 pointer-events-none transition-all duration-75"
-                            style={{ top: `${100 - hsv.v}%` }}
-                        />
-                    </div>
-
-                    {/* Swatch & Input Area */}
-                    <div className="flex flex-col justify-between items-end flex-1">
-                        <div
-                            className="w-8 h-8 rounded-lg border border-white/10 shadow-inner"
-                            style={{ backgroundColor: color }}
-                        />
-
-                        <input
-                            type="text"
-                            value={color.toUpperCase()}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                if (/^#[0-9A-F]{0,6}$/i.test(val)) {
-                                    onChange(val);
-                                }
-                            }}
-                            className="w-16 bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-[9px] font-mono text-stone-300 focus:outline-none focus:border-accent/40 text-center"
-                            placeholder="#FFF"
-                        />
-                    </div>
+                        className="absolute left-0 right-0 h-1.5 bg-white border border-black/20 shadow-md -translate-y-1/2 pointer-events-none transition-[top] duration-75"
+                        style={{ top: `${100 - hsv.v}%` }}
+                    />
                 </div>
+            </div>
 
-                {/* mini palette */}
-                <div className="flex flex-wrap gap-1.5 pt-1 border-t border-white/5">
-                    {PRESET_UI_COLORS.map(p => (
-                        <button
-                            key={p}
-                            onClick={() => onChange(p)}
-                            className={cn(
-                                "w-4 h-4 rounded-full border border-white/10 transition-transform hover:scale-125 active:scale-95",
-                                color.toUpperCase() === p && "ring-1 ring-accent ring-offset-1 ring-offset-stone-900"
-                            )}
-                            style={{ backgroundColor: p }}
-                        />
-                    ))}
-                </div>
+            <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+                <input
+                    type="text"
+                    value={color.toUpperCase()}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        if (/^#[0-9A-F]{0,6}$/i.test(val)) onChange(val);
+                    }}
+                    className="flex-1 bg-black/40 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-mono text-stone-300 focus:outline-none focus:border-accent/40 text-center"
+                    placeholder="#FFF"
+                />
+                <div className="w-8 h-8 rounded-lg border border-white/10 shadow-inner" style={{ backgroundColor: color }} />
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+                {PRESET_UI_COLORS.map(p => (
+                    <button
+                        key={p}
+                        onClick={() => onChange(p)}
+                        className={cn(
+                            "w-5 h-5 rounded-full border border-white/10 transition-all hover:scale-125 hover:shadow-lg",
+                            color.toUpperCase() === p && "ring-2 ring-accent ring-offset-2 ring-offset-stone-900"
+                        )}
+                        style={{ backgroundColor: p }}
+                    />
+                ))}
             </div>
         </div>
     );

@@ -1,16 +1,5 @@
 import React from 'react';
 import { 
-    DndContext, 
-    closestCorners, 
-    MeasuringStrategy,
-    SensorDescriptor,
-    SensorOptions,
-    DragStartEvent,
-    DragOverEvent,
-    DragEndEvent,
-    DragMoveEvent
-} from '@dnd-kit/core';
-import { 
     SortableContext, 
     horizontalListSortingStrategy 
 } from '@dnd-kit/sortable';
@@ -23,12 +12,11 @@ import TrackContainer, { TrackContainerHandle } from './TrackContainer';
 interface TimelineSlideTrackProps {
     localSlides: ISlide[];
     visualTimeline: TimelineItem[];
-    sensors: SensorDescriptor<SensorOptions>[];
-    handleDragStart: (event: DragStartEvent) => void;
-    handleDragOver: (event: DragOverEvent) => void;
-    handleDragEnd: (event: DragEndEvent) => Promise<void>;
+    // Handlers (DndContext now in parent)
+    handleDragStart: (event: any) => void;
+    handleDragOver: (event: any) => void;
+    handleDragEnd: (event: any) => Promise<void>;
     handleDragCancel: () => void;
-    handleDragMove: (event: DragMoveEvent) => void;
     handleAddSlide: (blockId: string, e?: React.MouseEvent) => void;
     addPresentationToTimeline: (pid: string, idx?: number) => Promise<void>;
     setNativeDropIndex: (idx: number | null) => void;
@@ -51,18 +39,21 @@ interface TimelineSlideTrackProps {
     setContextMenu: (menu: any) => void;
     isSubItemSelected: boolean;
     dragActiveId: string | null;
+    audioTrack?: React.ReactNode;
     children?: React.ReactNode;
 }
 
+/**
+ * TimelineSlideTrack - Pure layout component for the slide track.
+ * The DndContext and DragOverlay are managed by the parent SlideTimeline.
+ */
 export const TimelineSlideTrack: React.FC<TimelineSlideTrackProps> = ({
     localSlides,
     visualTimeline,
-    sensors,
     handleDragStart,
     handleDragOver,
     handleDragEnd,
     handleDragCancel,
-    handleDragMove,
     handleAddSlide,
     addPresentationToTimeline,
     setNativeDropIndex,
@@ -85,80 +76,87 @@ export const TimelineSlideTrack: React.FC<TimelineSlideTrackProps> = ({
     setContextMenu,
     isSubItemSelected,
     dragActiveId,
+    audioTrack,
     children
 }) => {
+    const handleSelect = React.useCallback((id: string, e?: React.MouseEvent) => {
+        toggleSlideSelection(id, !!(e?.metaKey || e?.ctrlKey), e?.shiftKey);
+    }, [toggleSlideSelection]);
+
+    const handleContextMenu = React.useCallback((e: React.MouseEvent, id: string) => {
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            slideId: id,
+            presentationId: activePresentationId
+        });
+    }, [setContextMenu, activePresentationId]);
+
+    const handleAddPresentation = React.useCallback((pid: string, idx?: number) => {
+        addPresentationToTimeline(pid, idx);
+        setNativeDropIndex(null);
+    }, [addPresentationToTimeline, setNativeDropIndex]);
+
+    const sortableIds = React.useMemo(() => localSlides.map(s => s.id), [localSlides]);
+
     return (
         <div className="flex-1 overflow-hidden relative">
             <TrackContainer ref={trackRef}>
-                <div className="flex flex-col min-h-full">
+                <div className="flex flex-col min-h-full min-w-full">
                     {/* Lane 1: Slides */}
-                    <div className="flex items-center px-8 py-4 min-w-full relative">
+                    <div className="flex-1 flex items-center px-8 py-4 min-w-full relative">
                         <TimelineDroppableZone 
+                            disabled={!!dragActiveId && dragActiveId !== 'presentation-item-drag'}
                             onAddSlide={handleAddSlide} 
-                            onAddPresentation={(pid, idx) => {
-                                addPresentationToTimeline(pid, idx);
-                                setNativeDropIndex(null);
-                            }} 
+                            onAddPresentation={handleAddPresentation} 
                             visualTimeline={visualTimeline}
                             onNativeDragOver={setNativeDropIndex}
                         />
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCorners}
-                            measuring={{
-                                droppable: {
-                                    strategy: MeasuringStrategy.Always,
-                                },
-                            }}
-                            onDragStart={handleDragStart}
-                            onDragOver={handleDragOver}
-                            onDragEnd={handleDragEnd}
-                            onDragCancel={handleDragCancel}
-                            onDragMove={handleDragMove}
-                        >
-                            <div className="flex items-center gap-3 relative">
-                                <SortableContext
-                                    items={localSlides.map(s => s.id)}
-                                    strategy={horizontalListSortingStrategy}
-                                >
-                                    {localSlides.map((slide, index) => (
-                                        <SortableSlideBlock
-                                            key={slide.id}
-                                            slide={slide}
-                                            index={index}
-                                            activePresentationId={activePresentationId}
-                                            previewSlideId={previewSlideId}
-                                            selectedPresentationId={selectedPresentationId}
-                                            liveSlideId={liveSlideId}
-                                            blocksMap={blocksMap}
-                                            templatesMap={templatesMap}
-                                            presentationsMap={presentationsMap}
-                                            navigationParentSlideId={navigationParentSlideId}
-                                            lang={lang}
-                                            onSelect={(id, e) => toggleSlideSelection(id, !!(e?.metaKey || e?.ctrlKey), e?.shiftKey)}
-                                            onLive={setLiveSlide}
-                                            onContextMenu={(e, id) => {
-                                                e.preventDefault();
-                                                setContextMenu({
-                                                    x: e.clientX,
-                                                    y: e.clientY,
-                                                    slideId: id,
-                                                    presentationId: activePresentationId
-                                                });
-                                            }}
-                                            onToggleExpansion={toggleSlideExpansion}
-                                            isSelected={selectedSlideIds.includes(slide.id)}
-                                            isMultiSelect={selectedSlideIds.length > 1}
-                                            isSubItemSelected={isSubItemSelected}
-                                            isMultiDragHidden={!!dragActiveId && selectedSlideIds.length > 1 && selectedSlideIds.includes(slide.id) && slide.id !== dragActiveId}
-                                            setContextMenu={setContextMenu}
-                                        />
-                                    ))}
-                                </SortableContext>
-                                {children}
-                            </div>
-                        </DndContext>
+                        
+                        <div className="flex items-center gap-3 relative z-10">
+                            <SortableContext
+                                items={sortableIds}
+                                strategy={horizontalListSortingStrategy}
+                            >
+                                {localSlides.map((slide, index) => (
+                                    <SortableSlideBlock
+                                        key={slide.id}
+                                        slide={slide}
+                                        index={index}
+                                        activePresentationId={activePresentationId}
+                                        previewSlideId={previewSlideId}
+                                        selectedPresentationId={selectedPresentationId}
+                                        liveSlideId={liveSlideId}
+                                        blocksMap={blocksMap}
+                                        templatesMap={templatesMap}
+                                        presentationsMap={presentationsMap}
+                                        navigationParentSlideId={navigationParentSlideId}
+                                        lang={lang}
+                                        onSelect={handleSelect}
+                                        onLive={setLiveSlide}
+                                        onContextMenu={handleContextMenu}
+                                        onToggleExpansion={toggleSlideExpansion}
+                                        isSelected={selectedSlideIds.includes(slide.id)}
+                                        isMultiSelect={selectedSlideIds.length > 1}
+                                        isSubItemSelected={isSubItemSelected}
+                                        isMultiDragHidden={!!dragActiveId && selectedSlideIds.length > 1 && selectedSlideIds.includes(slide.id) && slide.id !== dragActiveId}
+                                        setContextMenu={setContextMenu}
+                                    />
+                                ))}
+                            </SortableContext>
+                            
+                            {/* DragOverlay is now in SlideTimeline */}
+                            {children}
+                        </div>
                     </div>
+
+                    {/* Lane 2: Audio */}
+                    {audioTrack && (
+                        <div className="shrink-0 h-[98px] border-t border-white/5 bg-stone-950/20 relative min-w-full px-8 pt-[10px] pb-4">
+                            {audioTrack}
+                        </div>
+                    )}
                 </div>
             </TrackContainer>
         </div>

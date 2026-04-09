@@ -1,9 +1,10 @@
 import React, { useRef, useId, memo, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import { selectedCanvasItemIdsAtom, fontPreviewFamilyAtom, fontPreviewWeightAtom } from '@/core/store/uiAtoms';
-import { ICanvasItem } from '@/core/types';
+import { ICanvasItem, IStyleLayer } from '@/core/types';
 import { cn } from '@/core/utils/cn';
-import { ensureLayers } from '@/core/utils/styleMigration';
+import { ensureLayers, ensureEffects } from '@/core/utils/styleMigration';
+import { getEffectsStyle } from '@/core/utils/effectUtils';
 import { SlideBackground } from '../display/SlideBackground';
 import { useTextFit } from '../../hooks/useTextFit';
 import { Z_INDEX } from '@/core/constants/zIndex';
@@ -94,6 +95,9 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
                             <div className="absolute inset-0" style={{ zIndex: Z_INDEX.CANVAS_EDITOR_OVERLAY }}>
                                 <InlineTextEditor
                                     item={item}
+                                    fittedFontSize={fittedFontSize}
+                                    activeFontFamily={activeFontFamily}
+                                    activeFontWeight={activeFontWeight}
                                     onSave={onSave}
                                     onInput={onInput}
                                     onCancel={onCancel}
@@ -133,8 +137,37 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
 
     const align = item.strokeAlign || 'center';
     const borderWidth = item.borderWidth || 0;
+    const itemFills = item.fills || [];
+    
+    // Fallback: If fills is empty but it's a media item with legacy data, synthesize a layer
+    const fills = useMemo(() => {
+        const layers = ensureLayers(itemFills);
+        if (layers.length > 0) return layers;
+        
+        if (item.type === 'image' && (item as any).image) {
+            return [{
+                id: `legacy-img-${item.id}`,
+                type: 'image',
+                visible: true,
+                opacity: 1,
+                blendMode: 'normal',
+                image: (item as any).image
+            } as IStyleLayer];
+        }
+        if (item.type === 'video' && (item as any).video) {
+            return [{
+                id: `legacy-vid-${item.id}`,
+                type: 'video',
+                visible: true,
+                opacity: 1,
+                blendMode: 'normal',
+                video: (item as any).video
+            } as IStyleLayer];
+        }
+        return layers;
+    }, [itemFills, item]);
+
     const strokes = ensureLayers(item.strokes);
-    const fills = ensureLayers(item.fills);
 
     const getBorderRadius = () => {
         if (item.lockBorderRadius !== false) {
@@ -142,6 +175,9 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
         }
         return `${item.borderRadiusTL ?? 0}px ${item.borderRadiusTR ?? 0}px ${item.borderRadiusBR ?? 0}px ${item.borderRadiusBL ?? 0}px`;
     };
+
+    const effects = useMemo(() => ensureEffects(item), [item]);
+    const { filter, backdropFilter, boxShadow } = useMemo(() => getEffectsStyle(effects), [effects]);
 
     const hasAnyRadius = () => {
         if (item.lockBorderRadius !== false) return (item.borderRadius || 0) > 0;
@@ -154,7 +190,7 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
             className={cn(isFlowText ? (isAutoHeightText ? 'w-full relative' : 'relative') : 'w-full h-full relative')}
             style={{
                 opacity: item.opacity ?? 1,
-                filter: item.dropShadow ? `drop-shadow(${item.dropShadow.x}px ${item.dropShadow.y}px ${item.dropShadow.blur}px ${item.dropShadow.color})` : undefined,
+                filter: item.type === 'text' ? undefined : filter,
             }}
         >
             {/* 1. Stroke Layer (If Outside) */}
@@ -170,8 +206,9 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
                 style={{
                     zIndex: Z_INDEX.CANVAS_ITEM,
                     borderRadius: getBorderRadius(),
-                    backdropFilter: item.backdropBlur ? `blur(${item.backdropBlur}px)` : undefined,
-                    WebkitBackdropFilter: item.backdropBlur ? `blur(${item.backdropBlur}px)` : undefined,
+                    boxShadow: boxShadow,
+                    backdropFilter: backdropFilter,
+                    WebkitBackdropFilter: backdropFilter,
                 }}
             >
                 {/* Fill Layer Stack */}
@@ -182,7 +219,13 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
                 )}
 
                 {/* Content Layer */}
-                <div className={cn("relative", isFlowText ? (isAutoHeightText ? 'w-full' : '') : 'w-full h-full')} style={{ zIndex: Z_INDEX.CANVAS_ITEM }}>
+                <div 
+                    className={cn("relative", isFlowText ? (isAutoHeightText ? 'w-full' : '') : 'w-full h-full')} 
+                    style={{ 
+                        zIndex: Z_INDEX.CANVAS_ITEM,
+                        filter: item.type === 'text' ? filter : undefined
+                    }}
+                >
                     {renderContent()}
                 </div>
 

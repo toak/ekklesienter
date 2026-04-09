@@ -6,6 +6,10 @@ import { CustomSlider } from '@/components/CustomSlider';
 import { IAudioScope } from '@/core/types';
 import type { TFunction } from 'i18next';
 import { ScrubbableInput } from '../slide-properties/ScrubbableInput';
+import { db } from '@/core/db';
+import { toast } from '@/core/utils/toast';
+import { ffmpegService } from '@/core/services/FFmpegService';
+import { useState, useCallback } from 'react';
 
 interface IAudioTabContentProps {
     scope: IAudioScope | undefined;
@@ -21,6 +25,55 @@ export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
     scope, mediaItem, selectedAudioScopeId, updateAudioScope, removeAudioScope, selectAudioScope, t,
 }) => {
     const { openModal } = useModalStore();
+    const [isTrimming, setIsTrimming] = useState(false);
+
+    const handleApplyTrim = useCallback(async () => {
+        if (!scope || !scope.fileId || (!scope.trimStart && !scope.trimEnd)) return;
+        
+        try {
+            setIsTrimming(true);
+            toast.info(t('trimming_audio_start', 'Trimming audio, please wait...'));
+
+            const trimmedBlob = await ffmpegService.trimMediaById(
+                scope.fileId,
+                scope.trimStart || 0,
+                scope.trimEnd || 0
+            );
+
+            if (!trimmedBlob) {
+                throw new Error("Failed to trim media");
+            }
+
+            // Add as a new trimmed copy to the pool
+            const original = await db.mediaPool.get(scope.fileId);
+            const newMediaId = crypto.randomUUID();
+            const newName = original ? `${original.name} (Trimmed)` : 'Trimmed Audio';
+
+            await db.mediaPool.add({
+                id: newMediaId,
+                name: newName,
+                path: `Trimmed/${newName}`,
+                type: 'audio',
+                data: trimmedBlob,
+                createdAt: Date.now(),
+            });
+
+            // Update scope with the new media, resetting the conceptual trim boundaries
+            await updateAudioScope(scope.id, { 
+                fileId: newMediaId,
+                trimStart: 0,
+                trimEnd: 0
+            });
+
+            toast.success(t('audio_trimmed_success', 'Audio physically trimmed successfully!'));
+        } catch (error: any) {
+            console.error('[AudioTabContent] Trim failed:', error);
+            toast.error(t('audio_trim_failed', 'Failed to trim audio. Check console.'));
+        } finally {
+            setIsTrimming(false);
+        }
+    }, [scope, updateAudioScope, t]);
+
     if (!selectedAudioScopeId || !scope) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-12">
@@ -57,17 +110,33 @@ export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
             {/* Trimming */}
             <div className="space-y-4 px-1">
                 <div className="flex items-center gap-2"><div className="w-1 h-3 bg-accent/40 rounded-full" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-500">{t('trimming', 'Trimming')}</span></div>
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-black/40 p-4 rounded-3xl border border-white/5 space-y-3 group hover:border-white/10 transition-colors">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('trim_start', 'Start')}</span>
-                        <ScrubbableInput label={t('trim_start')} value={scope.trimStart ?? 0} onChange={(v) => updateAudioScope(scope.id, { trimStart: v })} min={0} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
+                <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-black/40 p-4 rounded-3xl border border-white/5 space-y-3 group hover:border-white/10 transition-colors">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('trim_start', 'Start')}</span>
+                            <ScrubbableInput value={scope.trimStart ?? 0} onChange={(v) => updateAudioScope(scope.id, { trimStart: v })} min={0} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
+                        </div>
+                        <div className="bg-black/40 p-4 rounded-3xl border border-white/5 space-y-3 group hover:border-white/10 transition-colors">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('trim_end', 'End')}</span>
+                            <ScrubbableInput value={scope.trimEnd ?? 0} onChange={(v) => updateAudioScope(scope.id, { trimEnd: v })} min={0} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
+                        </div>
                     </div>
-                    <div className="bg-black/40 p-4 rounded-3xl border border-white/5 space-y-3 group hover:border-white/10 transition-colors">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('trim_end', 'End')}</span>
-                        <ScrubbableInput label={t('trim_end')} value={scope.trimEnd ?? 0} onChange={(v) => updateAudioScope(scope.id, { trimEnd: v })} min={0} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
-                    </div>
+                    {((scope.trimStart ?? 0) > 0 || (scope.trimEnd ?? 0) > 0) && (
+                        <button
+                            onClick={handleApplyTrim}
+                            disabled={isTrimming}
+                            className={cn(
+                                "w-full flex items-center justify-center gap-2 p-3 rounded-2xl transition-all font-bold text-[11px] uppercase tracking-wider",
+                                isTrimming 
+                                ? "bg-white/5 text-stone-500 cursor-wait" 
+                                : "bg-accent/10 border border-accent/20 text-accent hover:bg-accent/15 cursor-pointer active:scale-[0.98]"
+                            )}
+                        >
+                            {isTrimming ? t('trimming_wait', 'Applying Trim...') : t('apply_physical_trim', 'Apply Physical Trim')}
+                        </button>
+                    )}
+                    <p className="text-[9px] text-stone-600 px-1 font-medium">{t('trim_help')} <span className="text-stone-400">{((scope.trimEnd || 0) - (scope.trimStart || 0)).toFixed(1)}s</span></p>
                 </div>
-                <p className="text-[9px] text-stone-600 px-1 font-medium">{t('trim_help')} <span className="text-stone-400">{((scope.trimEnd || 0) - (scope.trimStart || 0)).toFixed(1)}s</span></p>
             </div>
 
             {/* Playback */}
@@ -84,12 +153,12 @@ export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
                 <div className="flex items-center gap-2"><div className="w-1 h-3 bg-accent/40 rounded-full" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-500">{t('fade_settings', 'Fade Settings')}</span></div>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="bg-black/40 p-4 rounded-3xl border border-white/5 space-y-3 group hover:border-white/10 transition-colors">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('fade_in', 'Fade In')}</span>
-                        <ScrubbableInput label={t('fade_in')} value={cf?.fadeInDuration ?? 0} onChange={(v) => updateAudioScope(scope.id, { crossfadeSettings: { fadeInDuration: v, fadeOutDuration: cf?.fadeOutDuration ?? 0 } })} min={0} max={10} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('trim_start', 'Start')}</span>
+                        <ScrubbableInput value={cf?.fadeInDuration ?? 0} onChange={(v) => updateAudioScope(scope.id, { crossfadeSettings: { fadeInDuration: v, fadeOutDuration: cf?.fadeOutDuration ?? 0 } })} min={0} max={10} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
                     </div>
                     <div className="bg-black/40 p-4 rounded-3xl border border-white/5 space-y-3 group hover:border-white/10 transition-colors">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('fade_out', 'Fade Out')}</span>
-                        <ScrubbableInput label={t('fade_out')} value={cf?.fadeOutDuration ?? 0} onChange={(v) => updateAudioScope(scope.id, { crossfadeSettings: { fadeOutDuration: v, fadeInDuration: cf?.fadeInDuration ?? 0 } })} min={0} max={10} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5">{t('trim_end', 'End')}</span>
+                        <ScrubbableInput value={cf?.fadeOutDuration ?? 0} onChange={(v) => updateAudioScope(scope.id, { crossfadeSettings: { fadeOutDuration: v, fadeInDuration: cf?.fadeInDuration ?? 0 } })} min={0} max={10} step={0.1} className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5" />
                     </div>
                 </div>
             </div>

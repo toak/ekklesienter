@@ -20,17 +20,20 @@ export const themeAccentAtom = atom('amber'); // amber, rose, blue, stone
 export const sidebarOpenAtom = atom(true);
 export const historyOpenAtom = atom(false);
 export const searchOpenAtom = atom(false);
-export const slideDesignPanelOpenAtom = atom(false);
+export const canvasZoomAtom = atom<number>(1.0);
+export const canvasOffsetAtom = atom<{ x: number, y: number }>({ x: 0, y: 0 });
+export const slideDesignPanelOpenAtom = atom<boolean>(false);
+export const latestInteractionAreaAtom = atom<'canvas' | 'timeline' | 'audio'>('timeline');
 export const selectedCanvasItemIdsAtom = atom<string[]>([]);
 export const timelineHeightAtom = atom(236); // Strictly limited to 236px
 export const isTimelineHoveredAtom = atom(false);
 export const editingCanvasItemIdAtom = atom<string | null>(null);
 export const selectedTransitionSlideIdAtom = atom(null as string | null) as PrimitiveAtom<string | null>;
 
-export type SlideDesignTab = 'background' | 'elements' | 'style' | 'audio' | 'timer' | 'transition';
+export type SlideDesignTab = 'background' | 'elements' | 'style' | 'audio' | 'timer' | 'transition' | 'video';
 export const slideDesignTabAtom = atom<SlideDesignTab>('style');
 
-export type CanvasTool = 'select' | 'text';
+export type CanvasTool = 'select' | 'text' | 'pan' | 'image' | 'video' | 'shape' | 'stroke' | 'effect' | string;
 export const canvasToolAtom = atom<CanvasTool>('select');
 
 export interface TextCommand {

@@ -65,14 +65,12 @@ export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
         isDragging,
     } = useSortable({ id: slide.id });
 
-    const style = {
+    const style: React.CSSProperties = {
         transform: transform && !isDragging
             ? CSS.Transform.toString(transform)
             : undefined,
         transition,
-        // When dragging multiple items, hide the counterparts in the timeline completely
-        // to avoid visual clutter and layout measurement loops.
-        opacity: isDragging ? 0 : 1, 
+        willChange: 'transform',
         display: 'flex',
         gap: '0.75rem',
         alignItems: 'center',
@@ -85,13 +83,20 @@ export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
     return (
         <div
             ref={setNodeRef}
-            style={style}
+            style={{
+                ...style,
+                visibility: isDragging ? 'hidden' : undefined,
+            }}
             className={cn(
                 "relative flex items-center h-fit",
-                // Remove transforms here to prevent infinite measurement loops
                 isDragging && "z-50"
             )}
         >
+            {/* Drop placeholder — always in DOM, toggled via CSS only (no DOM mutation on drag) */}
+            <div
+                className="absolute inset-0 rounded-xl border-2 border-dashed border-accent/30 bg-accent/5 pointer-events-none"
+                style={{ visibility: isDragging ? 'visible' : 'hidden' }}
+            />
             <TransitionSeparator slide={slide} activePresentationId={activePresentationId} />
             <SlideTile
                 slide={slide}
@@ -114,6 +119,7 @@ export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
                 presentationsMap={presentationsMap}
                 navigationParentSlideId={navigationParentSlideId}
                 listeners={listeners}
+                attributes={attributes}
             />
 
             {isMaster && slide.isExpanded && nestedPres && (

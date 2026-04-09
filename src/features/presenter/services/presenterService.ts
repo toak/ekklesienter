@@ -41,6 +41,16 @@ export const PresenterService = {
   },
 
   /**
+   * Requests the projector to pre-warm a preview slide.
+   */
+  showPreview: (presentationId: string, slideId: string) => {
+    PresenterService.sendCommand({
+      type: 'show-preview-slide',
+      payload: { presentationId, slideId }
+    });
+  },
+
+  /**
    * Sets a presentation override (blackout, etc).
    */
   setOverride: (type: 'blackout' | 'whiteout' | 'logo' | null) => {

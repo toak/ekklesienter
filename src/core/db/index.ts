@@ -36,17 +36,17 @@ export class ScriptureDatabase extends Dexie {
 
         // Single consolidated schema — all tables defined upfront.
         // Previous migrations (v1–v16) have been collapsed since there are no existing users.
-        this.version(2).stores({
+        this.version(4).stores({
             verses: '++id, [translationId+bookId+chapter], translationId',
             books: '++id, [translationId+bookId], translationId',
             translations: 'id',
             settings: 'key',
             blocks: 'id',
-            presentationFiles: 'id, updatedAt, workflowId, lastOpened, serviceId, binId',
+            presentationFiles: 'id, updatedAt, workflowId, lastOpened, serviceId, binId, ektpHash',
             templates: 'id, category',
             logos: 'id',
             backgrounds: 'id',
-            mediaPool: 'id, name, type, createdAt, binId',
+            mediaPool: 'id, name, path, type, createdAt, binId',
             mediaBins: 'id, createdAt',
             presentationBins: 'id, createdAt',
             audioScopes: 'id, presentationId, startSlideId, endSlideId',
@@ -56,20 +56,75 @@ export class ScriptureDatabase extends Dexie {
         this.on('populate', () => {
             this.seed();
         });
+
+        // Cleanup broken media on startup
+        this.on('ready', () => {
+            this.sanitize();
+        });
+    }
+
+    async sanitize() {
+        try {
+            console.log('[DB] Starting database sanitization...');
+
+            // 1. Sanitize Media Pool
+            const brokenItems = await this.mediaPool
+                .filter(item => 
+                    typeof item.path === 'string' && (
+                        item.path.startsWith('blob:') || 
+                        item.path.includes('webkit-fake-url')
+                    )
+                )
+                .toArray();
+            
+            if (brokenItems.length > 0) {
+                console.warn(`[DB] Sanitizing ${brokenItems.length} broken media items from pool...`);
+                await this.mediaPool.bulkDelete(brokenItems.map(i => i.id));
+            }
+
+            // 2. Sanitize Presentation Thumbnails
+            const presentations = await this.presentationFiles.toArray();
+            for (const pres of presentations) {
+                if (pres.thumbnailUrl?.startsWith('blob:') || pres.thumbnailUrl?.includes('webkit-fake-url')) {
+                    console.warn(`[DB] Clearing stale blob thumbnail for presentation: ${pres.name} (${pres.id})`);
+                    await this.presentationFiles.update(pres.id, { thumbnailUrl: undefined });
+                }
+            }
+
+            // 3. Sanitize Template Thumbnails
+            const templates = await this.templates.toArray();
+            for (const template of templates) {
+                if (template.thumbnail?.startsWith('blob:') || template.thumbnail?.includes('webkit-fake-url')) {
+                    console.warn(`[DB] Clearing stale blob thumbnail for template: ${template.name} (${template.id})`);
+                    await this.templates.update(template.id, { thumbnail: undefined });
+                }
+            }
+
+            console.log('[DB] Sanitization complete.');
+        } catch (err) {
+            console.error('[DB] Sanitization failed:', err);
+        }
     }
 
     async seed() {
-        const count = await this.translations.count();
-        if (count === 0) {
-            await this.transaction('rw', [this.verses, this.books, this.translations, this.blocks, this.templates], async () => {
+        // Individual checks for each core table to ensure survivors from older versions get new metadata
+        const transCount = await this.translations.count();
+        if (transCount === 0) {
+            await this.transaction('rw', [this.verses, this.books, this.translations], async () => {
                 await this.translations.add(INITIAL_DATA.translation);
                 await this.books.bulkAdd(INITIAL_DATA.books);
                 await this.verses.bulkAdd(INITIAL_DATA.verses);
-
-                // Only seed the minimal defaults — everything else comes from bundled templates
-                await this.blocks.bulkAdd(DEFAULT_BLOCKS);
-                await this.templates.bulkAdd(DEFAULT_TEMPLATES);
             });
+        }
+
+        const blocksCount = await this.blocks.count();
+        if (blocksCount === 0) {
+            await this.blocks.bulkAdd(DEFAULT_BLOCKS);
+        }
+
+        const templatesCount = await this.templates.count();
+        if (templatesCount === 0) {
+            await this.templates.bulkAdd(DEFAULT_TEMPLATES);
         }
     }
 }

@@ -8,6 +8,7 @@ export interface TimelineDroppableZoneProps {
     onAddPresentation: (presentationId: string, index?: number) => void;
     visualTimeline: any[];
     onNativeDragOver?: (index: number | null) => void;
+    disabled?: boolean;
 }
 
 /**
@@ -19,10 +20,12 @@ export const TimelineDroppableZone: React.FC<TimelineDroppableZoneProps> = ({
     onAddSlide, 
     onAddPresentation, 
     visualTimeline, 
-    onNativeDragOver 
+    onNativeDragOver,
+    disabled
 }) => {
     const { isOver, setNodeRef } = useDroppable({
         id: 'timeline-droppable',
+        disabled,
         data: {
             accepts: ['presentation', 'block']
         }
@@ -108,11 +111,12 @@ export const TimelineDroppableZone: React.FC<TimelineDroppableZoneProps> = ({
     return (
         <div
             ref={setNodeRef}
+            data-testid="timeline-droppable-zone"
             onDragOver={handleNativeDragOver}
             onDragLeave={handleNativeDragLeave}
             onDrop={handleNativeDrop}
             className={cn(
-                "absolute inset-0 z-40 pointer-events-none border-2 border-transparent transition-all",
+                "absolute inset-0 z-0 pointer-events-none border-2 border-transparent transition-all",
                 (isOver || isNativeOver) && "border-accent/40 bg-accent/5 pointer-events-auto"
             )}
         >

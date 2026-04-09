@@ -1,4 +1,4 @@
-import { BackgroundSettings, IStyleLayer } from '../types';
+import { BackgroundSettings, ICanvasEffect, ICanvasItem, IStyleLayer } from '../types';
 
 /**
  * Migrates legacy BackgroundSettings to the new IStyleLayer array format.
@@ -44,4 +44,36 @@ export const migrateBackgroundToLayers = (bg: BackgroundSettings | undefined): I
 export const ensureLayers = (layers: IStyleLayer[] | BackgroundSettings | undefined): IStyleLayer[] => {
     if (Array.isArray(layers)) return layers;
     return migrateBackgroundToLayers(layers as BackgroundSettings);
+};
+
+/**
+ * Ensures a canvas item has an effects array, migrating legacy properties if needed.
+ */
+export const ensureEffects = (item: ICanvasItem): ICanvasEffect[] => {
+    const effects: ICanvasEffect[] = Array.isArray(item.effects) ? [...item.effects] : [];
+
+    // Migrate dropShadow if it exists and isn't already in the array
+    if (item.dropShadow && !effects.some(e => e.type === 'drop-shadow')) {
+        effects.push({
+            id: 'legacy-shadow-1',
+            type: 'drop-shadow',
+            visible: true,
+            x: item.dropShadow.x,
+            y: item.dropShadow.y,
+            blur: item.dropShadow.blur,
+            color: item.dropShadow.color
+        });
+    }
+
+    // Migrate backdropBlur if it exists and isn't already in the array
+    if (item.backdropBlur !== undefined && !effects.some(e => e.type === 'background-blur')) {
+        effects.push({
+            id: 'legacy-blur-1',
+            type: 'background-blur',
+            visible: true,
+            blur: item.backdropBlur
+        });
+    }
+
+    return effects;
 };

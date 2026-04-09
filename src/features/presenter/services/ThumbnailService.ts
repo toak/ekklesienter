@@ -157,6 +157,7 @@ export class ThumbnailService {
         return new Promise((resolve) => {
             const img = new Image();
             const url = URL.createObjectURL(blob);
+            console.log(`[ThumbnailService] Created internal load URL: ${url} (Origin: ${window.location.origin})`);
             img.onload = () => {
                 URL.revokeObjectURL(url);
                 resolve(img);

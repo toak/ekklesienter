@@ -44,15 +44,20 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     setActivePresentation: async (id) => {
-        const { activePresentationId, activePresentation } = get();
-        if (id === activePresentationId) return;
+        const { activePresentationId, activePresentation, activeServiceId } = get();
+        if (id === activePresentationId && activePresentation) return;
 
         if (activePresentation) {
             set({ cachedPresentation: activePresentation });
         }
 
         if (!id) {
-            set({ activePresentationId: null, activePresentation: null, previewSlideId: null });
+            set({ 
+                activePresentationId: null, 
+                activePresentation: null, 
+                previewSlideId: null,
+                selectedSlideIds: []
+            });
             return;
         }
 
@@ -61,12 +66,82 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
             const now = new Date();
             await db.presentationFiles.update(id, { lastOpened: now });
 
+            // --- Migration: Audio Scopes ---
+            // If the presentation has audioScopes in its root or nested in slides, 
+            // move them to the relational db.audioScopes table.
+            const allMigratableScopes: any[] = [];
+            
+            // 1. Root-level presentation.audioScopes
+            if (pres.audioScopes && Array.isArray(pres.audioScopes)) {
+                allMigratableScopes.push(...pres.audioScopes);
+            }
+
+            // 2. Slide-level slide.audioScopes (Legacy)
+            let slidesModified = false;
+            const migratedSlides = pres.slides.map(slide => {
+                if ('audioScopes' in slide && Array.isArray((slide as any).audioScopes)) {
+                    allMigratableScopes.push(...(slide as any).audioScopes);
+                    slidesModified = true;
+                    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                    const { audioScopes, ...cleanSlide } = slide as any;
+                    return cleanSlide;
+                }
+                return slide;
+            });
+
+            if (allMigratableScopes.length > 0) {
+                for (const scope of allMigratableScopes) {
+                    const existing = await db.audioScopes.get(scope.id);
+                    if (!existing) {
+                        await db.audioScopes.add({
+                            ...scope,
+                            presentationId: id // Ensure link is correct
+                        });
+                    }
+                }
+            }
+
+            // Clean up the presentation object to avoid re-migration redundant data
+            if (pres.audioScopes || slidesModified) {
+                await db.presentationFiles.update(id, { 
+                    audioScopes: undefined,
+                    slides: migratedSlides 
+                });
+                pres.audioScopes = undefined;
+                pres.slides = migratedSlides;
+            }
+            // --- End Migration ---
+
+            const firstSlideId = pres.slides.length > 0 ? pres.slides[0].id : null;
+
+            // Sync Service if needed
+            let serviceUpdate = {};
+            if (pres.serviceId) {
+                if (pres.serviceId !== activeServiceId) {
+                    const service = await db.serviceFiles.get(pres.serviceId);
+                    if (service) {
+                        serviceUpdate = {
+                            activeServiceId: pres.serviceId,
+                            activeService: { ...service, lastOpened: now }
+                        };
+                    }
+                }
+            } else {
+                // Standalone presentation - clear active service for consistency
+                serviceUpdate = {
+                    activeServiceId: null,
+                    activeService: null
+                };
+            }
+
             set({
+                ...serviceUpdate,
                 activePresentationId: id,
                 selectedPresentationId: id,
                 activePresentation: { ...pres, lastOpened: now },
                 selectedPresentation: { ...pres, lastOpened: now },
-                previewSlideId: pres.slides.length > 0 ? pres.slides[0].id : null,
+                previewSlideId: firstSlideId,
+                selectedSlideIds: firstSlideId ? [firstSlideId] : [],
                 liveSlideId: null,
                 presentationStack: []
             });
@@ -79,11 +154,15 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         const { activePresentationId, activePresentation, selectedPresentationId, selectedPresentation, presentationStack } = get();
         let targetPresId = presentationId || activePresentationId;
 
-        const currentPres = (targetPresId === activePresentationId && activePresentation)
+        let currentPres = (targetPresId === activePresentationId && activePresentation)
             ? activePresentation
             : (targetPresId === selectedPresentationId && selectedPresentation)
                 ? selectedPresentation
-                : await db.presentationFiles.get(targetPresId || '');
+                : null;
+
+        if (!currentPres && targetPresId) {
+            currentPres = await db.presentationFiles.get(targetPresId);
+        }
 
         // SPECIAL: Auto-enter nested presentation if we selected a nested Slide from the timeline
         if (currentPres && id) {
@@ -104,9 +183,11 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
 
                         // If moving backward, enter at the end. Otherwise enter at start.
                         const entryIdx = navigationDirection === 'backward' ? nestedPres.slides.length - 1 : 0;
-                        
+                        const entrySlideId = nestedPres.slides[entryIdx].id;
+
                         set({
-                            previewSlideId: nestedPres.slides[entryIdx].id,
+                            previewSlideId: entrySlideId,
+                            selectedSlideIds: [entrySlideId],
                             selectedPresentationId: nestedPres.id,
                             selectedPresentation: nestedPres,
                             navigationParentSlideId: id
@@ -122,10 +203,11 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         }
 
         if (targetPresId && targetPresId !== selectedPresentationId) {
-            const pres = await db.presentationFiles.get(targetPresId);
+            const pres = currentPres || await db.presentationFiles.get(targetPresId);
             if (pres) {
                 set({
                     previewSlideId: id,
+                    selectedSlideIds: [id],
                     selectedPresentationId: targetPresId,
                     selectedPresentation: pres,
                     navigationDirection: 'forward'
@@ -136,6 +218,7 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
 
         set({
             previewSlideId: id,
+            selectedSlideIds: [id],
             selectedPresentationId: targetPresId,
             navigationDirection: 'forward'
         });
@@ -148,6 +231,7 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         if (liveSlideId) {
             set({
                 previewSlideId: liveSlideId,
+                selectedSlideIds: [liveSlideId],
                 selectedPresentationId: activePresentationId,
                 selectedPresentation: activePresentation
             });
@@ -177,16 +261,18 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     navigateNext: async (detached = false) => {
-        const { activePresentationId, selectedPresentationId, previewSlideId, setPreviewSlide, setLiveSlide, liveSlideId, activePresentation, presentationStack } = get();
+        const { activePresentationId, selectedPresentationId, selectedPresentation, previewSlideId, setPreviewSlide, setLiveSlide, liveSlideId, activePresentation, presentationStack } = get();
         if (!activePresentationId) return;
 
         const currentPresId = selectedPresentationId || activePresentationId;
         
         const presentation = (activePresentation && activePresentation.id === currentPresId)
             ? activePresentation
-            : await db.presentationFiles.get(currentPresId);
+            : (selectedPresentation && selectedPresentation.id === currentPresId)
+                ? selectedPresentation
+                : await db.presentationFiles.get(currentPresId);
 
-        if (!presentation || !presentation.slides.length) return;
+        if (!presentation || !presentation.slides?.length) return;
 
         const slides = presentation.slides;
         const currentId = previewSlideId || slides[0].id;
@@ -204,14 +290,16 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
                     const parentIdx = parentPres.slides.findIndex(s => s.id === lastState.parentNestedSlideId);
                     if (parentIdx !== -1) {
                         const nextIdx = Math.min(parentPres.slides.length - 1, parentIdx + 1);
+                        const nextId = parentPres.slides[nextIdx].id;
                         set({ 
-                            previewSlideId: parentPres.slides[nextIdx].id,
+                            previewSlideId: nextId,
+                            selectedSlideIds: [nextId],
                             selectedPresentationId: parentPres.id,
                             selectedPresentation: parentPres,
                             navigationDirection: 'forward',
                             navigationParentSlideId: null
                         });
-                        if (!detached && liveSlideId) setLiveSlide(get().previewSlideId); 
+                        if (!detached && liveSlideId) setLiveSlide(nextId); 
                         return;
                     }
                 }
@@ -227,7 +315,7 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     navigatePrev: async (detached = false) => {
-        const { activePresentationId, selectedPresentationId, previewSlideId, setPreviewSlide, setLiveSlide, liveSlideId, activePresentation, presentationStack } = get();
+        const { activePresentationId, selectedPresentationId, selectedPresentation, previewSlideId, setPreviewSlide, setLiveSlide, liveSlideId, activePresentation, presentationStack } = get();
         if (!activePresentationId) return;
 
         const currentPresId = selectedPresentationId || activePresentationId;
@@ -254,14 +342,16 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
                     const parentIdx = parentPres.slides.findIndex(s => s.id === lastState.parentNestedSlideId);
                     if (parentIdx !== -1) {
                         const prevIdx = Math.max(0, parentIdx - 1);
+                        const prevId = parentPres.slides[prevIdx].id;
                         set({ 
-                            previewSlideId: parentPres.slides[prevIdx].id,
+                            previewSlideId: prevId,
+                            selectedSlideIds: [prevId],
                             selectedPresentationId: parentPres.id,
                             selectedPresentation: parentPres,
                             navigationDirection: 'backward',
                             navigationParentSlideId: null
                         });
-                        if (!detached && liveSlideId) setLiveSlide(get().previewSlideId);
+                        if (!detached && liveSlideId) setLiveSlide(prevId);
                         return;
                     }
                 }

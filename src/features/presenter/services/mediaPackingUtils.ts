@@ -25,6 +25,23 @@ export async function sha256(blob: Blob): Promise<string> {
 }
 
 /**
+ * Extracts a filesystem path from a local-resource:// or file:/// URL.
+ */
+export function extractPathFromLocalResource(url: string): string | null {
+    if (!url) return null;
+    if (url.startsWith('local-resource://localhost/')) {
+        return decodeURIComponent(url.replace('local-resource://localhost/', '/'));
+    }
+    if (url.startsWith('file:///')) {
+        return decodeURIComponent(url.replace('file:///', '/'));
+    }
+    if (url.startsWith('/') || /^[a-zA-Z]:\\/.test(url)) {
+        return url;
+    }
+    return null;
+}
+
+/**
  * Safely reads a local file using Electron IPC if available.
  */
 export async function readLocalFileSafe(path: string): Promise<Blob | null> {
@@ -108,11 +125,23 @@ export async function collectMediaRefs(
 
     const collectFromLayers = (layers: IStyleLayer[], layerRole: string) => {
         for (const layer of layers) {
-            if (layer.image?.id && layer.image.isFromDb) {
-                addRef(layer.image.id, `${layerRole}_image`);
+            // Always collect media with a valid ID — isFromDb is no longer a gate.
+            // This ensures backgrounds and canvas element images are packed regardless
+            // of whether the flag was set by the original code path.
+            if (layer.image?.id) {
+                const name = (layer.image as any).name || layer.image.id;
+                addRef(layer.image.id, `${layerRole}_image`, name);
+            } else if (layer.image?.url) {
+                const path = extractPathFromLocalResource(layer.image.url);
+                if (path) addRef(path, `${layerRole}_image_linked`, path);
             }
-            if (layer.video?.id && layer.video.isFromDb) {
-                addRef(layer.video.id, `${layerRole}_video`);
+
+            if (layer.video?.id) {
+                const name = (layer.video as any).name || layer.video.id;
+                addRef(layer.video.id, `${layerRole}_video`, name);
+            } else if (layer.video?.url) {
+                const path = extractPathFromLocalResource(layer.video.url);
+                if (path) addRef(path, `${layerRole}_video_linked`, path);
             }
         }
     };
@@ -122,7 +151,10 @@ export async function collectMediaRefs(
 
     // 2. Presentation Audio Scopes
     for (const scope of presentationAudioScopes) {
-        if (scope.fileId) addRef(scope.fileId, 'audio_scope', scope.fileName || scope.fileId);
+        if (scope.fileId) {
+            const h = extractPathFromLocalResource(scope.fileId) || scope.fileId;
+            addRef(h, 'audio_scope', scope.fileName || scope.fileId);
+        }
     }
 
     // 3. Slides & Font Gathering
@@ -139,28 +171,54 @@ export async function collectMediaRefs(
                 for (const item of s.content.canvasItems) {
                     if (item.fills) collectFromLayers(item.fills, 'item_fill');
                     if (item.strokes) collectFromLayers(item.strokes, 'item_stroke');
-                    
-                    if (item.type === 'text' && item.text?.fontFamily) {
-                        fontFamilies.add(item.text.fontFamily);
+
+                    if (item.type === 'image' && (item as any).image?.id) {
+                        const img = (item as any).image;
+                        addRef(img.id, 'item_image', img.name || img.id);
+                    } else if (item.type === 'video' && (item as any).video?.id) {
+                        const vid = (item as any).video;
+                        addRef(vid.id, 'item_video', vid.name || vid.id);
+                    }
+
+                    if (item.type === 'text' && item.text) {
+                        if (item.text.fontFamily) fontFamilies.add(item.text.fontFamily);
+                        if (item.text.textFills) collectFromLayers(item.text.textFills, 'text_fill');
+                        if (item.text.textStrokes) collectFromLayers(item.text.textStrokes, 'text_stroke');
                     }
                 }
             }
             if (s.audioScopes) {
                 for (const scope of s.audioScopes) {
-                    if (scope.fileId) addRef(scope.fileId, 'slide_audio', scope.fileName || scope.fileId);
+                    if (scope.fileId) {
+                        const h = extractPathFromLocalResource(scope.fileId) || scope.fileId;
+                        addRef(h, 'slide_audio', scope.fileName || scope.fileId);
+                    }
                 }
             }
             if (s.timerSettings?.playlist) {
-                for (const mid of s.timerSettings.playlist) addRef(mid, 'timer_audio');
+                for (const mid of s.timerSettings.playlist) {
+                    const h = extractPathFromLocalResource(mid) || mid;
+                    addRef(h, 'timer_audio');
+                }
             }
         } else if (type === 'timer') {
             const s = slide as ITimerSlide;
             if (s.playlist) {
-                for (const mid of s.playlist) addRef(mid, 'timer_audio');
+                for (const mid of s.playlist) {
+                    const h = extractPathFromLocalResource(mid) || mid;
+                    addRef(h, 'timer_audio');
+                }
             }
         } else if (type === 'verse') {
-            const s = slide as any; // Future-proofing if backgroundOverride is added to Verse
+            const s = slide as any;
             if (s.backgroundOverride) collectFromLayers(s.backgroundOverride, 'background');
+        } else if (type === 'video') {
+            const s = slide as any;
+            if (s.backgroundOverride) collectFromLayers(s.backgroundOverride, 'background');
+            if (s.videoSettings?.mediaId) {
+                const id = extractPathFromLocalResource(s.videoSettings.mediaId) || s.videoSettings.mediaId;
+                addRef(id, 'video_slide_media', `Slide Video: ${s.name || s.id}`);
+            }
         }
     }
 
@@ -217,6 +275,16 @@ export async function getMediaBlob(localId: string): Promise<{ blob: Blob; name:
         if (blob) return { blob, name: mediaItem.name };
     }
 
+    // Try treating localId as a path or URL
+    const path = extractPathFromLocalResource(localId);
+    if (path) {
+        const blob = await readLocalFileSafe(path);
+        if (blob) {
+            const name = path.split(/[/\\]/).pop() || 'Untitled';
+            return { blob, name };
+        }
+    }
+
     return null;
 }
 
@@ -239,7 +307,15 @@ export function patchMediaIds(target: any, map: Map<string, string>) {
         for (const key of Object.keys(target)) {
             if (key === 'fileId' || key === 'url') {
                 if (typeof target[key] === 'string') {
-                    const replacement = map.get(target[key]);
+                    // Try exact match first
+                    let replacement = map.get(target[key]);
+                    
+                    // Fallback: Try normalized path if it's a local URL
+                    if (!replacement) {
+                        const path = extractPathFromLocalResource(target[key]);
+                        if (path) replacement = map.get(path);
+                    }
+
                     if (replacement) {
                         if (key === 'url' && target[key].startsWith('blob:')) continue;
                         target[key] = replacement;
@@ -247,13 +323,36 @@ export function patchMediaIds(target: any, map: Map<string, string>) {
                 }
             } else if (key === 'image' || key === 'video') {
                 const mediaObj = target[key];
-                if (mediaObj && typeof mediaObj === 'object' && typeof mediaObj.id === 'string') {
-                    const replacement = map.get(mediaObj.id);
-                    if (replacement) {
-                        mediaObj.id = replacement;
-                        mediaObj.isFromDb = true;
+                if (mediaObj && typeof mediaObj === 'object') {
+                    // Patch both ID and URL for robust remapping of linked files
+                    if (typeof mediaObj.id === 'string') {
+                        let replacement = map.get(mediaObj.id);
+                        if (!replacement) {
+                            const path = extractPathFromLocalResource(mediaObj.id);
+                            if (path) replacement = map.get(path);
+                        }
+                        if (replacement) {
+                            mediaObj.id = replacement;
+                            mediaObj.isFromDb = true;
+                        }
+                    }
+                    if (typeof mediaObj.url === 'string') {
+                        let replacement = map.get(mediaObj.url);
+                        if (!replacement) {
+                            const path = extractPathFromLocalResource(mediaObj.url);
+                            if (path) replacement = map.get(path);
+                        }
+                        if (replacement) {
+                            if (!mediaObj.id) mediaObj.id = replacement; // FIX: Ensure ID exists for DB linkage
+                            mediaObj.url = replacement;
+                            mediaObj.isFromDb = true;
+                        }
                     }
                     patchMediaIds(mediaObj, map);
+                }
+            } else if (key === 'textFills' || key === 'textStrokes') {
+                if (Array.isArray(target[key])) {
+                    patchMediaIds(target[key], map);
                 }
             } else if (typeof target[key] === 'object') {
                 patchMediaIds(target[key], map);

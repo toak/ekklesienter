@@ -95,11 +95,14 @@ export const InlineBackgroundPicker: React.FC<IInlineBackgroundPickerProps> = ({
     return (
         <div className="flex flex-col gap-1 w-full relative">
             {label && (
-                <div className="flex items-center justify-between px-1 mb-0.5 group">
-                    <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{label}</span>
+                <div className="flex items-center justify-between px-1 mb-1 group">
+                    <div className="flex items-center gap-2">
+                        <div className="w-1 h-3 bg-accent rounded-full" />
+                        <span className="text-[9px] font-black text-stone-500 uppercase tracking-[0.2em]">{label}</span>
+                    </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onClick={handleAddLayer} className="cursor-pointer p-1 hover:bg-white/10 rounded active:bg-white/20">
-                            <Plus className="w-3 h-3 text-stone-400 hover:text-white transition-colors" />
+                        <button onClick={handleAddLayer} className="cursor-pointer p-1 hover:bg-white/10 rounded-lg active:bg-white/20 transition-all">
+                            <Plus className="w-3.5 h-3.5 text-stone-400 hover:text-accent transition-colors" />
                         </button>
                     </div>
                 </div>

@@ -24,6 +24,7 @@ interface AppToolbarProps {
     redo: () => void;
     openProjector: () => void;
     openGlobalModal: (type: ModalType) => void;
+    isBibleSlide?: boolean;
 }
 
 export const AppToolbar: React.FC<AppToolbarProps> = ({
@@ -41,14 +42,29 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
     undo,
     redo,
     openProjector,
-    openGlobalModal
+    openGlobalModal,
+    isBibleSlide
 }) => {
     const { t } = useTranslation();
+
+    const handleToggleSidebar = React.useCallback(() => setSidebarOpen(!sidebarOpen), [sidebarOpen, setSidebarOpen]);
+    const handleToggleHistory = React.useCallback(() => setHistoryOpen(!historyOpen), [historyOpen, setHistoryOpen]);
+    const handleToggleDesignPanel = React.useCallback(() => {
+        if (isBibleSlide || appMode !== 'presentation') {
+            setDesignPanelOpen(false);
+            openGlobalModal(ModalType.CUSTOMIZATION);
+        } else {
+            setDesignPanelOpen(!designPanelOpen);
+        }
+    }, [appMode, designPanelOpen, setDesignPanelOpen, openGlobalModal, isBibleSlide]);
+    const handleToggleBlackout = React.useCallback(() => toggleOverride('blackout'), [toggleOverride]);
+    const handleToggleWhiteout = React.useCallback(() => toggleOverride('whiteout'), [toggleOverride]);
+    const handleToggleLogo = React.useCallback(() => toggleOverride('logo'), [toggleOverride]);
 
     return (
         <div className="absolute top-4 left-4 z-50 flex gap-2">
             <button
-                onClick={() => setSidebarOpen(!sidebarOpen)}
+                onClick={handleToggleSidebar}
                 className="p-2 bg-stone-900/80 text-stone-400 rounded-md hover:text-amber-400 hover:bg-stone-800 border border-stone-800 backdrop-blur-md transition-colors"
                 title={sidebarOpen ? t('hide_controls') : t('show_controls')}
             >
@@ -56,7 +72,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
             </button>
 
             <button
-                onClick={() => setHistoryOpen(!historyOpen)}
+                onClick={handleToggleHistory}
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-colors",
                     historyOpen
@@ -97,14 +113,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
             </button>
 
             <button
-                onClick={() => {
-                    if (appMode === 'presentation') {
-                        // Logic moved to caller or handled by store
-                        setDesignPanelOpen(!designPanelOpen);
-                    } else {
-                        openGlobalModal(ModalType.CUSTOMIZATION);
-                    }
-                }}
+                onClick={handleToggleDesignPanel}
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-colors",
                     designPanelOpen && appMode === 'presentation'
@@ -120,7 +129,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
             <div className="h-9 w-px bg-white/5 mx-1" />
 
             <button
-                onClick={() => toggleOverride('blackout')}
+                onClick={handleToggleBlackout}
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden",
                     activeOverride === 'blackout'
@@ -134,7 +143,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
             </button>
 
             <button
-                onClick={() => toggleOverride('whiteout')}
+                onClick={handleToggleWhiteout}
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden",
                     activeOverride === 'whiteout'
@@ -148,7 +157,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
             </button>
 
             <button
-                onClick={() => toggleOverride('logo')}
+                onClick={handleToggleLogo}
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden min-w-[38px] min-h-[38px]",
                     activeOverride === 'logo'
@@ -157,7 +166,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
                 )}
                 title={`${t('logo_mode', 'Show Logo')} (L)`}
             >
-                {activeLogoUrl ? (
+                {activeLogoUrl && activeLogoUrl !== '' ? (
                     <div className="w-5 h-5 rounded-sm overflow-hidden flex items-center justify-center">
                         <img src={activeLogoUrl} alt={activeLogoName || 'Logo'} className="w-full h-full object-contain" />
                     </div>
