@@ -18,7 +18,7 @@ import { SlideBackground } from '@/features/presenter/components/display/SlideBa
 import TimerSlideRenderer from '@/features/presenter/components/display/TimerSlideRenderer';
 import VideoSlideRenderer from '@/features/presenter/components/display/VideoSlideRenderer';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
-import { db } from '@/core/db';
+import { PresentationDataService } from '@/features/presenter/services/PresentationDataService';
 import { useLiveQuery } from 'dexie-react-hooks';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string; strokeWidth?: number }>> = {
@@ -81,6 +81,7 @@ interface SlideContentRendererProps {
     /** Data maps for resolving references */
     blocksMap?: Map<string, any>;
     templatesMap?: Map<string, any>;
+    isRemote?: boolean;
 }
 
 const BASE_WIDTH = 1920;
@@ -112,7 +113,9 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
     bibleSecondVerse,
     isTransitioning,
     blocksMap,
-    templatesMap
+    templatesMap,
+    isRemote = false,
+    isProjector = false
 }) => {
     const { settings: globalSettings } = usePresenterStore();
     const settings = propSettings || globalSettings;
@@ -120,11 +123,11 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
 
     // Resolve missing block/template data directly from DB if props are missing
     const dbBlock = useLiveQuery(
-        () => (!propBlock && slide?.blockId) ? db.blocks.get(slide.blockId) : undefined,
+        () => (!propBlock && slide?.blockId) ? PresentationDataService.getBlock(slide.blockId) : undefined,
         [propBlock, slide?.blockId]
     );
     const dbTemplate = useLiveQuery(
-        () => (!propTemplate && slide?.templateId) ? db.templates.get(slide.templateId) : undefined,
+        () => (!propTemplate && slide?.templateId) ? PresentationDataService.getTemplate(slide.templateId) : undefined,
         [propTemplate, slide?.templateId]
     );
 
@@ -133,7 +136,10 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
 
     const isRu = lang === 'ru';
     const ts = template?.textStyle;
-    const bg = backgroundOverride || template?.background;
+    const bg = backgroundOverride || (slide as any)?.backgroundOverride || template?.background;
+    const items = (canvasItems && canvasItems.length > 0)
+        ? canvasItems
+        : (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.canvasItems : []);
 
     const isTimer = slide?.type === 'timer';
 
@@ -168,7 +174,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                 ) : (
                     <div 
                         className="absolute inset-0 transition-colors duration-500" 
-                        style={{ backgroundColor: block?.color || '#1c1917' }} 
+                        style={{ backgroundColor: block?.color || 'var(--color-stone-900)' }} 
                     />
                 )}
             </div>
@@ -201,7 +207,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                             )}
                             style={{
                                 fontFamily: formatFontFamily(ts?.fontFamily),
-                                color: ts?.color || '#ffffff',
+                                color: ts?.color || 'white',
                                 textShadow: ts?.shadow,
                                 textTransform: (ts?.titleTransform || 'uppercase') as React.CSSProperties['textTransform'],
                                 fontWeight: ts?.titleWeight || '900',
@@ -217,7 +223,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                             className={cn(subtitleClass, 'font-medium tracking-wider uppercase line-clamp-1')}
                             style={{
                                 fontFamily: formatFontFamily(ts?.fontFamily),
-                                color: ts?.subtitleColor || '#a8a29e',
+                                color: ts?.subtitleColor || 'var(--color-stone-400)',
                                 textShadow: ts?.shadow,
                             }}
                         >
@@ -231,7 +237,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                             className={cn(contentClass, 'line-clamp-3')}
                             style={{
                                 fontFamily: formatFontFamily(ts?.fontFamily),
-                                color: ts?.contentColor || '#78716c',
+                                color: ts?.contentColor || 'var(--color-stone-500)',
                             }}
                         >
                             {content}
@@ -246,7 +252,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                     {(() => {
                         const hasParallel = !!variables.secondTranslationId && !!variables.secondVerseText;
                         const primaryVerse: Verse = {
-                            id: (slideId || slide?.id || 'thumbnail') as unknown as number,
+                            id: Number(slideId || slide?.id || 0),
                             bookId: (variables.bookId as string) || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.bookId as string : undefined) || 'GEN',
                             chapter: Number(variables.chapter || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.chapter : 1)),
                             verseNumber: Number(variables.verseStart || (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.verseStart : 1)),
@@ -291,7 +297,9 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                         id={slide.id}
                         settings={(slide as ICanvasSlide).timerSettings!}
                         isPreview={isPreview}
-                        isLive={!isPreview && !!slideId}
+                        isLive={!isPreview && !!slideId && !isPreloading}
+                        isProjector={isProjector}
+                        isPreloading={isPreloading}
                     />
                 </div>
             )}
@@ -305,6 +313,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                         isPreview={isPreview}
                         isLive={!isPreview && !isPreloading}
                         isPreloading={isPreloading}
+                        isRemote={isRemote}
                     />
                 </div>
             )}
@@ -318,16 +327,12 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
 
             {/* Canvas Items Overlay */}
             {(() => {
-                const items = (canvasItems && canvasItems.length > 0) 
-                    ? canvasItems 
-                    : (slide?.type === 'normal' ? (slide as ICanvasSlide).content?.canvasItems : []);
-                
                 if (hideCanvasItems || !items || items.length === 0) return null;
                 
                 const sortedItems = [...items].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
                 return (
-                    <div className="absolute inset-0 z-20 pointer-events-none">
+                    <div className="absolute inset-0 z-20 pointer-events-none overflow-visible">
                         {sortedItems.filter((ci: ICanvasItem) => ci.visible).map((item: ICanvasItem) => {
                         const isAutoWidth = item.type === 'text' && item.text?.resizingMode === 'auto-width';
                         const isAutoHeight = item.type === 'text' && item.text?.resizingMode === 'auto-height';
@@ -335,7 +340,7 @@ const SlideContentRenderer: React.FC<SlideContentRendererProps> = ({
                         return (
                             <div
                                 key={item.id}
-                                className="absolute"
+                                className="absolute overflow-visible"
                                 style={{
                                     left: `${item.x}%`,
                                     top: `${item.y}%`,

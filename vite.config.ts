@@ -8,13 +8,10 @@ import electron from 'vite-plugin-electron/simple'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   return {
+    appType: 'mpa',
     server: {
       port: 3210,
       host: '0.0.0.0',
-      headers: {
-        'Cross-Origin-Embedder-Policy': 'require-corp',
-        'Cross-Origin-Opener-Policy': 'same-origin',
-      },
     },
     plugins: [
       react(),
@@ -23,6 +20,13 @@ export default defineConfig(({ mode }) => {
         main: {
           // Shortcut of `build.lib.entry`.
           entry: 'electron/main.ts',
+          vite: {
+            build: {
+              rollupOptions: {
+                external: ['bufferutil', 'utf-8-validate']
+              }
+            }
+          }
         },
         preload: {
           // Shortcut of `build.rollupOptions.input`.
@@ -49,6 +53,7 @@ export default defineConfig(({ mode }) => {
         input: {
           main: path.resolve(__dirname, 'index.html'),
           projector: path.resolve(__dirname, 'projector.html'),
+          remote: path.resolve(__dirname, 'remote.html'),
         },
       },
     },

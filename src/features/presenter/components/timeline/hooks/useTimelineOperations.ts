@@ -14,7 +14,7 @@ interface UseTimelineOperationsProps {
     templates: ITemplate[];
     t: TFunction;
     updatePresentationSlides: (id: string, slides: ISlide[]) => Promise<void>;
-    setPreviewSlide: (id: string, pid?: string) => void;
+    setPreviewSlide: (id: string | null, pid?: string, rootId?: string, parentId?: string | null) => void;
     updateSlideBackground: (sid: string, bg: any) => Promise<void>;
     openModal: (type: ModalType, props?: any) => void;
 }

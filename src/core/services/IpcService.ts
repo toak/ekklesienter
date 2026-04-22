@@ -83,6 +83,13 @@ export class IpcService {
     };
 
     /**
+     * Power-related IPC operations.
+     */
+    static power = {
+        setWakeLock: (enabled: boolean) => this.invoke<boolean>('power:set-wake-lock', enabled),
+    };
+
+    /**
      * Specialized listener for aspect ratio changes.
      */
     static onAspectRatioChanged(callback: (ratio: number) => void): () => void {

@@ -12,7 +12,12 @@ export const sanitizeHtml = (html: string): string => {
   if (!root) return '';
 
   const allowedTags = new Set(['SPAN', 'B', 'STRONG', 'I', 'EM', 'U', 'S', 'STRIKE', 'A', 'BR', 'UL', 'OL', 'LI', 'P', 'DIV']);
-  const allowedStyles = new Set(['color', 'font-size', 'font-family', 'font-weight', 'font-style', 'text-decoration', 'text-align']);
+  const allowedStyles = new Set([
+     'color', 'background-color', 'font-size', 'font-family', 'font-weight', 'font-style', 
+     'text-decoration', 'text-align', 'line-height', 'letter-spacing', 'text-transform',
+     'list-style-type', 'list-style-position', 'padding-left', 'margin-left',
+     'display'
+  ]);
   const dangerousTags = new Set(['SCRIPT', 'IFRAME', 'OBJECT', 'EMBED', 'SVG', 'CANVAS', 'IMG', 'META', 'LINK', 'STYLE', 'BUTTON', 'INPUT', 'FORM', 'TEXTAREA']);
 
   const processNode = (node: Node) => {
@@ -32,6 +37,9 @@ export const sanitizeHtml = (html: string): string => {
       if (!allowedTags.has(tag) && el.id !== 'root') {
         const parent = el.parentNode;
         if (parent) {
+          // Process children BEFORE unwrapping to ensure they are cleaned
+          Array.from(el.childNodes).forEach(processNode);
+          
           while (el.firstChild) {
             parent.insertBefore(el.firstChild, el);
           }
@@ -41,25 +49,27 @@ export const sanitizeHtml = (html: string): string => {
       }
 
       // 3. Sanitize attributes (only allow style and href for links)
-      Array.from(el.attributes).forEach(attr => {
+      const attrs = Array.from(el.attributes);
+      attrs.forEach(attr => {
         const attrName = attr.name.toLowerCase();
         if (attrName === 'style') {
-          // Filter inline styles
           const currentStyles = el.style;
           const newStyles: string[] = [];
-          for (let i = 0; i < currentStyles.length; i++) {
-            const prop = currentStyles[i];
-            if (allowedStyles.has(prop)) {
-              newStyles.push(`${prop}: ${currentStyles.getPropertyValue(prop)}`);
-            }
-          }
+          
+          // Use a more robust way to capture styles
+          allowedStyles.forEach(prop => {
+             const value = currentStyles.getPropertyValue(prop);
+             if (value) {
+                newStyles.push(`${prop}: ${value}`);
+             }
+          });
+
           if (newStyles.length > 0) {
             el.setAttribute('style', newStyles.join('; '));
           } else {
             el.removeAttribute('style');
           }
         } else if (tag === 'A' && attrName === 'href') {
-          // Only allow http/https/mailto protocols
           const href = attr.value.toLowerCase();
           if (!href.startsWith('http://') && !href.startsWith('https://') && !href.startsWith('mailto:')) {
             el.removeAttribute('href');
@@ -69,7 +79,7 @@ export const sanitizeHtml = (html: string): string => {
         }
       });
 
-      // Recurse into children (using a static array since removing/unwrapping modifies childNodes)
+      // Recurse into children
       Array.from(el.childNodes).forEach(processNode);
     }
   };

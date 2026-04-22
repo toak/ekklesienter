@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { 
     Trash2, Layers, Presentation, Copy, ArrowLeft, ArrowRight, LayoutTemplate, BookOpen,
-    ChevronsLeft, ChevronsRight, Unplug, Scissors, Clipboard as ClipboardIcon, CopyPlus
+    ChevronsLeft, ChevronsRight, Unplug, Scissors, Clipboard as ClipboardIcon, CopyPlus, Music
 } from 'lucide-react';
 import { ICanvasSlide, INestedSlide, ISlide } from '@/core/types';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
@@ -46,61 +46,38 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
     const lang = i18n.language?.substring(0, 2) || 'en';
     
     // Store State & Actions
-    const {
-        activePresentationId,
-        previewSlideId,
-        liveSlideId,
-        setPreviewSlide,
-        setLiveSlide,
-        updatePresentationSlides,
-        updateSlideBackground,
-        toggleSlideExpansion,
-        duplicateSlide,
-        duplicateSlides,
-        moveSlide,
-        removeSlide,
-        removeSlides,
-        addPresentationToTimeline,
-        selectedSlideIds,
-        setSelectedSlideIds,
-        toggleSlideSelection,
-        clearSelection,
-        copySlides,
-        pasteSlides,
-        selectedPresentationId,
-        navigationParentSlideId,
-        selectAudioScope,
-        detachNestedInstance,
-        clipboard,
-        activePresentation
-    } = usePresentationStore(useShallow(s => ({
-        activePresentationId: s.activePresentationId,
-        previewSlideId: s.previewSlideId,
-        liveSlideId: s.liveSlideId,
-        setPreviewSlide: s.setPreviewSlide,
-        setLiveSlide: s.setLiveSlide,
-        updatePresentationSlides: s.updatePresentationSlides,
-        updateSlideBackground: s.updateSlideBackground,
-        toggleSlideExpansion: s.toggleSlideExpansion,
-        duplicateSlide: s.duplicateSlide,
-        duplicateSlides: s.duplicateSlides,
-        moveSlide: s.moveSlide,
-        removeSlide: s.removeSlide,
-        removeSlides: s.removeSlides,
-        addPresentationToTimeline: s.addPresentationToTimeline,
-        selectedSlideIds: s.selectedSlideIds,
-        setSelectedSlideIds: s.setSelectedSlideIds,
-        toggleSlideSelection: s.toggleSlideSelection,
-        clearSelection: s.clearSelection,
-        copySlides: s.copySlides,
-        pasteSlides: s.pasteSlides,
-        selectedPresentationId: s.selectedPresentationId,
-        navigationParentSlideId: s.navigationParentSlideId,
-        selectAudioScope: s.selectAudioScope,
-        detachNestedInstance: s.detachNestedInstance,
-        clipboard: s.clipboard,
-        activePresentation: s.activePresentation
-    })));
+    // Actions (Stable selectors - no re-render)
+    const setPreviewSlide = usePresentationStore(s => s.setPreviewSlide);
+    const setLiveSlide = usePresentationStore(s => s.setLiveSlide);
+    const updatePresentationSlides = usePresentationStore(s => s.updatePresentationSlides);
+    const updateSlideBackground = usePresentationStore(s => s.updateSlideBackground);
+    const toggleSlideExpansion = usePresentationStore(s => s.toggleSlideExpansion);
+    const duplicateSlide = usePresentationStore(s => s.duplicateSlide);
+    const duplicateSlides = usePresentationStore(s => s.duplicateSlides);
+    const moveSlide = usePresentationStore(s => s.moveSlide);
+    const removeSlide = usePresentationStore(s => s.removeSlide);
+    const removeSlides = usePresentationStore(s => s.removeSlides);
+    const addPresentationToTimeline = usePresentationStore(s => s.addPresentationToTimeline);
+    const setSelectedSlideIds = usePresentationStore(s => s.setSelectedSlideIds);
+    const toggleSlideSelection = usePresentationStore(s => s.toggleSlideSelection);
+    const clearSelection = usePresentationStore(s => s.clearSelection);
+    const copySlides = usePresentationStore(s => s.copySlides);
+    const pasteSlides = usePresentationStore(s => s.pasteSlides);
+    const selectAudioScope = usePresentationStore(s => s.selectAudioScope);
+    const detachNestedInstance = usePresentationStore(s => s.detachNestedInstance);
+
+    // Dynamic State (Granular selectors)
+    const activePresentationId = usePresentationStore(s => s.activePresentationId);
+    const previewSlideId = usePresentationStore(s => s.previewSlideId);
+    const liveSlideId = usePresentationStore(s => s.liveSlideId);
+    const selectedSlideIds = usePresentationStore(s => s.selectedSlideIds);
+    const selectedPresentationId = usePresentationStore(s => s.selectedPresentationId);
+    const selectedPresentation = usePresentationStore(s => s.selectedPresentation);
+    const navigationParentSlideId = usePresentationStore(s => s.navigationParentSlideId);
+    const clipboard = usePresentationStore(s => s.clipboard);
+    const audioClipboard = usePresentationStore(s => s.audioClipboard);
+    const activePresentation = usePresentationStore(s => s.activePresentation);
+    const pasteAudioScope = usePresentationStore(s => s.pasteAudioScope);
 
     const { openModal } = useModalStore();
     const trackRef = useRef<TrackContainerHandle>(null);
@@ -156,14 +133,14 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
 
     const expandedPresentationIds = useMemo(() => {
         return (presentation?.slides || [])
-            .filter(s => s.isExpanded)
-			.map(s => {
-				if (s.type === 'normal') return (s as ICanvasSlide).masterPresentationId;
-				if (s.type === 'nested') return (s as INestedSlide).presentationId;
-				return undefined;
-			})
+            .filter(s => s.isExpanded || s.id === navigationParentSlideId)
+            .map(s => {
+                const canvasSlide = s.type === 'normal' ? s as ICanvasSlide : null;
+                const nestedSlide = s.type === 'nested' ? s as INestedSlide : null;
+                return canvasSlide?.masterPresentationId || nestedSlide?.presentationId;
+            })
             .filter(Boolean) as string[];
-    }, [presentation?.slides]);
+    }, [presentation?.slides, navigationParentSlideId]);
 
     const expandedPresentations = useLiveQuery(
         () => expandedPresentationIds.length > 0 ? db.presentationFiles.where('id').anyOf(expandedPresentationIds).toArray() : Promise.resolve([]),
@@ -225,10 +202,14 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
         addPresentationToTimeline
     });
 
+    const copyAudioScope = usePresentationStore(s => s.copyAudioScope);
+    const duplicateAudioScope = usePresentationStore(s => s.duplicateAudioScope);
+
     useTimelineShortcuts({
         activePresentationId,
         slides: presentation?.slides || [],
         selectedSlideIds,
+        selectedAudioScopeId: selectedAudioId,
         previewSlideId,
         isTimelineHoveredRef,
         copySlides,
@@ -237,6 +218,9 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
         duplicateSlide,
         removeSlides,
         removeSlide,
+        copyAudioScope,
+        pasteAudioScope,
+        duplicateAudioScope,
         setSelectedSlideIds,
         setLiveSlide,
         clearSelection
@@ -249,11 +233,30 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
             LiveSyncService.clear();
             return;
         }
-        const liveItem = visualTimeline.find(item => item.id === liveSlideId);
-        if (liveItem?.slide) {
-            LiveSyncService.showSlide(liveItem.slide);
+        
+        const pres = (selectedPresentationId && selectedPresentation?.id === selectedPresentationId) 
+            ? selectedPresentation 
+            : (selectedPresentationId === activePresentationId ? activePresentation : activePresentation);
+            
+        let slide = pres?.slides.find(s => s.id === liveSlideId);
+        let currentPresId = selectedPresentationId || activePresentationId;
+
+        // Fallback to searching the main timeline or expanded contexts if not strictly in selectedPres
+        if (!slide) {
+            slide = activePresentation?.slides.find(s => s.id === liveSlideId);
+            if (slide) currentPresId = activePresentationId;
         }
-    }, [liveSlideId, visualTimeline, appMode]);
+
+        if (slide) {
+            LiveSyncService.showSlide(slide, currentPresId!, activePresentationId, navigationParentSlideId);
+        } else {
+            // Ultimate fallback to visualTimeline in case it's deep and we just need something
+            const liveItem = visualTimeline.find(item => item.id === liveSlideId);
+            if (liveItem?.slide) {
+                LiveSyncService.showSlide(liveItem.slide, liveItem.presentationId);
+            }
+        }
+    }, [liveSlideId, selectedPresentationId, selectedPresentation, activePresentationId, activePresentation, presentationsMap, visualTimeline, appMode]);
     
     // Sync preview slide to projector for preloading
     useEffect(() => {
@@ -261,30 +264,64 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
             LiveSyncService.showPreviewSlide(null);
             return;
         }
-        const previewItem = visualTimeline.find(item => item.id === previewSlideId);
-        if (previewItem?.slide) {
-            LiveSyncService.showPreviewSlide(previewItem.slide);
+
+        const pres = (selectedPresentationId && selectedPresentation?.id === selectedPresentationId)
+            ? selectedPresentation
+            : (selectedPresentationId === activePresentationId ? activePresentation : activePresentation);
+            
+        let slide = pres?.slides.find(s => s.id === previewSlideId);
+        let currentPresId = selectedPresentationId || activePresentationId;
+
+        // Fallback
+        if (!slide) {
+            slide = activePresentation?.slides.find(s => s.id === previewSlideId);
+            if (slide) currentPresId = activePresentationId;
         }
-    }, [previewSlideId, visualTimeline, appMode]);
+
+        if (slide) {
+            LiveSyncService.showPreviewSlide(slide, currentPresId!, activePresentationId, navigationParentSlideId);
+        } else {
+            const previewItem = visualTimeline.find(item => item.id === previewSlideId);
+            if (previewItem?.slide) {
+                LiveSyncService.showPreviewSlide(previewItem.slide, previewItem.presentationId);
+            }
+        }
+    }, [previewSlideId, selectedPresentationId, selectedPresentation, activePresentationId, activePresentation, presentationsMap, visualTimeline, appMode]);
 
     useEffect(() => {
         if (!IpcService.isElectron()) return;
         const unsub = IpcService.on('projector-ready', () => {
             if (appMode === 'presentation' && liveSlideId) {
-                const liveItem = visualTimeline.find(item => item.id === liveSlideId);
-                if (liveItem?.slide) LiveSyncService.showSlide(liveItem.slide);
+                const pres = (selectedPresentationId && selectedPresentation?.id === selectedPresentationId) 
+                    ? selectedPresentation 
+                    : (selectedPresentationId === activePresentationId ? activePresentation : activePresentation);
+                    
+                const slide = pres?.slides.find(s => s.id === liveSlideId);
+                const currentPresId = slide ? (selectedPresentationId || activePresentationId) : null;
+
+                if (slide) {
+                    LiveSyncService.showSlide(slide, currentPresId!, activePresentationId, navigationParentSlideId);
+                } else {
+                    const liveItem = visualTimeline.find(item => item.id === liveSlideId);
+                    if (liveItem?.slide) LiveSyncService.showSlide(liveItem.slide, liveItem.presentationId, activePresentationId, navigationParentSlideId);
+                }
             }
         });
         return () => unsub?.();
-    }, [appMode, liveSlideId, visualTimeline]);
+    }, [appMode, liveSlideId, visualTimeline, selectedPresentation, selectedPresentationId, activePresentation, activePresentationId]);
 
     useEffect(() => {
         if (previewSlideId) trackRef.current?.scrollToSlide(previewSlideId);
     }, [previewSlideId]);
 
     const handleSelect = useCallback((id: string, multi: boolean, range?: boolean) => {
-        toggleSlideSelection(id, multi, range);
-        setPreviewSlide(id, activePresentationId);
+        if (multi || range) {
+            toggleSlideSelection(id, multi, range);
+            // Update preview without resetting the active multiselection
+            usePresentationStore.setState({ previewSlideId: id });
+        } else {
+            setPreviewSlide(id, activePresentationId);
+        }
         setTransEditId(null);
         selectAudioScope(null);
     }, [toggleSlideSelection, setPreviewSlide, activePresentationId, setTransEditId, selectAudioScope]);
@@ -294,8 +331,8 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
         if (openProjector) await openProjector();
     }, [setLiveSlide, openProjector]);
 
-    const isLiveVideo = !!(liveSlideId && visualTimeline.find(item => item.id === liveSlideId)?.slide?.type === 'video');
-    const timelineHeight = isLiveVideo ? 252 + 48 : 252;
+    // Always include space for the LiveMediaToolbar (48px) to avoid layout jumps
+    const timelineHeight = 252 + 48;
 
     if (!activePresentationId) return null;
 
@@ -390,7 +427,15 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
             </div>
 
             {/* Lane 3: Live Media Toolbar (Appears seamlessly only when video is live) */}
-            <LiveMediaToolbar />
+            {(() => {
+                const liveItem = liveSlideId ? visualTimeline.find(item => item.id === liveSlideId) : null;
+                return (
+                    <LiveMediaToolbar 
+                        liveSlide={liveItem?.slide} 
+                        presentationId={liveItem?.presentationId} 
+                    />
+                );
+            })()}
 
             {localSlides.length === 0 && (
                 <div className="absolute inset-0 top-10 flex items-center justify-center gap-4 text-stone-700 italic pointer-events-none">
@@ -473,6 +518,16 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
                             setContextMenu(null);
                         }}
                         shortcut="CMD+V"
+                    />
+
+                    <ContextMenuItem
+                        icon={<Music className="w-4 h-4" />}
+                        label={t('paste_audio', 'Paste Audio')}
+                        disabled={!audioClipboard}
+                        onClick={() => {
+                            pasteAudioScope(contextMenu.slideId);
+                            setContextMenu(null);
+                        }}
                     />
 
                     <div className="h-px bg-white/5 my-1" />
@@ -578,4 +633,4 @@ const SlideTimeline: React.FC<SlideTimelineProps> = ({ openProjector }) => {
     );
 };
 
-export default SlideTimeline;
+export default React.memo(SlideTimeline);

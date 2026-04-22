@@ -7,6 +7,7 @@ export interface PresentationState {
     selectedPresentationId: string | null;
     previewSlideId: string | null;
     liveSlideId: string | null;
+    rootPresentationId: string | null;
     activeBlockId: string | null;
     selectedAudioScopeId: string | null;
     graceLibSection: 'templates' | 'presentations' | 'media' | null;
@@ -15,6 +16,7 @@ export interface PresentationState {
     presentationBinNavPath: string[];
     selectedSlideIds: string[];
     clipboard: { slideIds: string[], presentationId: string, isCut: boolean } | null;
+    audioClipboard: { scope: IAudioScope, presentationId: string } | null;
     presentationStack: Array<{ presentationId: string; parentNestedSlideId: string }>;
 
     // Preloaded Data
@@ -22,6 +24,7 @@ export interface PresentationState {
     activePresentation: IPresentationFile | null;
     selectedPresentation: IPresentationFile | null;
     cachedPresentation: IPresentationFile | null;
+    nestedPresentationsCache: Record<string, IPresentationFile>;
     recents: IPresentationSummary[];
     navigationParentSlideId: string | null;
     navigationDirection: 'forward' | 'backward';
@@ -31,8 +34,8 @@ export interface PresentationState {
     setActivePresentation: (id: string | null) => Promise<void>;
 
     // Blind Mode Actions
-    setPreviewSlide: (id: string | null, presentationId?: string | null) => Promise<void>;
-    setLiveSlide: (id: string | null) => void;
+    setPreviewSlide: (id: string | null, presentationId?: string, rootPresentationId?: string, navigationParentSlideId?: string | null) => Promise<void>;
+    setLiveSlide: (id: string | null, presentationId?: string, rootPresentationId?: string, navigationParentSlideId?: string | null) => void;
     syncPreviewToLive: () => void;
 
     setActiveBlockId: (id: string | null) => void;
@@ -69,8 +72,10 @@ export interface PresentationState {
     updateAudioScope: (scopeId: string, updates: Partial<IAudioScope>) => Promise<void>;
     removeAudioScope: (scopeId: string) => Promise<void>;
     duplicateAudioScope: (scopeId: string) => Promise<string | undefined>;
+    copyAudioScope: (scopeId: string) => Promise<void>;
+    pasteAudioScope: (targetSlideId: string) => Promise<void>;
     selectAudioScope: (id: string | null) => void;
-    resolveAudioConflict: (action: 'replace' | 'shift', params: { targetSlideId: string, fileId: string, overlappingScopes: IAudioScope[] }) => Promise<void>;
+    resolveAudioConflict: (action: 'replace' | 'shift', params: { targetSlideId: string, fileId: string, fileName?: string, overlappingScopes: IAudioScope[] }) => Promise<void>;
 
     // Data Actions
     loadRecents: () => Promise<void>;
@@ -123,8 +128,8 @@ export interface PresentationState {
     undo: () => Promise<void>;
     redo: () => Promise<void>;
     takeSnapshot: (slideId: string) => Promise<void>;
-    navigateNext: (detached?: boolean) => Promise<void>;
-    navigatePrev: (detached?: boolean) => Promise<void>;
+    navigateNext: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
+    navigatePrev: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
 
     // Nested Stacks Actions
     addPresentationToTimeline: (presentationId: string, index?: number) => Promise<void>;
@@ -135,6 +140,7 @@ export interface PresentationState {
     saveActivePresentation: () => Promise<void>;
     importSlidesToService: (presentationName: string, slides: ISlide[]) => Promise<void>;
     syncNestedPresentation: (parentSlideId: string) => Promise<void>;
+    setCachedNestedPresentation: (id: string, presentation: IPresentationFile) => void;
 }
 
 export type PresentationSliceCreator = StateCreator<

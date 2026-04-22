@@ -8,7 +8,8 @@ import AboutSettings from './AboutSettings';
 import LogoSettings from './LogoSettings';
 import OverrideSettings from './OverrideSettings';
 import ShortcutsSettings from './ShortcutsSettings';
-import { X, Globe, Database, Monitor, Info, ImageIcon, Layers, Command } from 'lucide-react';
+import RemoteSettings from './RemoteSettings';
+import { X, Globe, Database, Monitor, Info, ImageIcon, Layers, Command, Smartphone } from 'lucide-react';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -29,6 +30,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             case 'data': return <DataSettings />;
             case 'overrides': return <OverrideSettings />;
             case 'shortcuts': return <ShortcutsSettings />;
+            case 'remote': return <RemoteSettings />;
             case 'about': return <AboutSettings />;
             default: return <GeneralSettings />;
         }
@@ -66,6 +68,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'data' && <Database className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'overrides' && <Layers className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'shortcuts' && <Command className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
+                                    {activeTab === 'remote' && <Smartphone className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'about' && <Info className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                 </div>
                             </div>
@@ -77,7 +80,13 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     </span>
                                     <span className="w-1 h-1 rounded-full bg-stone-800" />
                                     <span className="text-[10px] font-bold text-accent uppercase tracking-[0.3em]">
-                                        {t(activeTab)}
+                                        {activeTab === 'remote' && t('remote_control_title')}
+                                        {activeTab === 'general' && t('general')}
+                                        {activeTab === 'displays' && t('displays')}
+                                        {activeTab === 'data' && t('data')}
+                                        {activeTab === 'shortcuts' && t('shortcuts')}
+                                        {activeTab === 'overrides' && t('overrides')}
+                                        {activeTab === 'about' && t('about')}
                                     </span>
                                 </div>
                                 <h2 className="text-2xl font-black text-white tracking-tight">
@@ -86,6 +95,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'data' && t('bible_translations')}
                                     {activeTab === 'overrides' && t('overrides', 'Overrides')}
                                     {activeTab === 'shortcuts' && t('shortcuts', 'Shortcuts')}
+                                    {activeTab === 'remote' && t('remote_control_title', 'Remote Control')}
                                     {activeTab === 'about' && t('about_app')}
                                 </h2>
                             </div>

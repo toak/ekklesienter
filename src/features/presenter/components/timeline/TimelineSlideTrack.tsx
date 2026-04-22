@@ -32,8 +32,8 @@ interface TimelineSlideTrackProps {
     presentationsMap: Map<string, IPresentationFile>;
     navigationParentSlideId: string | null;
     lang: string;
-    setPreviewSlide: (id: string, pid?: string) => void;
-    setLiveSlide: (id: string) => void;
+    setPreviewSlide: (id: string | null, pid?: string, rootId?: string, parentId?: string | null) => void;
+    setLiveSlide: (id: string | null, pid?: string, rootId?: string, parentId?: string | null) => void;
     toggleSlideSelection: (id: string, multi: boolean, range?: boolean) => void;
     toggleSlideExpansion: (id: string) => void;
     setContextMenu: (menu: any) => void;
@@ -153,7 +153,7 @@ export const TimelineSlideTrack: React.FC<TimelineSlideTrackProps> = ({
 
                     {/* Lane 2: Audio */}
                     {audioTrack && (
-                        <div className="shrink-0 h-[98px] border-t border-white/5 bg-stone-950/20 relative min-w-full px-8 pt-[10px] pb-4">
+                        <div className="shrink-0 h-[88px] border-t border-white/5 bg-stone-950/20 relative min-w-full px-8 py-2">
                             {audioTrack}
                         </div>
                     )}

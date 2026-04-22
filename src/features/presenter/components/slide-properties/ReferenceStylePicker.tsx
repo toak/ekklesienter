@@ -189,7 +189,7 @@ export const ReferenceStylePicker: React.FC = () => {
                             )}
                         >
                             <StylePreview styleId={style.id} isActive={reference.style === style.id} />
-                            <span className="text-[9px] font-bold uppercase tracking-wider">{style.label}</span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider">{t(`ref_style_${style.id}`, style.label)}</span>
 
                             {reference.style === style.id && (
                                 <div className="absolute inset-0 bg-accent/5 animate-pulse pointer-events-none" />

@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.2] - 2026-04-22
+
+### Fixed
+
+- **Stability & Performance**: Critical maintenance update focused on reliability during live services.
+- **Screen Wake Lock**: Implemented system to prevent PC/Mac from entering sleep mode while a presentation is live (supports both Browser and Electron).
+- **Nested Presentation Refinement**: Prevented redundant "(Snapshot)" duplicates when adding nested presentations already present in the current service pool.
+- **Recursive Nesting Guard**: Added safety check and notifications to prevent infinite nesting of a presentation within itself.
+- **General Stability**: Various minor bug fixes and interface refinements for better performance.
+
+## [2.2.1] - 2026-04-12
+
+### Fixed
+
+- **Remote Control Stability**: Refined interface and keyboard control handling for smoother remote sessions.
+- **Media Controls**: Fixed inconsistent spacebar behavior and added audio toggle support to the global spacebar shortcut.
+
+## [2.2.0] - 2026-04-10
+
+### Added
+
+- **Remote Controlling**: Full support for controlling presentations via mobile devices over Wi-Fi.
+- **Mobile Preview**: Real-time slide previews and touch-optimized navigation controls on mobile.
+- **Remote Commands**: Live media playback and screen override controls from your phone.
+
 ## [2.1.0] - 2026-04-09
 
 ### Added

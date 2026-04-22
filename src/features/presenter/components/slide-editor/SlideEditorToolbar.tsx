@@ -9,13 +9,15 @@ import {
   canvasZoomAtom,
   slideDesignPanelOpenAtom,
   canvasOffsetAtom,
+  editorToolbarVisibleAtom,
 } from '@/core/store/uiAtoms';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { cn } from '@/core/utils/cn';
 import {
   MousePointer2, Hand, Type, ImageIcon, Video,
   Square, Minus, Circle, Triangle, Star, Hexagon as Diamond,
-  ChevronDown, Trash2, Copy, Clipboard, ZoomIn, ZoomOut,
+  ChevronDown, ChevronUp, Trash2, Copy, Clipboard, ZoomIn, ZoomOut,
+  PanelBottomClose, PanelBottomOpen,
 } from 'lucide-react';
 import { createCanvasItem, SHAPE_OPTIONS } from '../slide-properties/helpers';
 import { ICanvasItem, ICanvasSlide } from '@/core/types';
@@ -136,7 +138,7 @@ const ShapesDropdown: React.FC<{ onSelect: (type: string) => void }> = ({ onSele
       <button
         onClick={() => setOpen(v => !v)}
         className={cn(
-          "flex items-center justify-center w-5 h-9 rounded-r-xl text-stone-500 hover:text-stone-300 hover:bg-white/5 transition-all border-l border-white/5 cursor-pointer",
+          "flex items-center justify-center w-4 h-9 rounded-r-xl text-stone-500 hover:text-stone-300 hover:bg-white/5 transition-all cursor-pointer -ml-0.5",
           open && "bg-white/5 text-stone-200"
         )}
       >
@@ -255,9 +257,41 @@ export const SlideEditorToolbar: React.FC = () => {
 
   const liveSlideId = usePresentationStore(s => s.liveSlideId);
   const liveSlide = (selectedPresentation || activePresentation)?.slides.find(s => s.id === liveSlideId);
-  const isLiveVideo = liveSlide?.type === 'video';
   
-  const bottomOffset = isLiveVideo ? "bottom-[308px]" : "bottom-[260px]";
+  // The SlideTimeline is always 300px tall (252 + 48). 
+  // We use bottom-[316px] to give exactly a 16px gap above it.
+  const bottomOffset = "bottom-[316px]";
+
+  const [toolbarVisible, setToolbarVisible] = useAtom(editorToolbarVisibleAtom);
+
+  // When hidden, show only a small pill to re-open
+  if (!toolbarVisible) {
+    return (
+      <div 
+        className={cn(
+          "absolute left-1/2 -translate-x-1/2 z-100",
+          bottomOffset,
+          designPanelOpen ? "-ml-40" : "ml-0"
+        )}
+      >
+        <Tooltip label={t('show_toolbar', 'Show Toolbar')}>
+          <button
+            onClick={() => setToolbarVisible(true)}
+            className={cn(
+              "flex items-center justify-center w-9 h-9 rounded-full cursor-pointer",
+              "bg-stone-900/40 backdrop-blur-xl border border-white/10",
+              "hover:bg-stone-900/70 hover:border-white/20 shadow-lg",
+              "opacity-60 hover:opacity-100 transition-all duration-300 active:scale-90",
+              "animate-in fade-in zoom-in-75 duration-300"
+            )}
+            aria-label={t('show_toolbar', 'Show Toolbar')}
+          >
+            <ChevronUp className="w-4 h-4 text-stone-300" />
+          </button>
+        </Tooltip>
+      </div>
+    );
+  }
 
   return (
     <div 
@@ -271,7 +305,8 @@ export const SlideEditorToolbar: React.FC = () => {
         className={cn(
           "flex items-center gap-1.5 px-2 h-14 rounded-2xl shadow-2xl transition-all duration-300",
           "bg-stone-900/40 backdrop-blur-2xl border border-white/10 ring-1 ring-white/5",
-          "hover:bg-stone-900/60 hover:border-white/20"
+          "hover:bg-stone-900/60 hover:border-white/20",
+          "animate-in fade-in zoom-in-95 duration-300"
         )}
       >
         {/* Navigation Tools */}
@@ -385,6 +420,15 @@ export const SlideEditorToolbar: React.FC = () => {
                 onClick={() => setZoom(prev => Math.min(prev + 0.1, 4))}
               />
           </div>
+
+          <Divider />
+
+          {/* Hide Toolbar Button — inside the bar */}
+          <ToolButton
+            icon={ChevronDown}
+            label={t('hide_toolbar', 'Hide Toolbar')}
+            onClick={() => setToolbarVisible(false)}
+          />
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/core/db';
+import { PresentationDataService } from '@/features/presenter/services/PresentationDataService';
 import { ITemplate, IBlock } from '@/core/types';
 
 export type NavLevel =
@@ -13,8 +13,8 @@ export type NavLevel =
  */
 export function useTemplatePickerData(blockId?: string) {
   // ─── Data Queries ───
-  const allTemplates = useLiveQuery(() => db.templates.toArray()) || [];
-  const allBlocks = useLiveQuery(() => db.blocks.toArray()) || [];
+  const allTemplates = useLiveQuery(() => PresentationDataService.getTemplates()) || [];
+  const allBlocks = useLiveQuery(() => PresentationDataService.getBlocks()) || [];
   const blocksMap = useMemo(() => new Map(allBlocks.map((b: IBlock) => [b.id, b])), [allBlocks]);
 
   // ─── Search ───

@@ -56,10 +56,18 @@ export const PropertySection: React.FC<IPropertySectionProps> = ({
 
     return (
         <div className="bg-black/40 rounded-2xl border border-white/5 overflow-hidden transition-colors hover:border-white/10 shadow-sm">
-            <button
+            <div
+                role="button"
+                tabIndex={0}
                 onClick={() => setIsOpen(!isOpen)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setIsOpen(!isOpen);
+                    }
+                }}
                 onMouseDown={(e) => e.preventDefault()}
-                className="w-full flex items-center justify-between px-3 py-2.5 text-stone-500 hover:text-stone-300 transition-colors cursor-pointer group"
+                className="w-full flex items-center justify-between px-3 py-2.5 text-stone-500 hover:text-stone-300 transition-colors cursor-pointer group outline-none"
             >
                 <div className="flex items-center gap-2">
                     <Icon className="w-3.5 h-3.5 text-stone-400 group-hover:text-accent transition-colors" />
@@ -69,7 +77,7 @@ export const PropertySection: React.FC<IPropertySectionProps> = ({
                     {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
                     <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", isOpen ? "" : "-rotate-90 opacity-40")} />
                 </div>
-            </button>
+            </div>
             <div className={cn(
                 "px-3 pb-3 transition-all duration-300 origin-top overflow-hidden",
                 isOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"

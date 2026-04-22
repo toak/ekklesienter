@@ -21,18 +21,26 @@ interface TimerSlideRendererProps {
     settings: ITimerSettings;
     isPreview?: boolean;
     isLive?: boolean;
+    isProjector?: boolean;
+    isPreloading?: boolean;
 }
 
 /**
  * Main renderer for Timer slides.
  * Orchestrates audio playback, countdown logic, and visual styles.
  */
-const TimerSlideRenderer: React.FC<TimerSlideRendererProps> = ({ id, settings, isLive = false }) => {
-    // Audio Logic (Playlist, Cross-fading)
-    useTimerAudio(id, settings, isLive);
-
+const TimerSlideRenderer: React.FC<TimerSlideRendererProps> = ({ 
+    id, 
+    settings, 
+    isLive = false, 
+    isProjector = false,
+    isPreloading = false 
+}) => {
     // Core Logic (Countdown, Triggers, Flash)
-    const { timeLeft, showFlash, formatTime } = useTimerCore(id, settings, isLive);
+    const { timeLeft, isPaused, showFlash, formatTime } = useTimerCore(id, settings, isLive, isProjector, isPreloading);
+
+    // Audio Logic (Playlist, Cross-fading)
+    useTimerAudio(id, settings, isLive, isPaused);
 
     const renderStyle = () => {
         const timeStr = formatTime(timeLeft);
@@ -62,7 +70,7 @@ const TimerSlideRenderer: React.FC<TimerSlideRendererProps> = ({ id, settings, i
                 return (
                     <div
                         className="text-[120px] font-black tracking-tighter"
-                        style={{ color: getFillColor(settings.themeFill, '#f97316') }}
+                        style={{ color: getFillColor(settings.themeFill, 'var(--color-orange-500)') }}
                     >
                         {timeStr}
                     </div>

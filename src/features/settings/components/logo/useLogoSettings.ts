@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
-import { db } from '@/core/db';
+import { LogoService } from '@/core/services/LogoService';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
 import { IpcService } from '@/core/services/IpcService';
 import { ILogo, ILogoGroup } from '@/core/types';
@@ -42,7 +42,7 @@ export const useLogoSettings = () => {
                 if (!result) return;
                 const blob = new Blob([new Uint8Array(result.data)], { type: result.mimeType });
 
-                await db.logos.put({
+                await LogoService.saveLogo({
                     id: logoId,
                     name: fileName,
                     data: blob,
@@ -84,7 +84,7 @@ export const useLogoSettings = () => {
                         if (!result) throw new Error('Failed to read file data');
 
                         const blob = new Blob([new Uint8Array(result.data)], { type: result.mimeType });
-                        await db.logos.put({
+                        await LogoService.saveLogo({
                             id: l.id,
                             name: l.name,
                             data: blob,
@@ -134,7 +134,7 @@ export const useLogoSettings = () => {
                 const dbLogos: ILogo[] = await Promise.all(newLogos.map(async (l) => {
                     const resp = await fetch(l.url);
                     const blob = await resp.blob();
-                    await db.logos.put({
+                    await LogoService.saveLogo({
                         id: l.id,
                         name: l.name,
                         data: blob,

@@ -18,18 +18,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ appMode, onOpenSettings 
     return (
         <>
             {/* Column 1: Navigation / Core App Context */}
-            <div style={{ width: navPanel.size }} className="h-full shrink-0">
+            <div style={{ width: navPanel.size }} className="h-full shrink-0 relative z-20">
                 <NavigationPanel onOpenSettings={onOpenSettings} />
             </div>
 
             {/* Resize Handle */}
             <div
                 onMouseDown={navPanel.handleMouseDown}
-                className="w-1 bg-stone-800 hover:bg-accent transition-colors cursor-col-resize shrink-0"
+                className="w-1 bg-stone-800 hover:bg-accent transition-colors cursor-col-resize shrink-0 relative z-20"
             />
 
             {/* Column 2: Specific Panel (Library or Verse List) */}
-            <div style={{ width: sidePanel.size }} className="h-full shrink-0">
+            <div style={{ width: sidePanel.size }} className="h-full shrink-0 relative z-20">
                 {appMode === 'scripture' ? (
                     <VerseList />
                 ) : (
@@ -40,7 +40,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({ appMode, onOpenSettings 
             {/* Resize Handle */}
             <div
                 onMouseDown={sidePanel.handleMouseDown}
-                className="w-1 bg-stone-800 hover:bg-accent transition-colors cursor-col-resize shrink-0"
+                className="w-1 bg-stone-800 hover:bg-accent transition-colors cursor-col-resize shrink-0 relative z-20"
             />
         </>
     );

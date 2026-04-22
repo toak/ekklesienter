@@ -80,7 +80,7 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
         switch (item.type) {
             case 'text':
                 return (
-                    <div className={cn("relative", isFlowText ? (isAutoHeightText ? 'w-full' : '') : 'w-full h-full')}>
+                    <div className={cn("relative overflow-visible", isFlowText ? (isAutoHeightText ? 'w-full' : '') : 'w-full h-full')}>
                         <TextRenderer
                             item={item}
                             containerRef={containerRef}
@@ -144,6 +144,17 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
         const layers = ensureLayers(itemFills);
         if (layers.length > 0) return layers;
         
+        // Comprehensive legacy fallback
+        if (item.type === 'text' && item.text?.color) {
+            return [{
+                id: `legacy-text-color-${item.id}`,
+                type: 'color',
+                visible: true,
+                opacity: 1,
+                blendMode: 'normal',
+                color: item.text.color
+            } as IStyleLayer];
+        }
         if (item.type === 'image' && (item as any).image) {
             return [{
                 id: `legacy-img-${item.id}`,
@@ -187,18 +198,20 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
 
     return (
         <div
-            className={cn(isFlowText ? (isAutoHeightText ? 'w-full relative' : 'relative') : 'w-full h-full relative')}
-            style={{
-                opacity: item.opacity ?? 1,
-                filter: item.type === 'text' ? undefined : filter,
-            }}
+            className={cn("overflow-visible", isFlowText ? (isAutoHeightText ? 'w-full relative' : 'relative') : 'w-full h-full relative')}
+            style={{ opacity: item.opacity ?? 1 }}
         >
-            {/* 1. Stroke Layer (If Outside) */}
-            {borderWidth > 0 && align === 'outside' && (
-                <div className="absolute inset-0 pointer-events-none overflow-visible" style={{ zIndex: Z_INDEX.CANVAS_ITEM_STROKE }}>
-                    <StrokeRenderer item={item} strokes={strokes} align="outside" idPrefix={idPrefix} />
-                </div>
-            )}
+            {/* Filtered Container: Receives drop-shadows and blurs, but isolating noise above it */}
+            <div 
+                className={cn(isFlowText ? 'overflow-visible' : 'absolute inset-0 w-full h-full overflow-visible')}
+                style={{ filter: item.type === 'text' ? undefined : filter }}
+            >
+                {/* 1. Stroke Layer (If Outside) */}
+                {borderWidth > 0 && align === 'outside' && item.type !== 'text' && (
+                    <div className="absolute inset-0 pointer-events-none overflow-visible" style={{ zIndex: Z_INDEX.CANVAS_ITEM_STROKE }}>
+                        <StrokeRenderer item={item} strokes={strokes} align="outside" idPrefix={idPrefix} />
+                    </div>
+                )}
 
             {/* 2. Main Element Container (Fill + Content) */}
             <div
@@ -209,10 +222,12 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
                     boxShadow: boxShadow,
                     backdropFilter: backdropFilter,
                     WebkitBackdropFilter: backdropFilter,
+                    isolation: 'isolate',
+                    overflow: 'visible',
                 }}
             >
-                {/* Fill Layer Stack */}
-                {fills.length > 0 && (
+                {/* Fill Layer Stack (Disabled for text elements to match Figma behavior) */}
+                {fills.length > 0 && !isText && (
                     <div className="absolute inset-0" style={{ zIndex: Z_INDEX.CANVAS_BACKGROUND, borderRadius: getBorderRadius(), overflow: hasAnyRadius() ? 'hidden' : 'visible' }}>
                         <SlideBackground background={fills} showOverlay={false} />
                     </div>
@@ -220,7 +235,7 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
 
                 {/* Content Layer */}
                 <div 
-                    className={cn("relative", isFlowText ? (isAutoHeightText ? 'w-full' : '') : 'w-full h-full')} 
+                    className={cn("relative overflow-visible", isFlowText ? (isAutoHeightText ? 'w-full' : '') : 'w-full h-full')} 
                     style={{ 
                         zIndex: Z_INDEX.CANVAS_ITEM,
                         filter: item.type === 'text' ? filter : undefined
@@ -230,12 +245,37 @@ const CanvasItemView: React.FC<CanvasItemViewProps> = ({
                 </div>
 
                 {/* 3. Stroke Layer Stack (If Inside or Center) */}
-                {borderWidth > 0 && (align === 'inside' || align === 'center') && (
-                    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: Z_INDEX.CANVAS_ITEM_STROKE }}>
+                {borderWidth > 0 && item.type !== 'text' && (align === 'inside' || align === 'center') && (
+                    <div className="absolute inset-0 pointer-events-none overflow-visible" style={{ zIndex: Z_INDEX.CANVAS_ITEM_STROKE }}>
                         <StrokeRenderer item={item} strokes={strokes} align={align} idPrefix={idPrefix} />
                     </div>
                 )}
             </div>
+            </div>
+
+            {/* 4. Noise Effects (Unblurred!) */}
+            {effects.filter((e) => e.type === 'noise' && e.visible).map((noise) => (
+                <div 
+                    key={noise.id} 
+                    className="absolute inset-0 pointer-events-none mix-blend-overlay z-50" 
+                    style={{ 
+                        opacity: (noise.blur ?? 20) / 100, 
+                        borderRadius: getBorderRadius(),
+                        overflow: hasAnyRadius() ? 'hidden' : 'visible'
+                    }}
+                >
+                    <svg className="w-full h-full contrast-125 opacity-75">
+                        <filter id={`noise-${idPrefix}-${noise.id}`}>
+                            <feTurbulence type="fractalNoise" baseFrequency={Math.max(0.1, (noise.noiseScale ?? 65) / 100)} numOctaves="3" stitchTiles="stitch" />
+                            <feColorMatrix type="saturate" values="0" />
+                            {noise.noiseSoftness && noise.noiseSoftness > 0 ? (
+                                <feGaussianBlur stdDeviation={(noise.noiseSoftness / 100) * 3} />
+                            ) : null}
+                        </filter>
+                        <rect width="100%" height="100%" filter={`url(#noise-${idPrefix}-${noise.id})`} />
+                    </svg>
+                </div>
+            ))}
         </div>
     );
 };

@@ -48,7 +48,10 @@ export function useNavigationState() {
     }, 250);
   }, [cycleTranslation]);
 
-  const toggleModePicker = useCallback(() => {
+  const toggleModePicker = useCallback((triggerElement: HTMLElement | null) => {
+    if (triggerElement) {
+      setTriggerRect(triggerElement.getBoundingClientRect());
+    }
     setIsModePickerOpen(prev => !prev);
   }, []);
 

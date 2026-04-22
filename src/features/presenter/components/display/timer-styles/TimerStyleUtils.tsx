@@ -3,7 +3,7 @@ import { IStyleLayer } from '@/core/types';
 import { cn } from '@/core/utils/cn';
 import { SlideBackground } from '../SlideBackground';
 
-export const getFillColor = (fill?: IStyleLayer[], fallback: string = '#ffffff'): string => {
+export const getFillColor = (fill?: IStyleLayer[], fallback: string = 'white'): string => {
     if (!fill || fill.length === 0) return fallback;
     const firstLayer = fill.find(l => l.visible);
     if (!firstLayer) return fallback;

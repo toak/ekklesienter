@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { IMediaItem, MediaType } from '@/core/types';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
+import { IpcService } from '@/core/services/IpcService';
 
 /**
  * Hook to manage media pool data: bins, media items, and duration preloading.
@@ -29,9 +30,34 @@ export function useMediaPoolData(filter: MediaType | 'all', activeBinId: string 
 
   const activeBin = activeBinId ? bins.find(b => b.id === activeBinId) : null;
 
+  // File integrity check: Verify that local files still exist on disk
+  useEffect(() => {
+    // Only check items that haven't been checked in this session or are visible
+    // We check visible items to ensure they are up to date
+    visibleItems.forEach(async (item) => {
+      // Skip blobs (they are always "present") and items already marked correctly
+      if (!item.path || !!item.data) return;
+
+      try {
+        const stats = await IpcService.invoke('get-file-stats', item.path);
+        const isMissing = !stats;
+        
+        // Only update if state changed to avoid unnecessary re-renders/db writes
+        if (item.isMissing !== isMissing) {
+          await db.mediaPool.update(item.id, { isMissing });
+        }
+      } catch (error) {
+        if (item.isMissing !== true) {
+          await db.mediaPool.update(item.id, { isMissing: true });
+        }
+      }
+    });
+  }, [visibleItems.length, activeBinId]); // Re-check when bin changes or count changes
+
   // Preload audio durations using AudioContext for audio items without stored duration
   useEffect(() => {
-    const audioOnly = visibleItems.filter(i => i.type === 'audio' && !mediaTimes[i.id]);
+    // Skip items marked as missing to avoid console noise (404s)
+    const audioOnly = visibleItems.filter(i => i.type === 'audio' && !mediaTimes[i.id] && !i.isMissing);
     for (const item of audioOnly) {
       if (!item.path) continue;
       
@@ -48,7 +74,10 @@ export function useMediaPoolData(filter: MediaType | 'all', activeBinId: string 
             ctx.close();
           });
         })
-        .catch(() => { /* mute errors */ });
+        .catch(() => {
+          // If fetch fails, it might be missing. We could mark it here too,
+          // but the dedicated integrity check useEffect handles it more reliably.
+        });
     }
   }, [visibleItems.length]);
 

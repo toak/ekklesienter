@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Globe, Database, Monitor, Info, ImageIcon, Layers, Command } from 'lucide-react';
+import { Globe, Database, Monitor, Info, ImageIcon, Layers, Command, Smartphone } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 
 interface SettingsSidebarProps {
@@ -16,6 +16,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, setActiveT
         { id: 'data', label: t('data'), icon: Database, description: t('bible_translations') },
         { id: 'overrides', label: t('overrides', 'Overrides'), icon: Layers, description: t('overrides_description', 'Black, white & logo screens') },
         { id: 'shortcuts', label: t('shortcuts', 'Shortcuts'), icon: Command, description: t('hotkeys_overview', 'App keyboard shortcuts') },
+        { id: 'remote', label: t('remote_control_title', 'Remote Control'), icon: Smartphone, description: t('remote_control_desc', 'Connect your mobile device to control presentation') },
         { id: 'about', label: t('about_app'), icon: Info, description: t('about_description') },
     ];
 
@@ -66,16 +67,6 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, setActiveT
                             </button>
                         );
                     })}
-                </div>
-            </div>
-
-            {/* Bottom Accent */}
-            <div className="mt-auto relative z-10 px-4">
-                <div className="flex flex-col items-center gap-2 py-4 border-t border-white/5 opacity-40">
-                    <p className="text-[9px] text-stone-500 font-bold uppercase tracking-[0.2em] text-center">
-                        {t('app_title')} <br />
-                        <span className="text-stone-700">{t('settings_premium_edition')}</span>
-                    </p>
                 </div>
             </div>
         </div>

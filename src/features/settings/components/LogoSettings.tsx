@@ -39,7 +39,7 @@ const LogoSettings: React.FC = () => {
             {!IpcService.isElectron() && (
                 <div className="flex items-center gap-3 px-6 py-4 bg-red-500/10 border border-red-500/20 rounded-3xl text-red-400 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
-                    <span>{t('electron_required_warning', 'System features (Image/Folder Import) require the Desktop application.')}</span>
+                    <span>{t('electron_required_warning')}</span>
                 </div>
             )}
             {/* ─── Action Bar ──────────────────────────────────────────────── */}
@@ -53,8 +53,8 @@ const LogoSettings: React.FC = () => {
                         <Plus className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                        <span className="block text-xs font-bold text-white tracking-tight">{t('add_logo', 'Add Logo')}</span>
-                        <span className="block text-[10px] text-stone-500 font-medium">{t('select_single_logo_desc', 'Select a single image file')}</span>
+                        <span className="block text-xs font-bold text-white tracking-tight">{t('add_logo')}</span>
+                        <span className="block text-[10px] text-stone-500 font-medium">{t('select_single_logo_desc')}</span>
                     </div>
                 </button>
 
@@ -69,9 +69,9 @@ const LogoSettings: React.FC = () => {
                     </div>
                     <div className="text-left">
                         <span className="block text-xs font-bold text-white tracking-tight">
-                            {isImporting && importTargetGroupId === null ? t('importing', 'Importing...') : t('import_folder', 'Import Folder')}
+                            {isImporting && importTargetGroupId === null ? t('importing') : t('import_folder')}
                         </span>
-                        <span className="block text-[10px] text-stone-500 font-medium">{t('import_folder_desc', 'Creates a new collection from folder')}</span>
+                        <span className="block text-[10px] text-stone-500 font-medium">{t('import_folder_desc')}</span>
                     </div>
                 </button>
 
@@ -84,8 +84,8 @@ const LogoSettings: React.FC = () => {
                         <FolderPlus className="w-4 h-4" />
                     </div>
                     <div className="text-left">
-                        <span className="block text-xs font-bold text-white tracking-tight">{t('create_collection', 'New Collection')}</span>
-                        <span className="block text-[10px] text-stone-500 font-medium">{t('create_collection_desc', 'Organize logos into groups')}</span>
+                        <span className="block text-xs font-bold text-white tracking-tight">{t('create_collection')}</span>
+                        <span className="block text-[10px] text-stone-500 font-medium">{t('create_collection_desc')}</span>
                     </div>
                 </button>
             </div>
@@ -104,7 +104,7 @@ const LogoSettings: React.FC = () => {
                     <div className="flex items-center gap-3 px-2">
                         <ImageIcon className="w-4 h-4 text-accent" />
                         <h3 className="text-xs font-bold text-stone-400 uppercase tracking-[0.2em]">
-                            {t('ungrouped_logos', 'Ungrouped Logos')}
+                            {t('ungrouped_logos')}
                         </h3>
                         <span className="text-[10px] text-stone-600 font-mono">{settings.logo.customLogos.length}</span>
                     </div>
@@ -142,7 +142,7 @@ const LogoSettings: React.FC = () => {
                                 {group.name}
                             </h3>
                             <span className="text-[10px] text-stone-600 font-mono shrink-0">
-                                {group.logos.length} {t('common:items', 'items')}
+                                {group.logos.length} {t('common:items')}
                             </span>
 
                             {/* Group actions */}
@@ -204,7 +204,7 @@ const LogoSettings: React.FC = () => {
                             group.logos.length === 0 ? (
                                 <div className="mx-2 p-8 border-2 border-dashed border-white/5 rounded-2xl flex flex-col items-center justify-center text-stone-600 gap-3">
                                     <ImageIcon className="w-10 h-10 opacity-10" />
-                                    <p className="text-[10px] font-medium italic">{t('no_logos_in_group', 'No logos in this collection yet')}</p>
+                                    <p className="text-[10px] font-medium italic">{t('no_logos_in_group')}</p>
                                 </div>
                             ) : (
                                 <div className="px-2">
@@ -228,9 +228,9 @@ const LogoSettings: React.FC = () => {
                 <div className="p-12 border-2 border-dashed border-white/5 rounded-[2.5rem] flex flex-col items-center justify-center text-stone-600 gap-4">
                     <ImageIcon className="w-14 h-14 opacity-10" />
                     <div className="text-center">
-                        <p className="text-xs font-bold text-stone-500">{t('no_custom_logos_title', 'No logos added yet')}</p>
+                        <p className="text-xs font-bold text-stone-500">{t('no_custom_logos_title')}</p>
                         <p className="text-[10px] font-medium italic mt-1">
-                            {t('no_custom_logos_hint', 'Add your church logo or import a folder to get started')}
+                            {t('no_custom_logos_hint')}
                         </p>
                     </div>
                 </div>
@@ -242,7 +242,7 @@ const LogoSettings: React.FC = () => {
                     <div className="flex items-center gap-3 px-2">
                         <Group className="w-4 h-4 text-stone-500" />
                         <h3 className="text-xs font-bold text-stone-500 uppercase tracking-[0.2em]">
-                            {t('preloaded_logo_groups', 'Built-in Collections')}
+                            {t('preloaded_logo_groups')}
                         </h3>
                     </div>
 
@@ -250,7 +250,7 @@ const LogoSettings: React.FC = () => {
                         <div key={group.id} className="space-y-3">
                             <div className="px-2">
                                 <h4 className="text-sm font-bold text-white">
-                                    {group.id === 'group-default' ? t('logo_group_default', 'Default Logos') : group.name}
+                                    {group.id === 'group-default' ? t('logo_group_default') : group.name}
                                 </h4>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">

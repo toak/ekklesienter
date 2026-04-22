@@ -14,10 +14,10 @@ export function useNavigationSearch(lang: string, currentTranslationId: string) 
 
   useEffect(() => {
     const timer = setTimeout(async () => {
-      if (parseResult.type === 'keyword' && parseResult.query.length >= 2) {
+      if (parseResult.type === 'keyword' && parseResult.originalQuery.length >= 2) {
         setIsSearching(true);
         try {
-          const results = await searchVerses(parseResult.query, currentTranslationId);
+          const results = await searchVerses(parseResult.originalQuery, currentTranslationId);
           setSearchResults(results);
         } catch (error) {
           console.error('Search error:', error);

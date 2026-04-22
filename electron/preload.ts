@@ -45,6 +45,21 @@ contextBridge.exposeInMainWorld('electron', {
             const sub = (_event: any, ratio: number) => callback(ratio);
             ipcRenderer.on('on-aspect-ratio-changed', sub);
             return () => ipcRenderer.removeListener('on-aspect-ratio-changed', sub);
+        },
+        remote: {
+            start: () => ipcRenderer.invoke('remote:start'),
+            stop: () => ipcRenderer.invoke('remote:stop'),
+            getInfo: () => ipcRenderer.invoke('remote:get-info'),
+            updateState: (payload: any) => ipcRenderer.send('remote:update-state', payload),
+            onCommand: (callback: (command: string, payload?: any) => void) => {
+                const sub = (_event: any, command: string, payload: any) => callback(command, payload);
+                ipcRenderer.on('remote:command-received', sub);
+                return () => ipcRenderer.removeListener('remote:command-received', sub);
+            },
+            sendResults: (requestId: string, results: any) => ipcRenderer.send('remote:bible-results', { requestId, results }),
+        },
+        power: {
+            setWakeLock: (enabled: boolean) => ipcRenderer.invoke('power:set-wake-lock', enabled),
         }
     },
 });

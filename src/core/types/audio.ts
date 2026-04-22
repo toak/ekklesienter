@@ -21,5 +21,8 @@ export interface IAudioScope {
     fadeOutDuration: number;
   };
   volumeFadeDuration?: number; // custom duration for programmatic fades
+  speed?: number; // Playback speed (0.5 - 2.0)
+  strategy?: 'auto' | 'delay' | 'manual';
+  delaySeconds?: number;
   onEnded?: () => void;
 }

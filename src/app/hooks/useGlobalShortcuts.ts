@@ -7,7 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { db } from '@/core/db';
 import { OverrideType } from '@/core/store/uiAtoms';
+import { Verse } from '@/core/types';
 import { createCanvasItem } from '@/features/presenter/components/slide-properties/helpers';
+import { LiveSyncService } from '@/core/services/liveSyncService';
 
 interface IGlobalShortcutsProps {
     appMode: 'scripture' | 'presentation';
@@ -16,8 +18,8 @@ interface IGlobalShortcutsProps {
     activeVerse: any;
     selectedCanvasItemIds: string[];
     isTimelineHovered: boolean;
-    handleNext: (detached?: boolean) => Promise<void>;
-    handlePrev: (detached?: boolean) => Promise<void>;
+    handleNext: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
+    handlePrev: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
     openProjector: () => Promise<void>;
     closeProjector: () => void;
     toggleOverride: (type: OverrideType) => void;
@@ -40,7 +42,10 @@ export function useGlobalShortcuts({
     toggleOverride
 }: IGlobalShortcutsProps) {
     const { t } = useTranslation();
-    const { undo, redo, setPreviewSlide, setLiveSlide } = usePresentationStore();
+    const undo = usePresentationStore(s => s.undo);
+    const redo = usePresentationStore(s => s.redo);
+    const setPreviewSlide = usePresentationStore(s => s.setPreviewSlide);
+    const setLiveSlide = usePresentationStore(s => s.setLiveSlide);
 
     const executeHotkey = useCallback(async (e: {
         key: string;
@@ -371,9 +376,104 @@ export function useGlobalShortcuts({
             });
         }
 
+        let unsubscribeRemote: (() => void) | undefined;
+        if (IpcService.isElectron()) {
+            unsubscribeRemote = IpcService.on('remote:command-received', async (command: string, payload: unknown) => {
+                if (command === 'NEXT') handleNext(false, true);
+                else if (command === 'PREV') handlePrev(false, true);
+                else if (command === 'OVERRIDE_BLACK') toggleOverride('blackout');
+                else if (command === 'OVERRIDE_WHITE') toggleOverride('whiteout');
+                else if (command === 'OVERRIDE_LOGO') toggleOverride('logo');
+                else if (command === 'MEDIA_PLAY') {
+                    const liveSlideId = usePresentationStore.getState().liveSlideId;
+                    if (liveSlideId) {
+                        LiveSyncService.sendVideoCommand(liveSlideId, 'play');
+                    }
+                }
+                else if (command === 'MEDIA_PAUSE') {
+                    const liveSlideId = usePresentationStore.getState().liveSlideId;
+                    if (liveSlideId) {
+                        LiveSyncService.sendVideoCommand(liveSlideId, 'pause');
+                    }
+                }
+                else if (command === 'MEDIA_TOGGLE') {
+                    const liveSlideId = usePresentationStore.getState().liveSlideId;
+                    if (liveSlideId) {
+                        LiveSyncService.sendVideoCommand(liveSlideId, 'toggle');
+                    }
+                }
+                else if (command === 'MEDIA_STOP') {
+                    const liveSlideId = usePresentationStore.getState().liveSlideId;
+                    if (liveSlideId) {
+                        LiveSyncService.sendVideoCommand(liveSlideId, 'pause');
+                        LiveSyncService.sendVideoCommand(liveSlideId, 'seek', 0);
+                    }
+                }
+                else if (command === 'BIBLE_QUERY') {
+                    const queryPayload = payload as Record<string, unknown>;
+                    const { type, ...query } = queryPayload;
+                    let results: unknown[] = [];
+                    
+                    try {
+                        if (type === 'GET_TRANSLATIONS') {
+                            results = await db.translations.toArray();
+                        } else if (type === 'GET_BOOKS') {
+                            results = await db.books.where('translationId').equals(query.translationId as string).toArray();
+                        } else if (type === 'GET_VERSES') {
+                            results = await db.verses
+                                .where('[translationId+bookId+chapter]')
+                                .equals([query.translationId as string, query.bookId as string, query.chapter as number])
+                                .toArray();
+                        } else if (type === 'SEARCH') {
+                            results = await db.verses
+                                .where('text')
+                                .startsWithIgnoreCase(query.text as string)
+                                .limit(50)
+                                .toArray();
+                        }
+                        
+                        IpcService.send('remote:bible-results', { requestId: queryPayload.requestId, results });
+                    } catch (err) {
+                        console.error('Remote Bible Query failed:', err);
+                    }
+                }
+                else if (command === 'BIBLE_SELECT') {
+                    const selectPayload = payload as Record<string, unknown>;
+                    const bibleState = useBibleStore.getState();
+                    
+                    if (Array.isArray(selectPayload.verses)) {
+                        // Multi-verse project
+                        bibleState.setSelectedVerses(selectPayload.verses as Verse[]);
+                        bibleState.commitToProjector();
+                        openProjector();
+                    } else if (selectPayload.verse) {
+                        // Single-verse project
+                        bibleState.setActiveVerse(selectPayload.verse as Verse);
+                        bibleState.commitToProjector();
+                        openProjector();
+                    }
+                }
+                else if (command === 'PROJECTOR_START') {
+                    if (previewSlideId) {
+                        setLiveSlide(previewSlideId);
+                        openProjector();
+                    }
+                }
+                else if (command === 'PROJECTOR_STOP') {
+                    closeProjector();
+                }
+                else if (command === 'GET_STATE') {
+                    // Trigger a re-sync of state to remote clients
+                    IpcService.send('remote:request-state');
+                }
+            });
+        }
+
         return () => {
             window.removeEventListener('keydown', handleKeyDown, true);
             unsubscribeRelay?.();
+            unsubscribeRemote?.();
         };
     }, [executeHotkey]);
+
 }

@@ -27,6 +27,7 @@ interface UseVideoPlaybackOptions {
   slideId: string;
   /** When true, skip auto-play and volume sync effects (toolbar control-only mode) */
   controlOnly?: boolean;
+  isRemote?: boolean;
 }
 
 /** Duration in seconds for the fade-out when a video slide is being unmounted */
@@ -43,6 +44,7 @@ export const useVideoPlayback = ({
   isPreloading,
   slideId,
   controlOnly = false,
+  isRemote = false,
 }: UseVideoPlaybackOptions): {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   state: IVideoPlaybackState;
@@ -210,7 +212,7 @@ export const useVideoPlayback = ({
   // ── Auto-play strategy when live ──────────────────────────────────────────
   // Skip in controlOnly mode so the toolbar doesn't fire duplicate play commands.
   useEffect(() => {
-    if (controlOnly) return;
+    if (controlOnly || isRemote) return;
     const video = videoRef.current;
     if (!video || !isLive || isPreloading) return;
 

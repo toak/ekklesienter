@@ -57,9 +57,13 @@ export const LibraryMediaSection: React.FC<ILibraryMediaSectionProps> = ({
                 ))}
 
                 {graceLibMediaBins.length === 0 && (
-                    <div className="py-20 text-center opacity-30 flex flex-col items-center gap-3">
-                        <Music className="w-10 h-10" />
-                        <p className="text-xs italic">{t('configure_media_bins', 'Create bins to organize local media')}</p>
+                    <div className="py-12 flex flex-col items-center justify-center">
+                        <div className="w-full max-w-[240px] p-6 rounded-2xl bg-stone-950/20 border border-white/5 flex flex-col items-center gap-3 text-center opacity-40 hover:opacity-100 transition-opacity">
+                            <Music className="w-8 h-8 text-stone-500" />
+                            <p className="text-[10px] font-bold uppercase tracking-widest leading-relaxed">
+                                {t('configure_media_bins', 'Create bins to organize local media')}
+                            </p>
+                        </div>
                     </div>
                 )}
             </div>

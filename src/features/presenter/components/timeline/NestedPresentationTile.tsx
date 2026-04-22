@@ -49,7 +49,7 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
     const isLinked = slide.type === 'normal' && Boolean((slide as ICanvasSlide).linkedPresentationId);
 
     return (
-        <div className="flex items-center gap-2 px-2 bg-white/2 rounded-2xl border border-white/5 py-3 ml-[-8px]">
+        <div className="flex items-center gap-2 px-2 bg-white/2 rounded-2xl border border-white/5 py-3">
             {/* Left accent bar */}
             <div className={cn(
                 'w-1 h-12 rounded-full shrink-0',

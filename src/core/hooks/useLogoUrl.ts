@@ -23,7 +23,6 @@ export function useLogoUrl(logo: ILogo | null) {
                     const entry = await db.logos.get(logo.id);
                     if (entry) {
                         const url = URL.createObjectURL(entry.data);
-                        console.log(`[useLogoUrl] Created Blob URL: ${url} (Origin: ${window.location.origin}, ID: ${logo.id})`);
                         currentUrl = url;
                         setLogoUrl(url);
                         return;

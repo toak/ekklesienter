@@ -86,10 +86,15 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
     }
 
     if (!activeVerse) {
+      if (!isProjector) {
+        return (
+          <div className="h-full flex flex-col items-center justify-center text-stone-700 italic gap-4">
+            <p className="text-sm">{t('no_verse_selected', 'Select a verse to present')}</p>
+          </div>
+        );
+      }
       return (
-        <div className="h-full flex items-center justify-center text-stone-700 italic text-sm">
-          <p>{t('no_verse_selected_short')}</p>
-        </div>
+        <div className="h-full w-full bg-black flex items-center justify-center" />
       );
     }
 
@@ -117,15 +122,20 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
 
   const renderPresentationContent = () => {
     if (!selectedSlide) {
+      if (!isProjector) {
+        return (
+          <div className="h-full flex flex-col items-center justify-center text-stone-700 italic gap-4">
+            <PresentationIcon className="w-12 h-12 opacity-10" strokeWidth={1} />
+            <p className="text-sm">
+              {!hasActivePresentation 
+                ? t('select_presentation_hint', 'Select a presentation to begin') 
+                : t('select_slide_hint', 'Select a slide to preview')}
+            </p>
+          </div>
+        );
+      }
       return (
-        <div className="h-full flex flex-col items-center justify-center text-stone-700 italic gap-4">
-          <PresentationIcon className="w-12 h-12 opacity-10" strokeWidth={1} />
-          <p className="text-sm">
-            {!hasActivePresentation 
-              ? t('select_presentation_hint', 'Select a presentation to begin') 
-              : t('select_slide_hint', 'Select a slide to preview')}
-          </p>
-        </div>
+        <div className="h-full w-full bg-black flex items-center justify-center" />
       );
     }
 
@@ -216,6 +226,8 @@ export const SlideContentOrchestrator: React.FC<SlideContentOrchestratorProps> =
             slide={selectedSlide}
             slideId={selectedSlide.id}
             isPreview={!isProjector}
+            isProjector={isProjector}
+            isPreloading={isPreloading}
             hideCanvasItems={!isProjector}
           />
           {!isProjector && (

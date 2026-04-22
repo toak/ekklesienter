@@ -323,7 +323,6 @@ export const EktService = {
 
     download(blob: Blob, filename: string) {
         const url = URL.createObjectURL(blob);
-        console.log(`[EktService] Created download URL: ${url} (Origin: ${window.location.origin})`);
         const a = document.createElement('a');
         a.href = url;
         a.download = filename.endsWith('.ekt') ? filename : `${filename}.ekt`;

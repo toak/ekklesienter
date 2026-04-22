@@ -400,7 +400,6 @@ export const EktpService = {
 
     download(blob: Blob, filename: string) {
         const url = URL.createObjectURL(blob);
-        console.log(`[EktpService] Created download URL: ${url} (Origin: ${window.location.origin})`);
         const link = document.createElement('a');
         link.href = url;
         link.download = filename.endsWith('.ektp') ? filename : `${filename}.ektp`;

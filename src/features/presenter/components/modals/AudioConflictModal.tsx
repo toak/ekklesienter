@@ -16,15 +16,15 @@ const AudioConflictModal: React.FC = () => {
 
     if (!isOpen) return null;
 
-    const { targetSlideId, fileId, overlappingScopes, actionType } = modalData.props;
+    const { targetSlideId, fileId, fileName, overlappingScopes, actionType } = modalData.props;
 
     const handleReplace = async () => {
-        await resolveAudioConflict('replace', { targetSlideId, fileId, overlappingScopes });
+        await resolveAudioConflict('replace', { targetSlideId, fileId, fileName, overlappingScopes });
         closeModal(ModalType.AUDIO_CONFLICT);
     };
 
     const handleShift = async () => {
-        await resolveAudioConflict('shift', { targetSlideId, fileId, overlappingScopes });
+        await resolveAudioConflict('shift', { targetSlideId, fileId, fileName, overlappingScopes });
         closeModal(ModalType.AUDIO_CONFLICT);
     };
 

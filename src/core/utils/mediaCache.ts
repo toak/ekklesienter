@@ -11,11 +11,21 @@ class MediaCache {
     /**
      * Gets or creates an ObjectURL for a given media ID from the backgrounds table.
      */
-    async getBackgroundUrl(mediaId: string): Promise<string | null> {
+    async getBackgroundUrl(mediaId: string | undefined): Promise<string | null> {
+        if (!mediaId) return null;
+        
         const cached = this.urlCache.get(mediaId);
         if (cached) {
             cached.count++;
             return cached.url;
+        }
+
+        // REMOTE PROXY SUPPORT: If we are on a remote controller (mobile/browser),
+        // we don't have a local DB. Instead, route to the desktop media proxy.
+        const isRemote = !window.electron?.ipcRenderer;
+        if (isRemote) {
+            const mediaProxyHost = `${window.location.protocol}//${window.location.hostname}:3211`;
+            return `${mediaProxyHost}/media/${mediaId}`;
         }
 
         try {
@@ -53,7 +63,6 @@ class MediaCache {
         }
 
         const url = URL.createObjectURL(blob);
-        console.log(`[MediaCache] Cached Blob: ${url} (ID: ${mediaId})`);
         this.urlCache.set(mediaId, { url, count: 1 });
         this.blobCache.set(mediaId, blob);
         return url;

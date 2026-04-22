@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowRightLeft, Compass } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { CompactColorPicker } from './CompactColorPicker';
@@ -60,13 +61,15 @@ export const GradientPicker: React.FC<GradientPickerProps> = ({ from, to, angle,
 
     const QUICK_ANGLES = [0, 90, 135, 180, 270];
 
+    const { t } = useTranslation();
+
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
             {/* Angle & Preview Section */}
             <div className="flex items-center gap-6">
                 {/* Visual Dial */}
                 <div className="flex flex-col items-center gap-2">
-                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">Angle</label>
+                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">{t('gradient_angle')}</label>
                     <div
                         ref={dialRef}
                         onMouseDown={() => setIsDragging(true)}
@@ -102,7 +105,7 @@ export const GradientPicker: React.FC<GradientPickerProps> = ({ from, to, angle,
 
                 {/* Gradient Preview Bar */}
                 <div className="flex-1 space-y-2">
-                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest pl-1">Live Preview</label>
+                    <label className="text-[10px] font-bold text-stone-500 uppercase tracking-widest pl-1">{t('gradient_preview')}</label>
                     <div
                         className="h-20 w-full rounded-2xl border-2 border-white/10 shadow-inner relative overflow-hidden group"
                         style={{ background: `linear-gradient(${angle}deg, ${from}, ${to})` }}
@@ -111,7 +114,7 @@ export const GradientPicker: React.FC<GradientPickerProps> = ({ from, to, angle,
                         <button
                             onClick={swapColors}
                             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-2 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-white opacity-0 group-hover:opacity-100 transition-all hover:scale-110 active:scale-90"
-                            title="Swap Colors"
+                            title={t('swap_colors')}
                         >
                             <ArrowRightLeft className="w-4 h-4" />
                         </button>

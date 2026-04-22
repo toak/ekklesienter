@@ -37,5 +37,9 @@ export default {
     "no_results": "Ничего не найдено",
     "search_hint": "Подсказка: попробуйте \"Ин 3 16\"",
     "navigate": "Перейти",
-    "no_verse_selected_short": "Стих не выбран"
+    "no_verse_selected_short": "Стих не выбран",
+    "edit_verse": "Редактировать стих",
+    "set_as_primary": "Сделать основным",
+    "set_as_secondary": "Сделать параллельным",
+    "remove_secondary": "Убрать параллельный"
 };

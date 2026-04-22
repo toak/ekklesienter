@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ICanvasItem, IStyleLayer } from '@/core/types';
 import { Palette } from 'lucide-react';
 
@@ -10,6 +11,7 @@ export interface ISlideColorsProps {
 }
 
 export const SlideColors: React.FC<ISlideColorsProps> = ({ items, onColorClick }) => {
+    const { t } = useTranslation();
     // Collect all unique solid colors from all canvas items
     const allColors = useMemo(() => {
         const colorMap = new Map<string, IStyleLayer>();
@@ -31,7 +33,7 @@ export const SlideColors: React.FC<ISlideColorsProps> = ({ items, onColorClick }
                     <Palette className="w-5 h-5 text-stone-700" />
                 </div>
                 <p className="text-[10px] text-stone-600 font-bold uppercase tracking-widest text-center">
-                    No elements on slide
+                    {t('no_elements_on_slide')}
                 </p>
             </div>
         );
@@ -41,7 +43,7 @@ export const SlideColors: React.FC<ISlideColorsProps> = ({ items, onColorClick }
         <div className="space-y-4">
             <div className="flex items-center gap-2 px-1">
                 <div className="w-1 h-3 bg-accent/40 rounded-full shrink-0" />
-                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-500">Slide Colors</span>
+                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-500">{t('slide_colors')}</span>
             </div>
             <div className="grid grid-cols-8 gap-1.5 bg-black/20 p-3 rounded-2xl border border-white/5">
                 {allColors.map((layer, idx) => (
@@ -55,7 +57,7 @@ export const SlideColors: React.FC<ISlideColorsProps> = ({ items, onColorClick }
                 ))}
             </div>
             <p className="text-[9px] text-stone-600 px-1 leading-relaxed">
-                Click a color to edit all elements sharing it simultaneously.
+                {t('click_color_hint')}
             </p>
         </div>
     );

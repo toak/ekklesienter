@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAtom, useSetAtom } from 'jotai';
 import { editingCanvasItemIdAtom, textCommandAtom, type TextCommand } from '@/core/store/uiAtoms';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import {
     Eye, Trash2, Plus, Move, Layers, Palette,
     Wand2, Link2, Unlink, Target, Sun, BoxSelect,
-    MoveHorizontal, MoveVertical
+    MoveHorizontal, MoveVertical, Minus, ChevronDown
 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { ICanvasItem, IStyleLayer, ICanvasEffect, CanvasEffectType } from '@/core/types';
@@ -22,11 +23,13 @@ import { CompactColorPicker } from '@/components/CompactColorPicker';
 import { 
     EyeOff, Settings, Hash, MoveRight 
 } from 'lucide-react';
+import { CanvasService } from '@/features/presenter/services/CanvasService';
 
 interface IItemPropertiesProps {
     selectedIds: string[];
     canvasItems: ICanvasItem[];
     updateCanvasItems: (ids: string[], updates: Partial<ICanvasItem>) => void;
+    onBatchUpdate: (updates: Array<{ id: string; updates: Partial<ICanvasItem> }>) => void;
     isPreview: boolean;
     t: (key: string, fallback?: string) => string;
 }
@@ -35,10 +38,13 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
     selectedIds,
     canvasItems,
     updateCanvasItems,
+    onBatchUpdate,
     isPreview,
     t
 }) => {
-    const { previewSlideId, updateCanvasItems: batchUpdateCanvasItems, takeSnapshot } = usePresentationStore();
+    const previewSlideId = usePresentationStore(s => s.previewSlideId);
+    const batchUpdateCanvasItems = usePresentationStore(s => s.updateCanvasItems);
+    const takeSnapshot = usePresentationStore(s => s.takeSnapshot);
     const [editingId] = useAtom(editingCanvasItemIdAtom);
     const setTextCommand = useSetAtom(textCommandAtom);
 
@@ -52,84 +58,42 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
     // Safe fallback if item is deleted but selection hasn't updated yet
     if (!baseItem) return null;
 
-    const getSelectionValue = <T,>(getter: (item: ICanvasItem) => T): T | 'mixed' => {
-        if (selectedIds.length <= 1) return getter(baseItem);
-        const firstItem = canvasItems.find(i => i.id === selectedIds[0]);
-        if (!firstItem) return 'mixed';
-        const firstValue = getter(firstItem);
-        const allSame = selectedIds.every(id => {
-            const item = canvasItems.find(i => i.id === id);
-            return item && isEqual(getter(item), firstValue);
-        });
-        return allSame ? firstValue : 'mixed';
-    };
+    const getSelectionValue = <T,>(getter: (item: ICanvasItem) => T): T | 'mixed' => 
+        CanvasService.getSelectionState(selectedIds, canvasItems, getter);
 
     const handleAlign = async (type: string) => {
-        if (previewSlideId) await takeSnapshot(previewSlideId);
-        const updates: Array<{ id: string; updates: Partial<ICanvasItem> }> = [];
-        selectedIds.forEach(id => {
-            const item = canvasItems.find(i => i.id === id);
-            if (!item) return;
-            const u: Partial<ICanvasItem> = {};
-            switch (type) {
-                case 'left': u.x = 0; break; case 'h-center': u.x = 50; break; case 'right': u.x = 100; break;
-                case 'top': u.y = 0; break; case 'v-middle': u.y = 50; break; case 'bottom': u.y = 100; break;
-            }
-            updates.push({ id, updates: u });
-        });
-        if (updates.length > 0) batchUpdateCanvasItems(previewSlideId!, updates);
+        const u = CanvasService.getAlignmentUpdates(type);
+        if (Object.keys(u).length > 0) updateCanvasItems(selectedIds, u);
     };
 
     const handleDimensionChange = async (dim: 'width' | 'height', newVal: number) => {
-        if (previewSlideId) await takeSnapshot(previewSlideId);
         const updates: Array<{ id: string; updates: Partial<ICanvasItem> }> = [];
         selectedIds.forEach(id => {
             const item = canvasItems.find(i => i.id === id);
             if (!item) return;
-            const u: Partial<ICanvasItem> = { [dim]: newVal };
-            if (item.lockAspectRatio && item[dim] > 0) {
-                const other = dim === 'width' ? 'height' : 'width';
-                u[other] = (newVal * item[other]) / item[dim];
-            }
-            updates.push({ id, updates: u });
+            updates.push({ id, updates: CanvasService.calculateDimensionScale(item, dim, newVal) });
         });
-        if (updates.length > 0) batchUpdateCanvasItems(previewSlideId!, updates);
+        if (updates.length > 0) onBatchUpdate(updates);
     };
 
     const handlePivotChange = async (newPX?: number, newPY?: number) => {
-        if (previewSlideId) await takeSnapshot(previewSlideId);
         const updates: Array<{ id: string; updates: Partial<ICanvasItem> }> = [];
         selectedIds.forEach(id => {
             const item = canvasItems.find(i => i.id === id);
             if (!item) return;
-            const px = item.pivotX ?? 50, py = item.pivotY ?? 50;
-            const targetPX = newPX !== undefined ? newPX : px;
-            const targetPY = newPY !== undefined ? newPY : py;
-            const angleRad = ((item.rotation || 0) * Math.PI) / 180;
-            const cos = Math.cos(angleRad), sin = Math.sin(angleRad);
-            const dpxPct = targetPX - px, dpyPct = targetPY - py;
-            const dpxW = (dpxPct / 100) * item.width, dpyW = (dpyPct / 100) * item.height;
-            updates.push({ id, updates: { pivotX: targetPX, pivotY: targetPY, x: item.x + dpxW * cos - dpyW * sin, y: item.y + dpxW * sin + dpyW * cos } });
+            updates.push({ id, updates: CanvasService.calculatePivotTransformation(item, newPX, newPY) });
         });
-        if (updates.length > 0) batchUpdateCanvasItems(previewSlideId!, updates);
+        if (updates.length > 0) onBatchUpdate(updates);
     };
 
     const handleRadiusChange = async (key: 'borderRadius' | 'borderRadiusTL' | 'borderRadiusTR' | 'borderRadiusBL' | 'borderRadiusBR', value: number) => {
-        if (previewSlideId) await takeSnapshot(previewSlideId);
         const updates: Array<{ id: string; updates: Partial<ICanvasItem> }> = [];
         selectedIds.forEach(id => {
             const item = canvasItems.find(i => i.id === id);
             if (!item) return;
-            const u: Partial<ICanvasItem> = {};
-            if (item.lockBorderRadius !== false) {
-                u.borderRadius = value; u.borderRadiusTL = value; u.borderRadiusTR = value; u.borderRadiusBL = value; u.borderRadiusBR = value;
-            } else {
-                u[key] = value;
-                if (key === 'borderRadius') { u.borderRadiusTL = value; u.borderRadiusTR = value; u.borderRadiusBL = value; u.borderRadiusBR = value; }
-            }
-            updates.push({ id, updates: u });
+            updates.push({ id, updates: CanvasService.calculateRadiusUpdates(item, key, value) });
         });
-        if (updates.length > 0) batchUpdateCanvasItems(previewSlideId!, updates);
+        if (updates.length > 0) onBatchUpdate(updates);
     };
 
     return (
@@ -145,7 +109,7 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
                             </div>
                             <div className="grid grid-cols-[1fr_24px_1fr] gap-2 items-center">
                                 <ScrubbableInput label="W" name="W" value={getSelectionValue(i => i.width)} onChange={(v: number) => handleDimensionChange('width', v)} />
-                                <button onClick={() => updateCanvasItems(selectedIds, { lockAspectRatio: !baseItem.lockAspectRatio })} className={cn("flex items-center justify-center p-1 rounded-md transition-all cursor-pointer hover:bg-white/5", baseItem.lockAspectRatio ? "text-accent" : "text-stone-600")} title={t('lock_aspect_ratio', 'Lock Aspect Ratio')}>
+                                <button onClick={() => updateCanvasItems(selectedIds, { lockAspectRatio: !baseItem.lockAspectRatio })} className={cn("flex items-center justify-center p-1 rounded-md transition-all cursor-pointer hover:bg-white/5", baseItem.lockAspectRatio ? "text-accent" : "text-stone-600")} title={t('lock_aspect_ratio')}>
                                     {baseItem.lockAspectRatio ? <Link2 className="w-3 h-3" /> : <Unlink className="w-3 h-3" />}
                                 </button>
                                 <ScrubbableInput label="H" name="H" value={getSelectionValue(i => i.height)} onChange={(v: number) => handleDimensionChange('height', v)} />
@@ -156,7 +120,7 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
                     <div className="flex flex-col gap-2 p-2 bg-black/20 rounded-xl border border-white/5">
                         <div className="flex items-center gap-2 mb-1">
                             <Target className="w-3 h-3 text-stone-500" />
-                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{t('pivot_point', 'Pivot Point')}</span>
+                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{t('pivot_point')}</span>
                         </div>
                         <div className="flex gap-4 items-center">
                             <div className="grid grid-cols-3 gap-1 bg-black/40 p-1 rounded-md border border-white/5 w-fit">
@@ -177,7 +141,7 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
             </PropertySection>
 
             {/* ═══ Appearance Section ═══ */}
-            <PropertySection title="Appearance" icon={Eye} defaultOpen={false}>
+            <PropertySection title={t('appearance')} icon={Eye} defaultOpen={false}>
                 <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-2">
                         <ScrubbableInput label={<Sun className="w-3.5 h-3.5" />} name="Opacity" value={getSelectionValue(i => i.opacity ?? 1)} onChange={(v: number) => updateCanvasItems(selectedIds, { opacity: v })} step={0.05} min={0} max={1} formatter={(v) => Math.round(v * 100) / 100} />
@@ -207,7 +171,7 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
 
         {/* ═══ Effects Section ═══ */}
             <PropertySection 
-                title="Effects" 
+                title={t('effects')} 
                 icon={Wand2} 
                 defaultOpen={false}
                 extra={
@@ -241,7 +205,7 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
                     {effects.length === 0 && (
                         <div className="py-8 flex flex-col items-center justify-center gap-2 opacity-20 group">
                             <Wand2 className="w-6 h-6 group-hover:rotate-12 transition-transform duration-500" />
-                            <span className="text-[9px] font-black uppercase tracking-widest">No Effects Applied</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest">{t('no_effects_applied')}</span>
                         </div>
                     )}
                 </div>
@@ -252,15 +216,18 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
                 <div className="space-y-4">
                     <div className="space-y-2">
                         <div className="flex items-center justify-between px-1 mb-1">
-                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">Fill</span>
+                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{t('fill_label')}</span>
                             <button onClick={() => {
-                                const newLayer: IStyleLayer = { id: crypto.randomUUID(), type: 'color', visible: true, opacity: 1, blendMode: 'normal', color: '#1c1917', adjustments: { brightness: 100, contrast: 100, exposure: 0, saturation: 100, vibrance: 0, hue: 0, blur: 0 } };
+                                const newLayer: IStyleLayer = { id: crypto.randomUUID(), type: 'color', visible: true, opacity: 1, blendMode: 'normal', color: '#0c0a09', adjustments: { brightness: 100, contrast: 100, exposure: 0, saturation: 100, vibrance: 0, hue: 0, blur: 0 } };
                                 selectedIds.forEach(id => {
                                     const item = canvasItems.find(i => i.id === id);
                                     if (!item) return;
-                                    const currentFills = ensureLayers(item.type === 'text' ? item.text?.textFills : item.fills);
-                                    if (item.type === 'text') { updateCanvasItems([id], { text: { ...item.text!, textFills: [...currentFills, newLayer], color: item.text?.color || '#ffffff' } }); }
-                                    else { updateCanvasItems([id], { fills: [...currentFills, newLayer] }); }
+                                    const currentFills = ensureLayers(
+                                        item.type === 'text' ? item.text?.textFills : item.fills,
+                                        item.type === 'text' ? item.text?.color : undefined
+                                    );
+                                    if (item.type === 'text') { updateCanvasItems([id], { text: { ...item.text!, textFills: [newLayer, ...currentFills], color: item.text?.color || '#ffffff' } }); }
+                                    else { updateCanvasItems([id], { fills: [newLayer, ...currentFills] }); }
                                 });
                             }} onMouseDown={(e) => e.preventDefault()} className="p-1 hover:bg-white/10 rounded active:bg-white/20 cursor-pointer">
                                 <Plus className="w-3 h-3 text-stone-500 hover:text-stone-300 transition-colors" />
@@ -268,52 +235,79 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
                         </div>
                         <div className="space-y-4">
                             {getSelectionValue(i => i.type) === 'text' ? (
-                                <>
-                                    <InlineBackgroundPicker value={baseItem.text?.textFills || []} onChange={(v) => {
-                                        if (v && v.length === 0) {
-                                            updateCanvasItems(selectedIds, { text: { ...baseItem.text!, textFills: [], color: '#ffffff' } });
-                                            return;
+                                <InlineBackgroundPicker value={baseItem.text?.textFills || []} onChange={(v) => {
+                                    if (v && v.length === 0) {
+                                        updateCanvasItems(selectedIds, { text: { ...baseItem.text!, textFills: [], color: '#ffffff' } });
+                                        return;
+                                    }
+                                    if (editingId && selectedIds.includes(editingId) && v?.[0]?.type === 'color') {
+                                        setTextCommand({ command: 'foreColor', value: v[0].color, timestamp: Date.now() });
+                                    }
+                                    updateCanvasItems(selectedIds, {
+                                        text: {
+                                            ...baseItem.text!,
+                                            textFills: v || [],
+                                            color: v?.[0]?.type === 'color' ? v[0].color : baseItem.text?.color || '#ffffff'
                                         }
-                                        if (editingId && selectedIds.includes(editingId) && v?.[0]?.type === 'color') {
-                                            setTextCommand({ command: 'foreColor', value: v[0].color, timestamp: Date.now() });
-                                        }
-                                        updateCanvasItems(selectedIds, {
-                                            text: {
-                                                ...baseItem.text!,
-                                                textFills: v || [],
-                                                color: v?.[0]?.type === 'color' ? v[0].color : baseItem.text?.color || '#ffffff'
-                                            }
-                                        });
-                                    }} />
-                                    <InlineBackgroundPicker value={baseItem.fills || []} onChange={(v) => updateCanvasItems(selectedIds, { fills: v || [] })} onRemove={() => updateCanvasItems(selectedIds, { fills: [] })} />
-                                </>
+                                    });
+                                }} />
                             ) : (
                                 <InlineBackgroundPicker value={baseItem.fills} onChange={(v) => updateCanvasItems(selectedIds, { fills: v || [] })} onRemove={() => updateCanvasItems(selectedIds, { fills: [] })} />
                             )}
                         </div>
                     </div>
-                    <div className="h-px bg-white/5 mx-[-12px]" />
-                    <div className="space-y-3">
+                                       <div className="space-y-3">
                         <div className="flex items-center justify-between px-1">
-                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">Stroke</span>
+                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{t('stroke_label')}</span>
                             <button onClick={() => {
-                                const newLayer: IStyleLayer = { id: crypto.randomUUID(), type: 'color', visible: true, opacity: 1, blendMode: 'normal', color: '#ffffff', adjustments: { brightness: 100, contrast: 100, exposure: 0, saturation: 100, vibrance: 0, hue: 0, blur: 0 } };
-                                updateCanvasItems(selectedIds, { strokes: [newLayer], borderWidth: 2 });
+                                const newLayer: IStyleLayer = { id: crypto.randomUUID(), type: 'color', visible: true, opacity: 1, blendMode: 'normal', color: '#ffffff', width: baseItem.borderWidth || 2, adjustments: { brightness: 100, contrast: 100, exposure: 0, saturation: 100, vibrance: 0, hue: 0, blur: 0 } };
+                                selectedIds.forEach(id => {
+                                    const item = canvasItems.find(i => i.id === id);
+                                    if (!item) return;
+                                    if (item.type === 'text') {
+                                        const currentStrokes = ensureLayers(item.text?.textStrokes);
+                                        updateCanvasItems([id], { text: { ...item.text!, textStrokes: [newLayer, ...currentStrokes] } });
+                                    } else {
+                                        const currentStrokes = ensureLayers(item.strokes);
+                                        updateCanvasItems([id], { strokes: [newLayer, ...currentStrokes], borderWidth: item.borderWidth || 2 });
+                                    }
+                                });
                             }} onMouseDown={(e) => e.preventDefault()} className="p-1 hover:bg-white/10 rounded active:bg-white/20 cursor-pointer">
                                 <Plus className="w-3 h-3 text-stone-500 hover:text-stone-300 transition-colors" />
                             </button>
                         </div>
-                        <div className="grid grid-cols-[60px_1fr] gap-2 items-start">
-                            <ScrubbableInput label="W" name="BorderWidth" value={getSelectionValue(i => i.borderWidth ?? 0)} onChange={(v: number) => updateCanvasItems(selectedIds, { borderWidth: v })} min={0} className="h-8" onMouseDown={(e: React.MouseEvent) => e.preventDefault()} />
-                            <InlineBackgroundPicker value={baseItem.strokes} onChange={(v) => updateCanvasItems(selectedIds, { strokes: v || [] })} onRemove={() => updateCanvasItems(selectedIds, { borderWidth: 0, strokes: [] })} />
+                        
+                        {/* Row 1: Layers */}
+                        <div className="w-full">
+                            {baseItem.type === 'text' ? (
+                                <InlineBackgroundPicker 
+                                    value={baseItem.text?.textStrokes || []} 
+                                    onChange={(v) => updateCanvasItems(selectedIds, { text: { ...baseItem.text!, textStrokes: v || [] } })} 
+                                    onRemove={() => updateCanvasItems(selectedIds, { borderWidth: 0, text: { ...baseItem.text!, textStrokes: [] } })} 
+                                />
+                            ) : (
+                                <InlineBackgroundPicker 
+                                    value={baseItem.strokes} 
+                                    onChange={(v) => updateCanvasItems(selectedIds, { strokes: v || [] })} 
+                                    onRemove={() => updateCanvasItems(selectedIds, { borderWidth: 0, strokes: [] })} 
+                                />
+                            )}
                         </div>
-                        <div className="space-y-1.5 mt-1">
-                            <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 gap-0.5">
-                                {(['inside', 'center', 'outside'] as const).map((align) => (
-                                    <button key={align} onClick={() => updateCanvasItems(selectedIds, { strokeAlign: align })} onMouseDown={(e) => e.preventDefault()} className={cn("flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer", getSelectionValue(i => i.strokeAlign || 'center') === align ? "bg-accent/10 text-accent shadow-[0_0_10px_rgba(234,179,8,0.1)] border border-accent/20" : "text-stone-500 hover:bg-white/2 hover:text-stone-300 border border-transparent")}>
-                                        {t(`stroke_${align}`)}
-                                    </button>
-                                ))}
+
+                        <div className="h-px bg-white/5 mx-[-12px]" />
+
+                        <div className="space-y-2">
+                            {/* Width Row */}
+                            <div className="flex flex-col gap-1 w-1/2">
+                                <span className="text-[8px] font-bold text-stone-600 uppercase tracking-widest px-1">{t('stroke_width')}</span>
+                                <ScrubbableInput 
+                                    label="W" 
+                                    name="BorderWidth" 
+                                    value={getSelectionValue(i => i.borderWidth ?? 0)} 
+                                    onChange={(v: number) => updateCanvasItems(selectedIds, { borderWidth: v })} 
+                                    min={0} 
+                                    className="h-8"
+                                />
                             </div>
                         </div>
                     </div>
@@ -322,23 +316,87 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
 
             {/* ═══ Typography Section (text items only) ═══ */}
             {getSelectionValue(i => i.type) === 'text' && (
-                <TypographySection selectedIds={selectedIds} canvasItems={canvasItems} updateCanvasItems={updateCanvasItems} t={t} />
+                <TypographySection selectedIds={selectedIds} canvasItems={canvasItems} updateCanvasItems={updateCanvasItems} onBatchUpdate={onBatchUpdate} isPreview={isPreview} t={t} />
             )}
         </div>
     );
 };
 
+// ─── Local Helpers ──────────────────────────────────────────────────
+
+const parseDashArray = (str: string) => {
+    if (!str || str === 'mixed') return { dash: 0, gap: 0 };
+    const parts = str.split(/[\s,]+/).map(p => parseFloat(p)).filter(p => !isNaN(p));
+    if (parts.length === 0) return { dash: 0, gap: 0 };
+    if (parts.length === 1) return { dash: parts[0], gap: parts[0] };
+    return { dash: parts[0], gap: parts[1] };
+};
+
+const stringifyDashArray = (dash: number, gap: number) => {
+    if (dash === 0) return '';
+    if (dash === gap) return `${dash}`;
+    return `${dash},${gap}`;
+};
+
 // ─── Local Components ──────────────────────────────────────────────────
 
+const PropertyDropdown: React.FC<{
+    label: string;
+    value: string | 'mixed';
+    options: { value: string; label: string }[];
+    onChange: (val: string) => void;
+    t: (key: string) => string;
+}> = ({ label, value, options, onChange, t }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const anchorRef = useRef<HTMLDivElement>(null);
+
+    const activeOption = options.find(o => o.value === value);
+
+    return (
+        <div className="flex flex-col gap-1 flex-1">
+            <span className="text-[8px] font-bold text-stone-600 uppercase tracking-widest px-1">{label}</span>
+            <div 
+                ref={anchorRef}
+                onClick={() => setIsOpen(true)}
+                className="flex items-center justify-between px-3 py-1.5 bg-black/40 border border-white/5 rounded-xl hover:bg-black/60 hover:border-white/10 transition-all cursor-pointer group h-8"
+            >
+                <span className="text-[10px] font-bold text-stone-300 truncate">
+                    {value === 'mixed' ? 'Mixed' : (activeOption?.label || value)}
+                </span>
+                <ChevronDown className="w-3 h-3 text-stone-600 group-hover:text-stone-400 transition-colors" />
+            </div>
+
+            <FloatingPopover isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={anchorRef} title={label} width={160}>
+                <div className="p-1 flex flex-col gap-0.5">
+                    {options.map((opt) => (
+                        <button
+                            key={opt.value}
+                            onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                            className={cn(
+                                "w-full px-3 py-2 text-left text-[10px] font-bold uppercase tracking-widest rounded-lg transition-all cursor-pointer",
+                                value === opt.value ? "bg-accent/10 text-accent" : "text-stone-400 hover:text-stone-100 hover:bg-white/5"
+                            )}
+                        >
+                            {opt.label}
+                        </button>
+                    ))}
+                </div>
+            </FloatingPopover>
+        </div>
+    );
+};
+
 const AddEffectButton: React.FC<{ onAdd: (type: CanvasEffectType) => void }> = ({ onAdd }) => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const buttonRef = useRef<HTMLButtonElement>(null);
 
     const effectTypes: { type: CanvasEffectType; label: string }[] = [
-        { type: 'drop-shadow', label: 'Drop Shadow' },
-        { type: 'inner-shadow', label: 'Inner Shadow' },
-        { type: 'layer-blur', label: 'Layer Blur' },
-        { type: 'background-blur', label: 'Background Blur' },
+        { type: 'drop-shadow', label: t('drop_shadow') },
+        { type: 'inner-shadow', label: t('inner_shadow') },
+        { type: 'layer-blur', label: t('layer_blur') },
+        { type: 'background-blur', label: t('background_blur') },
+        { type: 'noise', label: t('noise') },
     ];
 
     return (
@@ -350,7 +408,7 @@ const AddEffectButton: React.FC<{ onAdd: (type: CanvasEffectType) => void }> = (
             >
                 <Plus className="w-3.5 h-3.5" />
             </button>
-            <FloatingPopover isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={buttonRef} title="Add Effect" width={180}>
+            <FloatingPopover isOpen={isOpen} onClose={() => setIsOpen(false)} anchorRef={buttonRef} title={t('add_effect_label')} width={180}>
                 <div className="p-1 flex flex-col gap-0.5">
                     {effectTypes.map(({ type, label }) => (
                         <button
@@ -373,10 +431,11 @@ const EffectRow: React.FC<{
     onUpdate: (updates: Partial<ICanvasEffect>) => void;
     onRemove: () => void;
 }> = ({ effect, onUpdate, onRemove }) => {
+    const { t } = useTranslation();
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const settingsButtonRef = useRef<HTMLButtonElement>(null);
 
-    const Icon = effect.type.includes('shadow') ? MoveRight : effect.type === 'layer-blur' ? Layers : Sun;
+    const Icon = effect.type.includes('shadow') ? MoveRight : effect.type === 'layer-blur' ? Layers : effect.type === 'noise' ? Hash : Sun;
 
     return (
         <div className={cn(
@@ -392,7 +451,7 @@ const EffectRow: React.FC<{
             </button>
             
             <span className="flex-1 text-[10px] font-bold text-stone-300 uppercase tracking-widest truncate select-none">
-                {effect.type.replace('-', ' ')}
+                {t(effect.type.replace('-', '_'))}
             </span>
 
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -414,7 +473,7 @@ const EffectRow: React.FC<{
                 isOpen={isSettingsOpen} 
                 onClose={() => setIsSettingsOpen(false)} 
                 anchorRef={settingsButtonRef} 
-                title={`${effect.type.replace('-', ' ')} Settings `}
+                title={`${t(effect.type.replace('-', '_'))} ${t('properties')}`}
                 width={220}
             >
                 <div className="p-3 space-y-4">
@@ -425,17 +484,25 @@ const EffectRow: React.FC<{
                                 <ScrubbableInput label="Y" name="fx-y" value={effect.y ?? 0} onChange={(v) => onUpdate({ y: v })} />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
-                                <ScrubbableInput label="Blur" name="fx-blur" value={effect.blur ?? 0} min={0} onChange={(v) => onUpdate({ blur: v })} />
-                                <ScrubbableInput label="Spread" name="fx-spread" value={effect.spread ?? 0} onChange={(v) => onUpdate({ spread: v })} />
+                                <ScrubbableInput label={t('effect_blur')} name="fx-blur" value={effect.blur ?? 0} min={0} onChange={(v) => onUpdate({ blur: v })} />
+                                <ScrubbableInput label={t('effect_spread')} name="fx-spread" value={effect.spread ?? 0} onChange={(v) => onUpdate({ spread: v })} />
                             </div>
                             <div className="flex items-center justify-between p-2 bg-black/40 rounded-xl border border-white/5">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-stone-500">Color</span>
+                                <span className="text-[9px] font-black uppercase tracking-widest text-stone-500">{t('effect_color')}</span>
                                 <CompactColorPicker color={effect.color || '#000000'} onChange={(c) => onUpdate({ color: c })} />
+                            </div>
+                        </div>
+                    ) : effect.type === 'noise' ? (
+                        <div className="space-y-3">
+                            <ScrubbableInput label={t('intensity', 'Intensity')} name="fx-noise" value={effect.blur ?? 0} min={0} max={100} onChange={(v) => onUpdate({ blur: v })} />
+                            <div className="grid grid-cols-2 gap-3">
+                                <ScrubbableInput label={t('scale', 'Scale')} name="fx-n-scale" value={effect.noiseScale ?? 65} min={1} max={100} onChange={(v) => onUpdate({ noiseScale: v })} />
+                                <ScrubbableInput label={t('softness', 'Softness')} name="fx-n-soft" value={effect.noiseSoftness ?? 0} min={0} max={100} onChange={(v) => onUpdate({ noiseSoftness: v })} />
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            <ScrubbableInput label="Radius" name="fx-blur-only" value={effect.blur ?? 0} min={0} onChange={(v) => onUpdate({ blur: v })} />
+                            <ScrubbableInput label={t('effect_radius')} name="fx-blur-only" value={effect.blur ?? 0} min={0} onChange={(v) => onUpdate({ blur: v })} />
                         </div>
                     )}
                 </div>

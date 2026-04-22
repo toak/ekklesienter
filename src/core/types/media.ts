@@ -7,6 +7,7 @@ export interface IMediaItem {
   type: MediaType;
   data?: Blob; // Optional binary data for imported/bundled media
   binId?: string; // Reference to IMediaBin (null = root)
+  isMissing?: boolean; // Track if the local file is missing from disk
   createdAt: number;
   updatedAt?: number;
 }

@@ -1,8 +1,9 @@
 import React from 'react';
-import { Music, Film, Image as ImageIcon, Play, Pause } from 'lucide-react';
+import { Music, Film, Image as ImageIcon, Play, Pause, AlertCircle } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { IMediaItem, MediaType } from '@/core/types';
 import { useMediaUrl } from '@/core/hooks/useMediaUrl';
+import { useTranslation } from 'react-i18next';
 
 export const THUMB_BG = "bg-stone-900";
 export const CARD_BG = "bg-stone-700/40 hover:bg-stone-700/60";
@@ -26,6 +27,7 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({
   item, isSelected, onClick, playingItemId, setPlayingItemId, handleDragStart, 
   setContextMenu, togglePlayback, videoRefs, handleTimeUpdate, mediaTimes
 }) => {
+  const { t } = useTranslation();
   const isPlaying = playingItemId === item.id;
   const displayUrl = useMediaUrl(item);
 
@@ -44,28 +46,36 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({
       onContextMenu={(e) => {
         e.preventDefault();
         if (!isSelected) {
-          onClick(e as unknown as React.MouseEvent);
+          onClick(e);
         }
         setContextMenu({ x: e.clientX, y: e.clientY, kind: 'item', item });
       }}
       className={cn(
         "group flex flex-col rounded-md overflow-hidden cursor-grab active:cursor-grabbing transition-all ring-offset-2 ring-offset-stone-900",
-        isSelected ? "bg-accent/20 ring-2 ring-accent" : CARD_BG
+        isSelected ? "bg-accent/20 ring-2 ring-accent" : CARD_BG,
+        item.isMissing && "ring-2 ring-red-500/80 bg-red-950/30"
       )}
     >
-      <div className="flex items-center gap-1.5 px-1.5 py-1 min-w-0 border-b border-white/5">
+      <div className={cn(
+        "flex items-center gap-1.5 px-1.5 py-1 min-w-0 border-b border-white/5",
+        item.isMissing && "bg-red-500/10"
+      )}>
         <TypeIcon type={item.type} className={cn("w-3 h-3 shrink-0", getTypeAccent(item.type))} />
-        <span className="text-[10px] text-stone-300 truncate min-w-0 flex-1 font-medium group-hover:text-white">
+        <span className={cn(
+          "text-[10px] truncate min-w-0 flex-1 font-medium group-hover:text-white transition-colors",
+          item.isMissing ? "text-red-400" : "text-stone-300"
+        )}>
           {item.name}
         </span>
+        {item.isMissing && <AlertCircle className="w-3 h-3 text-red-500 shrink-0" />}
       </div>
 
       <div className={cn("relative aspect-video overflow-hidden", THUMB_BG)}>
-        {item.type === 'image' && displayUrl && (
+        {item.type === 'image' && displayUrl && !item.isMissing && (
           <img src={displayUrl} alt="" className="w-full h-full object-cover" />
         )}
 
-        {item.type === 'video' && displayUrl && (
+        {item.type === 'video' && displayUrl && !item.isMissing && (
           <video
             ref={el => { videoRefs.current[item.id] = el; }}
             src={displayUrl}
@@ -80,11 +90,20 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({
 
         {item.type === 'audio' && (
           <div className="w-full h-full flex items-center justify-center">
-            <Music className="w-6 h-6 text-purple-500/30" />
+            <Music className={cn("w-6 h-6", item.isMissing ? "text-red-500/20" : "text-purple-500/30")} />
           </div>
         )}
 
-        {(item.type === 'video' || item.type === 'audio') && (
+        {item.isMissing && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/40 backdrop-blur-[1px]">
+            <AlertCircle className="w-8 h-8 text-red-500/50 mb-1" />
+            <span className="text-[9px] uppercase tracking-wider font-bold text-red-500/80">
+              {t('file_missing')}
+            </span>
+          </div>
+        )}
+
+        {!item.isMissing && (item.type === 'video' || item.type === 'audio') && (
           <>
             <button
               type="button"
@@ -111,10 +130,18 @@ export const MediaItemCard: React.FC<MediaItemCardProps> = React.memo(({
         )}
       </div>
 
-      {mediaTimes && (
+      {mediaTimes && !item.isMissing && (
         <div className={cn("flex items-center justify-end px-1.5 py-0.5", STRIP_BG)}>
           <span className="text-[9px] text-stone-500 tabular-nums font-medium">
             {formatTime(mediaTimes.current)} / {formatTime(mediaTimes.duration)}
+          </span>
+        </div>
+      )}
+
+      {item.isMissing && (
+        <div className={cn("px-1.5 py-0.5 bg-red-500/5 overflow-hidden")}>
+          <span className="text-[8px] text-red-500/60 truncate block" title={item.path}>
+            {item.path}
           </span>
         </div>
       )}

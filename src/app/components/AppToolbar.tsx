@@ -45,7 +45,9 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
     openGlobalModal,
     isBibleSlide
 }) => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const lang = i18n.language?.substring(0, 2) || 'en';
+    const isCyrillic = ['ru', 'uk', 'bg', 'be'].includes(lang);
 
     const handleToggleSidebar = React.useCallback(() => setSidebarOpen(!sidebarOpen), [sidebarOpen, setSidebarOpen]);
     const handleToggleHistory = React.useCallback(() => setHistoryOpen(!historyOpen), [historyOpen, setHistoryOpen]);
@@ -71,18 +73,20 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
                 {sidebarOpen ? <SidebarClose className="w-5 h-5" /> : <SidebarOpen className="w-5 h-5" />}
             </button>
 
-            <button
-                onClick={handleToggleHistory}
-                className={cn(
-                    "p-2 rounded-md border backdrop-blur-md transition-colors",
-                    historyOpen
-                        ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
-                        : "bg-stone-900/80 text-stone-400 hover:text-amber-400 hover:bg-stone-800 border-stone-800"
-                )}
-                title={t('history')}
-            >
-                <Clock className="w-5 h-5" />
-            </button>
+            {appMode === 'scripture' && (
+                <button
+                    onClick={handleToggleHistory}
+                    className={cn(
+                        "p-2 rounded-md border backdrop-blur-md transition-colors",
+                        historyOpen
+                            ? "bg-amber-500/20 text-amber-400 border-amber-500/50"
+                            : "bg-stone-900/80 text-stone-400 hover:text-amber-400 hover:bg-stone-800 border-stone-800"
+                    )}
+                    title={t('history')}
+                >
+                    <Clock className="w-5 h-5" />
+                </button>
+            )}
 
             <div className="h-9 w-px bg-white/5 mx-1" />
 
@@ -133,13 +137,21 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden",
                     activeOverride === 'blackout'
-                        ? "bg-red-500/20 text-red-500 border-red-500/50 shadow-lg shadow-red-500/10"
+                        ? "bg-red-600 border-red-500 shadow-lg shadow-red-500/20"
                         : "bg-stone-900/80 text-stone-400 hover:text-white hover:bg-stone-800 border-stone-800"
                 )}
                 title={`${t('blackout', 'Black Out')} (B)`}
             >
-                <Square className={cn("w-5 h-5 fill-current transition-transform", activeOverride === 'blackout' ? "scale-110" : "scale-90 opacity-10")} />
-                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black uppercase tracking-tighter">{t('blackout_short')}</div>
+                <Square className={cn(
+                    "w-5 h-5 fill-current transition-transform", 
+                    activeOverride === 'blackout' ? "scale-110 opacity-100 text-black" : "scale-90 opacity-10"
+                )} />
+                <div className={cn(
+                    "absolute inset-0 flex items-center justify-center text-[11px] font-black uppercase tracking-tighter",
+                    activeOverride === 'blackout' ? "text-white" : "text-stone-400 group-hover:text-white"
+                )}>
+                    {isCyrillic ? 'Ч' : 'B'}
+                </div>
             </button>
 
             <button
@@ -147,13 +159,21 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden",
                     activeOverride === 'whiteout'
-                        ? "bg-stone-100 text-black border-white shadow-lg shadow-white/10"
+                        ? "bg-red-600 border-red-500 shadow-lg shadow-red-500/20"
                         : "bg-stone-900/80 text-stone-400 hover:text-white hover:bg-stone-800 border-stone-800"
                 )}
                 title={`${t('whiteout', 'White Out')} (W)`}
             >
-                <Square className={cn("w-5 h-5 fill-current transition-transform", activeOverride === 'whiteout' ? "scale-110" : "scale-90 opacity-10")} />
-                <div className="absolute inset-0 flex items-center justify-center text-[11px] font-black uppercase tracking-tighter">{t('whiteout_short')}</div>
+                <Square className={cn(
+                    "w-5 h-5 fill-current transition-transform", 
+                    activeOverride === 'whiteout' ? "scale-110 opacity-100 text-white" : "scale-90 opacity-10"
+                )} />
+                <div className={cn(
+                    "absolute inset-0 flex items-center justify-center text-[11px] font-black uppercase tracking-tighter",
+                    activeOverride === 'whiteout' ? "text-black font-black" : "text-stone-400 group-hover:text-white"
+                )}>
+                    {isCyrillic ? 'Б' : 'W'}
+                </div>
             </button>
 
             <button
@@ -161,7 +181,7 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
                 className={cn(
                     "p-2 rounded-md border backdrop-blur-md transition-all flex items-center justify-center relative group overflow-hidden min-w-[38px] min-h-[38px]",
                     activeOverride === 'logo'
-                        ? "bg-accent/20 text-accent border-accent/50 shadow-lg shadow-accent/10"
+                        ? "bg-red-600 border-red-500 shadow-lg shadow-red-500/20"
                         : "bg-stone-900/80 text-stone-400 hover:text-white hover:bg-stone-800 border-stone-800"
                 )}
                 title={`${t('logo_mode', 'Show Logo')} (L)`}
@@ -172,8 +192,13 @@ export const AppToolbar: React.FC<AppToolbarProps> = ({
                     </div>
                 ) : (
                     <>
-                        <ImageIcon className={cn("w-5 h-5 transition-transform", activeOverride === 'logo' ? "scale-110" : "scale-90")} />
-                        <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold opacity-0 group-hover:opacity-100 bg-black/40">L</div>
+                        <ImageIcon className={cn("w-5 h-5 transition-transform", activeOverride === 'logo' ? "scale-110 text-white" : "scale-90")} />
+                        <div className={cn(
+                            "absolute inset-0 flex items-center justify-center text-[10px] font-bold transition-opacity",
+                            activeOverride === 'logo' ? "opacity-100 text-white" : "opacity-0 group-hover:opacity-100 bg-black/40"
+                        )}>
+                            L
+                        </div>
                     </>
                 )}
             </button>

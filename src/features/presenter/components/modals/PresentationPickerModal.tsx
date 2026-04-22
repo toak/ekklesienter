@@ -178,7 +178,7 @@ const PresentationPickerModal: React.FC = () => {
                     <div className="p-6 border-b border-white/5 flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <h2 className="text-sm font-black text-white uppercase tracking-widest">
-                                {t('store', 'Store')}
+                                {t('store')}
                             </h2>
                             <button
                                 onClick={() => closeModal(ModalType.PRESENTATION_PICKER)}
@@ -192,7 +192,7 @@ const PresentationPickerModal: React.FC = () => {
                             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
                             <input
                                 type="text"
-                                placeholder={t('search_presentations', 'Search presentations...')}
+                                placeholder={t('search_presentations')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full bg-black/40 border border-white/10 rounded-xl py-2 pl-9 pr-3 text-xs text-white placeholder:text-stone-600 focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 transition-all font-medium"
@@ -230,7 +230,7 @@ const PresentationPickerModal: React.FC = () => {
                                 </div>
                                 <div className="flex items-center justify-between mt-1">
                                     <span className="text-[9px] font-black uppercase tracking-widest text-stone-500">
-                                        {p.slides.length} {t('slides', 'Slides')}
+                                        {p.slides.length} {t('slides')}
                                     </span>
                                     {p.binId && (
                                         <div className="flex items-center gap-1 text-stone-600">
@@ -245,7 +245,7 @@ const PresentationPickerModal: React.FC = () => {
                         {availablePresentations.length === 0 && (
                             <div className="text-center py-10 flex flex-col items-center justify-center gap-3 text-stone-500">
                                 <Layers className="w-8 h-8 opacity-20" />
-                                <span className="text-[10px] font-black uppercase tracking-widest">{t('no_presentations_found', 'No presentations found')}</span>
+                                <span className="text-[10px] font-black uppercase tracking-widest">{t('no_presentations_found')}</span>
                             </div>
                         )}
                     </div>
@@ -263,7 +263,7 @@ const PresentationPickerModal: React.FC = () => {
                                 <div className="w-24 h-24 rounded-[32px] bg-white/5 flex items-center justify-center border border-white/5">
                                     <Layers className="w-10 h-10 opacity-20" />
                                 </div>
-                                <p className="text-sm font-black uppercase tracking-widest opacity-30">{t('select_to_preview', 'Select a presentation to preview')}</p>
+                                <p className="text-sm font-black uppercase tracking-widest opacity-30">{t('select_to_preview')}</p>
                             </div>
                         ) : currentPreviewSlide && fitWidth && fitHeight ? (
                             <>
@@ -289,7 +289,7 @@ const PresentationPickerModal: React.FC = () => {
 
                                     <div className="absolute bottom-8 left-8 bg-black/60 backdrop-blur-2xl border border-white/10 rounded-2xl px-5 py-3 shadow-2xl">
                                         <p className="text-xs font-black text-white uppercase tracking-widest mb-1">
-                                            {(currentPreviewSlide.type === 'normal' ? (currentPreviewSlide as ICanvasSlide).content?.variables?.title : undefined) || t('no_title', 'Untitled Slide')}
+                                            {(currentPreviewSlide.type === 'normal' ? (currentPreviewSlide as ICanvasSlide).content?.variables?.title : undefined) || t('no_title')}
                                         </p>
                                         <div className="flex items-center gap-2">
                                             <div className="w-1.5 h-1.5 rounded-full bg-accent" />
@@ -305,7 +305,7 @@ const PresentationPickerModal: React.FC = () => {
                                 <div className="w-24 h-24 rounded-[32px] bg-white/5 flex items-center justify-center border border-white/5">
                                     <Monitor className="w-10 h-10 opacity-20" />
                                 </div>
-                                <p className="text-sm font-black uppercase tracking-widest opacity-30">{t('preparing_preview', 'Preparing Preview...')}</p>
+                                <p className="text-sm font-black uppercase tracking-widest opacity-30">{t('preparing_preview')}</p>
                             </div>
                         )}
                     </div>
@@ -318,11 +318,11 @@ const PresentationPickerModal: React.FC = () => {
                         <div className="px-6 py-3 border-b border-white/5 flex items-center justify-between bg-stone-900/40 backdrop-blur-md">
                             <div className="flex items-center gap-2">
                                 <span className="text-[10px] font-black text-stone-500 uppercase tracking-widest">
-                                    {t('timeline', 'Timeline')}
+                                    {t('timeline')}
                                 </span>
                                 <div className="w-px h-3 bg-white/10" />
                                 <span className="text-[9px] font-bold text-stone-600 uppercase tracking-widest">
-                                    {slides.length} {t('slides', 'Slides')}
+                                    {slides.length} {t('slides')}
                                 </span>
                             </div>
                         </div>
@@ -332,11 +332,11 @@ const PresentationPickerModal: React.FC = () => {
                             <div className="w-16 shrink-0 border-r border-white/5 bg-stone-900/40 flex flex-col z-20 backdrop-blur-md">
                                 <div className="h-[104px] flex flex-col items-center justify-center gap-1 opacity-40">
                                     <Monitor className="w-4 h-4 text-stone-400" />
-                                    <span className="text-[7px] font-black uppercase tracking-widest text-stone-500">{t('slides', 'Slides')}</span>
+                                    <span className="text-[7px] font-black uppercase tracking-widest text-stone-500">{t('slides')}</span>
                                 </div>
                                 <div className="h-14 border-t border-white/5 flex flex-col items-center justify-center gap-1 bg-purple-500/5 opacity-50">
                                     <Music className="w-3 h-3 text-purple-400" />
-                                    <span className="text-[7px] font-black uppercase tracking-widest text-purple-500">{t('audio', 'Audio')}</span>
+                                    <span className="text-[7px] font-black uppercase tracking-widest text-purple-500">{t('audio')}</span>
                                 </div>
                             </div>
 
@@ -384,7 +384,7 @@ const PresentationPickerModal: React.FC = () => {
 
                                                         <div className="absolute inset-x-0 bottom-0 h-8 bg-linear-to-t from-black/80 to-transparent z-10 p-2 flex flex-col justify-end">
                                                             <p className="text-[7px] font-black text-white/80 uppercase truncate">
-                                                                {(slide.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.title : undefined) || `${t('slide', 'Slide')} ${index + 1}`}
+                                                                {(slide.type === 'normal' ? (slide as ICanvasSlide).content?.variables?.title : undefined) || `${t('slide')} ${index + 1}`}
                                                             </p>
                                                         </div>
 
@@ -410,7 +410,7 @@ const PresentationPickerModal: React.FC = () => {
                                             ))}
                                             {allScopes.length === 0 && (
                                                 <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                                                    <span className="text-[8px] text-stone-500 font-bold uppercase tracking-widest">{t('no_audio_tracks', 'No Audio Tracks')}</span>
+                                                    <span className="text-[8px] text-stone-500 font-bold uppercase tracking-widest">{t('no_audio_tracks')}</span>
                                                 </div>
                                             )}
                                         </div>
@@ -434,7 +434,7 @@ const PresentationPickerModal: React.FC = () => {
                                 )}
                             >
                                 <Plus className={cn("w-5 h-5 transition-transform group-hover:rotate-90 duration-500", !selectedPresentationId && "opacity-20")} />
-                                {t('add_to_timeline', 'Add to Timeline')}
+                                {t('add_to_timeline')}
                             </button>
                         </div>
                     </div>

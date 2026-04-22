@@ -8,6 +8,7 @@ import SlideContentRenderer from '../slide-editor/SlideContentRenderer';
 import SmartBadge from './SmartBadge';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
+import { useIntersection } from '@/core/hooks/useIntersection';
 import type { DraggableSyntheticListeners, DraggableAttributes } from '@dnd-kit/core';
 
 export interface SlideTileProps {
@@ -62,15 +63,49 @@ export const SlideTile: React.FC<SlideTileProps> = ({
     attributes
 }) => {
     const { t } = useTranslation();
-    const { syncNestedPresentation } = usePresentationStore();
+    const { syncNestedPresentation, setCachedNestedPresentation, nestedPresentationsCache } = usePresentationStore();
+    const containerRef = React.useRef<HTMLDivElement>(null);
     const isMaster = slide.blockId === 'master-presentation';
     const masterPresId = slide.type === 'normal' ? (slide as ICanvasSlide).masterPresentationId : (slide.type === 'nested' ? (slide as INestedSlide).presentationId : undefined);
-    const nestedPres = isMaster && masterPresId ? presentationsMap.get(masterPresId) : null;
     const isNestedActive = isMaster && navigationParentSlideId === slide.id;
 
-    // Use current nested slide for preview if this master presentation is "active"
-    const activeNestedSlide = isNestedActive && nestedPres 
-        ? (nestedPres.slides.find(s => s.id === previewSlideId) || nestedPres.slides[0]) 
+    // Viewport-aware lazy loading
+    const intersection = useIntersection(containerRef, {
+        rootMargin: '200px', // Preload when approaching the viewport
+        freezeOnceVisible: true // Once loaded, keep it (cached)
+    });
+    const isVisible = !!intersection?.isIntersecting;
+
+    // Only fetch if it's a master slide, we're not inside it (which would be handled by the parent), 
+    // and it's visible in the viewport.
+    const shouldFetch = isMaster && masterPresId && isVisible;
+
+    // Try to resolve from store cache first (instant)
+    const cachedPres = masterPresId ? nestedPresentationsCache[masterPresId] : null;
+
+    // Isolated lazy fetch for this specific master thumbnail
+    const liveNestedPres = useLiveQuery(
+        async () => {
+            if (!shouldFetch || cachedPres) return null;
+            const pres = await db.presentationFiles.get(masterPresId!);
+            if (pres) {
+                // Background update the store cache for other tiles of the same presentation
+                setCachedNestedPresentation(masterPresId!, pres);
+            }
+            return pres;
+        },
+        [shouldFetch, masterPresId, cachedPres]
+    );
+
+    // Resolve final presentation (Priority: 1. Props Map (for expanded), 2. Local Query, 3. Cache)
+    const nestedPres = (masterPresId ? presentationsMap.get(masterPresId) : null) || liveNestedPres || cachedPres;
+
+    // Use current nested slide for preview if this master presentation is "active", 
+    // or fallback to the first slide if we just want a representative thumbnail.
+    const activeNestedSlide = isMaster && nestedPres 
+        ? (isNestedActive 
+            ? (nestedPres.slides.find(s => s.id === previewSlideId) || nestedPres.slides[0]) 
+            : nestedPres.slides[0]) 
         : null;
     
     const displaySlide = activeNestedSlide || slide;
@@ -93,6 +128,7 @@ export const SlideTile: React.FC<SlideTileProps> = ({
 
     return (
         <div
+            ref={containerRef}
             data-slide-id={slide.id}
             {...listeners}
             {...attributes}
@@ -126,39 +162,41 @@ export const SlideTile: React.FC<SlideTileProps> = ({
                 className="absolute top-0 left-0 w-[1920px] h-[1080px] z-0 pointer-events-none isolate origin-top-left"
                 style={{ transform: `scale(${128 / 1920})` }}
             >
-                {displaySlide.type === 'video' ? (
-                    <div className="w-full h-full bg-stone-950 flex items-center justify-center relative">
-                        {((displaySlide as any).videoSettings?.posterFrame) ? (
-                            <img src={(displaySlide as any).videoSettings.posterFrame} className="w-full h-full object-cover" alt="Video poster" />
-                        ) : (
-                            <div className="w-[1920px] h-[1080px] flex items-center justify-center bg-stone-900 border border-white/5">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-700"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M7 3v18" /><path d="M17 3v18" /><path d="M3 7.5h4" /><path d="M3 12h18" /><path d="M3 16.5h4" /><path d="M17 7.5h4" /><path d="M17 16.5h4" /></svg>
+                {displaySlide && (
+                    displaySlide.type === 'video' ? (
+                        <div className="w-full h-full bg-stone-950 flex items-center justify-center relative">
+                            {((displaySlide as any).videoSettings?.posterFrame) ? (
+                                <img src={(displaySlide as any).videoSettings.posterFrame} className="w-full h-full object-cover" alt="Video poster" />
+                            ) : (
+                                <div className="w-[1920px] h-[1080px] flex items-center justify-center bg-stone-900 border border-white/5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-700"><rect width="18" height="18" x="3" y="3" rx="2" /><path d="M7 3v18" /><path d="M17 3v18" /><path d="M3 7.5h4" /><path d="M3 12h18" /><path d="M3 16.5h4" /><path d="M17 7.5h4" /><path d="M17 16.5h4" /></svg>
+                                </div>
+                            )}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                               <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white/80 drop-shadow-xl"><polygon points="6 3 20 12 6 21 6 3" /></svg>
                             </div>
-                        )}
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                           <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="white" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="text-white/80 drop-shadow-xl"><polygon points="6 3 20 12 6 21 6 3" /></svg>
+                            {mediaMetadata?.name && (
+                                <div className="absolute bottom-0 inset-x-0 h-[400px] bg-linear-to-t from-black/95 via-black/70 to-transparent flex items-end px-16 pb-32 z-10">
+                                    <span className="text-[120px] font-black text-white truncate drop-shadow-2xl tracking-tighter uppercase font-mono leading-none">
+                                        {mediaMetadata.name}
+                                    </span>
+                                </div>
+                            )}
                         </div>
-                        {mediaMetadata?.name && (
-                            <div className="absolute bottom-0 inset-x-0 h-[400px] bg-linear-to-t from-black/95 via-black/70 to-transparent flex items-end px-16 pb-32 z-10">
-                                <span className="text-[120px] font-black text-white truncate drop-shadow-2xl tracking-tighter uppercase font-mono leading-none">
-                                    {mediaMetadata.name}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                ) : (
-                    <SlideContentRenderer
-                        template={displayTemplate}
-                        block={displayBlock}
-                        variables={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.variables : undefined}
-                        lang={lang}
-                        isPreview={true}
-                        scale={1}
-                        backgroundOverride={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).backgroundOverride : undefined}
-                        canvasItems={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.canvasItems : []}
-                        slide={displaySlide}
-                        slideId={displaySlide.id}
-                    />
+                    ) : (
+                        <SlideContentRenderer
+                            template={displayTemplate}
+                            block={displayBlock}
+                            variables={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.variables : undefined}
+                            lang={lang}
+                            isPreview={true}
+                            scale={1}
+                            backgroundOverride={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).backgroundOverride : undefined}
+                            canvasItems={displaySlide.type === 'normal' ? (displaySlide as ICanvasSlide).content?.canvasItems : []}
+                            slide={displaySlide}
+                            slideId={displaySlide.id}
+                        />
+                    )
                 )}
             </div>
             <div className="absolute inset-x-0 top-0 h-8 bg-linear-to-b from-black/60 to-transparent z-10 pointer-events-none" />
@@ -185,7 +223,7 @@ export const SlideTile: React.FC<SlideTileProps> = ({
             )}
 
             {isLive && <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded-md bg-red-500/30 backdrop-blur-md border border-red-500/30 text-[7px] font-black text-red-300 uppercase tracking-wider animate-pulse z-20">LIVE</div>}
-            {isMaster && <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-orange-500/20 border border-orange-500/20 text-[6px] font-black text-orange-400 uppercase tracking-tighter z-20">Master</div>}
+            {isMaster && <div className="absolute bottom-1 left-1 px-1 py-0.5 rounded bg-orange-500/20 border border-orange-500/20 text-[6px] font-black text-orange-400 uppercase tracking-tighter z-20">{t('nested', 'Nested')}</div>}
             
             {/* Sync Badge */}
             {(() => {

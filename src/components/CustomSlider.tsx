@@ -11,6 +11,7 @@ interface CustomSliderProps {
     unit?: string;
     className?: string;
     formatValue?: (value: number) => string;
+    defaultValue?: number;
 }
 
 export const CustomSlider: React.FC<CustomSliderProps> = ({
@@ -22,7 +23,8 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
     label,
     unit = '',
     className,
-    formatValue
+    formatValue,
+    defaultValue
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState(false);
@@ -88,16 +90,28 @@ export const CustomSlider: React.FC<CustomSliderProps> = ({
                 ref={containerRef}
                 className="relative h-10 w-full bg-black/40 rounded-xl overflow-hidden cursor-pointer group active:scale-[0.99] transition-transform select-none"
                 onPointerDown={handlePointerDown}
+                onDoubleClick={() => {
+                    if (defaultValue !== undefined) {
+                        onChange(defaultValue);
+                        setIsDragging(false);
+                    }
+                }}
             >
                 {/* Track Fill */}
                 <div
-                    className="absolute inset-0 bg-accent/20 transition-all duration-150"
+                    className={cn(
+                        "absolute inset-0 bg-accent/20",
+                        !isDragging && "transition-all duration-150"
+                    )}
                     style={{ width: `${percentage}%` }}
                 />
 
                 {/* Main Fill Gradient (more bold) */}
                 <div
-                    className="absolute inset-y-0 left-0 bg-accent transition-all duration-150 shadow-[0_0_20px_rgba(var(--accent),0.3)]"
+                    className={cn(
+                        "absolute inset-y-0 left-0 bg-accent shadow-[0_0_20px_rgba(var(--accent),0.3)]",
+                        !isDragging && "transition-all duration-150"
+                    )}
                     style={{ width: `${percentage}%` }}
                 />
 

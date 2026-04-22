@@ -24,6 +24,17 @@ declare global {
                     saveFile: (options: any) => Promise<string | null>;
                     saveCollection: (options: any) => Promise<string | null>;
                 };
+                power: {
+                    setWakeLock: (enabled: boolean) => Promise<boolean>;
+                };
+                remote: {
+                    start: () => Promise<any>;
+                    stop: () => Promise<boolean>;
+                    getInfo: () => Promise<any>;
+                    updateState: (payload: any) => void;
+                    onCommand: (callback: (command: string, payload?: any) => void) => () => void;
+                    sendResults: (requestId: string, results: any) => void;
+                };
             };
         };
         showSaveFilePicker?: (options?: any) => Promise<any>;

@@ -8,6 +8,7 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
     selectedPresentationId: null,
     previewSlideId: null,
     liveSlideId: null,
+    rootPresentationId: null,
     activeBlockId: null,
     selectedAudioScopeId: null,
     graceLibSection: null,
@@ -137,6 +138,7 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
             set({
                 ...serviceUpdate,
                 activePresentationId: id,
+                rootPresentationId: id, // INITIALIZE ROOT CONTEXT
                 selectedPresentationId: id,
                 activePresentation: { ...pres, lastOpened: now },
                 selectedPresentation: { ...pres, lastOpened: now },
@@ -150,10 +152,19 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         }
     },
 
-    setPreviewSlide: async (id, presentationId) => {
-        const { activePresentationId, activePresentation, selectedPresentationId, selectedPresentation, presentationStack } = get();
-        let targetPresId = presentationId || activePresentationId;
+    setPreviewSlide: async (id, presentationId, rootPresentationId, navigationParentSlideId) => {
+        const { activePresentationId: currentRootId } = get();
+        const targetPresId = presentationId || currentRootId;
+        
+        // Update root and parent context if provided
+        if (rootPresentationId !== undefined || navigationParentSlideId !== undefined) {
+             set({ 
+                 rootPresentationId: rootPresentationId ?? get().rootPresentationId,
+                 navigationParentSlideId: navigationParentSlideId ?? get().navigationParentSlideId
+             });
+        }
 
+        const { activePresentationId, activePresentation, selectedPresentationId, selectedPresentation, presentationStack } = get();
         let currentPres = (targetPresId === activePresentationId && activePresentation)
             ? activePresentation
             : (targetPresId === selectedPresentationId && selectedPresentation)
@@ -224,7 +235,12 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         });
     },
 
-    setLiveSlide: (id) => set({ liveSlideId: id }),
+    setLiveSlide: (id, presentationId, rootPresentationId, navigationParentSlideId) => set((state) => ({ 
+        liveSlideId: id,
+        activePresentationId: presentationId || state.activePresentationId,
+        rootPresentationId: rootPresentationId !== undefined ? rootPresentationId : state.rootPresentationId,
+        navigationParentSlideId: navigationParentSlideId !== undefined ? navigationParentSlideId : state.navigationParentSlideId
+    })),
 
     syncPreviewToLive: () => {
         const { liveSlideId, activePresentationId, activePresentation } = get();
@@ -260,7 +276,7 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         set({ recents: summaries });
     },
 
-    navigateNext: async (detached = false) => {
+    navigateNext: async (detached = false, preferLiveAnchor = false) => {
         const { activePresentationId, selectedPresentationId, selectedPresentation, previewSlideId, setPreviewSlide, setLiveSlide, liveSlideId, activePresentation, presentationStack } = get();
         if (!activePresentationId) return;
 
@@ -275,8 +291,16 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         if (!presentation || !presentation.slides?.length) return;
 
         const slides = presentation.slides;
-        const currentId = previewSlideId || slides[0].id;
-        const idx = slides.findIndex(s => s.id === currentId);
+        // Anchor point for navigation: Remote uses Live slide, PC uses Preview slide
+        const anchorId = (preferLiveAnchor && liveSlideId) ? liveSlideId : (previewSlideId || (slides.length > 0 ? slides[0].id : null));
+        
+        let idx = -1;
+        if (anchorId) {
+            idx = slides.findIndex(s => s.id === anchorId);
+        }
+
+        // If not found in current presentation, reset to beginning (safety for navigation drift)
+        if (idx === -1) idx = 0;
 
         if (idx === slides.length - 1) {
             if (presentationStack.length > 0) {
@@ -291,15 +315,30 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
                     if (parentIdx !== -1) {
                         const nextIdx = Math.min(parentPres.slides.length - 1, parentIdx + 1);
                         const nextId = parentPres.slides[nextIdx].id;
-                        set({ 
-                            previewSlideId: nextId,
-                            selectedSlideIds: [nextId],
-                            selectedPresentationId: parentPres.id,
-                            selectedPresentation: parentPres,
-                            navigationDirection: 'forward',
-                            navigationParentSlideId: null
-                        });
-                        if (!detached && liveSlideId) setLiveSlide(nextId); 
+
+                        if (preferLiveAnchor) {
+                            setLiveSlide(nextId);
+                            if (!detached && previewSlideId === liveSlideId) {
+                                set({ 
+                                    previewSlideId: nextId,
+                                    selectedSlideIds: [nextId],
+                                    selectedPresentationId: parentPres.id,
+                                    selectedPresentation: parentPres,
+                                    navigationDirection: 'forward',
+                                    navigationParentSlideId: null
+                                });
+                            }
+                        } else {
+                            set({ 
+                                previewSlideId: nextId,
+                                selectedSlideIds: [nextId],
+                                selectedPresentationId: parentPres.id,
+                                selectedPresentation: parentPres,
+                                navigationDirection: 'forward',
+                                navigationParentSlideId: null
+                            });
+                            if (!detached && liveSlideId) setLiveSlide(nextId); 
+                        }
                         return;
                     }
                 }
@@ -309,12 +348,22 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         const nextIdx = Math.min(slides.length - 1, idx + 1);
         const nextId = slides[nextIdx].id;
 
-        set({ navigationDirection: 'forward' });
-        await setPreviewSlide(nextId, currentPresId);
-        if (!detached && liveSlideId) setLiveSlide(get().previewSlideId);
+        if (preferLiveAnchor) {
+            set({ navigationDirection: 'forward' });
+            // Must await setPreviewSlide to handle potential nested auto-entry
+            await setPreviewSlide(nextId, currentPresId);
+            const resolvedId = get().previewSlideId;
+            setLiveSlide(resolvedId!);
+        } else {
+            set({ navigationDirection: 'forward' });
+            await setPreviewSlide(nextId, currentPresId);
+            if (!detached && liveSlideId) {
+                setLiveSlide(get().previewSlideId);
+            }
+        }
     },
 
-    navigatePrev: async (detached = false) => {
+    navigatePrev: async (detached = false, preferLiveAnchor = false) => {
         const { activePresentationId, selectedPresentationId, selectedPresentation, previewSlideId, setPreviewSlide, setLiveSlide, liveSlideId, activePresentation, presentationStack } = get();
         if (!activePresentationId) return;
 
@@ -327,8 +376,16 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         if (!presentation || !presentation.slides.length) return;
 
         const slides = presentation.slides;
-        const currentId = previewSlideId || slides[0].id;
-        const idx = slides.findIndex(s => s.id === currentId);
+        // Anchor point for navigation: Remote uses Live slide, PC uses Preview slide
+        const anchorId = (preferLiveAnchor && liveSlideId) ? liveSlideId : (previewSlideId || (slides.length > 0 ? slides[0].id : null));
+        
+        let idx = -1;
+        if (anchorId) {
+            idx = slides.findIndex(s => s.id === anchorId);
+        }
+
+        // If not found in current presentation, reset to last slide (safety for navigation drift)
+        if (idx === -1) idx = slides.length - 1;
 
         if (idx === 0) {
             if (presentationStack.length > 0) {
@@ -343,15 +400,30 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
                     if (parentIdx !== -1) {
                         const prevIdx = Math.max(0, parentIdx - 1);
                         const prevId = parentPres.slides[prevIdx].id;
-                        set({ 
-                            previewSlideId: prevId,
-                            selectedSlideIds: [prevId],
-                            selectedPresentationId: parentPres.id,
-                            selectedPresentation: parentPres,
-                            navigationDirection: 'backward',
-                            navigationParentSlideId: null
-                        });
-                        if (!detached && liveSlideId) setLiveSlide(prevId);
+
+                        if (preferLiveAnchor) {
+                            setLiveSlide(prevId);
+                            if (!detached && previewSlideId === liveSlideId) {
+                                set({ 
+                                    previewSlideId: prevId,
+                                    selectedSlideIds: [prevId],
+                                    selectedPresentationId: parentPres.id,
+                                    selectedPresentation: parentPres,
+                                    navigationDirection: 'backward',
+                                    navigationParentSlideId: null
+                                });
+                            }
+                        } else {
+                            set({ 
+                                previewSlideId: prevId,
+                                selectedSlideIds: [prevId],
+                                selectedPresentationId: parentPres.id,
+                                selectedPresentation: parentPres,
+                                navigationDirection: 'backward',
+                                navigationParentSlideId: null
+                            });
+                            if (!detached && liveSlideId) setLiveSlide(prevId);
+                        }
                         return;
                     }
                 }
@@ -361,9 +433,18 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
         const prevIdx = Math.max(0, idx - 1);
         const prevId = slides[prevIdx].id;
 
-        set({ navigationDirection: 'backward' });
-        await setPreviewSlide(prevId, currentPresId);
-        if (!detached && liveSlideId) setLiveSlide(get().previewSlideId);
+        if (preferLiveAnchor) {
+            set({ navigationDirection: 'backward' });
+            await setPreviewSlide(prevId, currentPresId);
+            const resolvedId = get().previewSlideId;
+            setLiveSlide(resolvedId!);
+        } else {
+            set({ navigationDirection: 'backward' });
+            await setPreviewSlide(prevId, currentPresId);
+            if (!detached && liveSlideId) {
+                setLiveSlide(get().previewSlideId);
+            }
+        }
     },
 
     setActiveBlockId: (id) => set({ activeBlockId: id, graceLibSection: id ? 'templates' : get().graceLibSection }),

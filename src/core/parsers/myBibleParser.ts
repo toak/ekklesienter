@@ -9,6 +9,42 @@ import {
     BOOK_NAMES
 } from '@/core/data/bookData';
 import wasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
+import { extractWords } from '@/features/search/utils/bibleSearchUtils';
+
+const RUSSIAN_ALIASES: Record<string, string> = {
+    'притчей': 'PRO', 'притчи': 'PRO',
+    'екклесиаста': 'ECC', 'екклесиаст': 'ECC',
+    'песни песней': 'SNG', 'песнь песней': 'SNG',
+    'исаии': 'ISA', 'исаия': 'ISA',
+    'иеремии': 'JER', 'иеремия': 'JER',
+    'плач иеремии': 'LAM',
+    'иезекииля': 'EZK', 'иезекииль': 'EZK',
+    'даниила': 'DAN', 'даниил': 'DAN',
+    'осии': 'HOS', 'осия': 'HOS',
+    'иоиля': 'JOL', 'иоиль': 'JOL',
+    'амоса': 'AMO', 'амос': 'AMO',
+    'авдия': 'OBA', 'авдий': 'OBA',
+    'ионы': 'JON', 'иона': 'JON',
+    'михея': 'MIC', 'михей': 'MIC',
+    'наума': 'NAM', 'наум': 'NAM',
+    'аввакума': 'HAB', 'аввакум': 'HAB',
+    'софонии': 'ZEP', 'софоня': 'ZEP',
+    'аггея': 'HAG', 'аггей': 'HAG',
+    'захарии': 'ZEC', 'захария': 'ZEC',
+    'малахии': 'MAL', 'малахия': 'MAL',
+    // Apostles
+    'матфея': 'MAT', 'марка': 'MRK', 'луки': 'LUK', 'иоанна': 'JHN',
+    'деяния': 'ACT',
+    'иакова': 'JAS', 'петра': '1PE', 'иуды': 'JUD',
+    'откровение': 'REV',
+
+    // NEW ALIASES (Fixing missing books)
+    'есфирь': 'EST', 'есфири': 'EST',
+    'руфь': 'RUT', 'руфи': 'RUT',
+    'судей': 'JDG', 'судьи': 'JDG',
+    'царств': '1KI', // Handle with care, usually needs number prefix
+    'паралипоменон': '1CH',
+};
 
 /**
  * MyBible SQLite Parser
@@ -80,7 +116,6 @@ export class MyBibleParser {
             this.sqlPromise = initSqlJs({
                 // Load wasm from Vite-managed URL
                 locateFile: (file) => {
-                    console.log(`[MyBibleParser] Locating SQL.js file: ${file}, using wasmUrl: ${wasmUrl}`);
                     return wasmUrl;
                 }
             });
@@ -88,14 +123,16 @@ export class MyBibleParser {
         return this.sqlPromise;
     }
 
-    async parse(fileBuffer: ArrayBuffer, fileName: string): Promise<BibleData> {
-        console.log(`[MyBibleParser] Starting parse of "${fileName}" (${fileBuffer.byteLength} bytes)`);
+    async parse(
+        fileBuffer: ArrayBuffer, 
+        fileName: string, 
+        onProgress?: (type: 'metadata' | 'verses', data: any, progress?: number) => void
+    ): Promise<BibleData> {
         const SQL = await this.getSql();
         let db: Database;
         
         try {
             db = new SQL.Database(new Uint8Array(fileBuffer));
-            console.log(`[MyBibleParser] Database initialized successfully for ${fileName}`);
         } catch (e) {
             console.error(`[MyBibleParser] Failed to initialize SQLite database for ${fileName}:`, e);
             throw new Error(`Failed to initialize database: ${e instanceof Error ? e.message : String(e)}`);
@@ -145,7 +182,6 @@ export class MyBibleParser {
             }
 
             const rawVerses = versesResult[0].values;
-            console.log(`[MyBibleParser] Found ${rawVerses.length} raw verses.`);
 
             // Detect mapping type
             const bookNumberSet = new Set<number>();
@@ -161,9 +197,6 @@ export class MyBibleParser {
 
             // DIAGNOSTIC LOG: Print IDs that are NOT in the chosen map
             const unmappedIds = bookNumbers.filter(id => !bookMap[id]);
-            if (unmappedIds.length > 0) {
-                console.warn(`[MyBibleParser] WARNING: Found ${unmappedIds.length} unmapped Book IDs: [${unmappedIds.join(', ')}]`);
-            }
 
             // Build books and verses
             const booksMap = new Map<string, { chapters: Set<number>; name: string }>();
@@ -195,150 +228,11 @@ export class MyBibleParser {
                     }
                 }
             } catch (e) {
-                console.warn("[MyBibleParser] Could not read 'books' table or it does not verify:", e);
+                // Handled
             }
 
             // Cache for dynamic ID mapping (fuzzy match results)
             const dynamicBookMap: Record<number, string> = {};
-
-            for (const row of rawVerses) {
-                const bookNumber = Number(row[0]);
-                const chapter = Number(row[1]);
-                const verseNumber = Number(row[2]);
-                const text = cleanText(String(row[3]));
-
-                // CHECK 1: Standard Static Mapping
-                let bookId = bookMap[bookNumber];
-
-                // CHECK 2: Dynamic Cache (Previously matched)
-                if (!bookId && dynamicBookMap[bookNumber]) {
-                    bookId = dynamicBookMap[bookNumber];
-                }
-
-                // Get book name early to help with ID detection
-                let bookName = '';
-
-                // Use the custom name from 'books' table if available
-                if (customBookNames[bookNumber]) {
-                    bookName = customBookNames[bookNumber];
-                } else if (bookId) {
-                    bookName = getBookName(bookId, language);
-                }
-
-                // Fallback: If ID not found by number AND not in cache, try to fuzzy match by name
-                if (!bookId && bookName) {
-                    // TRACE: Specific check for ID 670 (Esther)
-                    if (bookNumber === 670 || bookNumber === 730) {
-                        console.warn(`[MyBibleParser] TRACE #${bookNumber}: Name="${bookName}", bookId="${bookId}", dynamicMap=${dynamicBookMap[bookNumber]}, bookMap[${bookNumber}]=${bookMap[bookNumber]}`);
-                    }
-
-                    // Only log attempting fuzzy match once per book
-                    if (chapter === 1 && verseNumber === 1) {
-                        console.warn(`[MyBibleParser] ID not found for #${bookNumber} ("${bookName}"). Attempting fuzzy match...`);
-                    }
-
-                    // Create reverse lookup for current language + EN + RU
-                    const cleanName = bookName.toLowerCase().trim();
-
-                    // Specific overrides for common Russian genitive forms/variations found in modules
-                    const RUSSIAN_ALIASES: Record<string, string> = {
-                        'притчей': 'PRO', 'притчи': 'PRO',
-                        'екклесиаста': 'ECC', 'екклесиаст': 'ECC',
-                        'песни песней': 'SNG', 'песнь песней': 'SNG',
-                        'исаии': 'ISA', 'исаия': 'ISA',
-                        'иеремии': 'JER', 'иеремия': 'JER',
-                        'плач иеремии': 'LAM',
-                        'иезекииля': 'EZK', 'иезекииль': 'EZK',
-                        'даниила': 'DAN', 'даниил': 'DAN',
-                        'осии': 'HOS', 'осия': 'HOS',
-                        'иоиля': 'JOL', 'иоиль': 'JOL',
-                        'амоса': 'AMO', 'амос': 'AMO',
-                        'авдия': 'OBA', 'авдий': 'OBA',
-                        'ионы': 'JON', 'иона': 'JON',
-                        'михея': 'MIC', 'михей': 'MIC',
-                        'наума': 'NAM', 'наум': 'NAM',
-                        'аввакума': 'HAB', 'аввакум': 'HAB',
-                        'софонии': 'ZEP', 'софония': 'ZEP',
-                        'аггея': 'HAG', 'аггей': 'HAG',
-                        'захарии': 'ZEC', 'захария': 'ZEC',
-                        'малахии': 'MAL', 'малахия': 'MAL',
-                        // Apostles
-                        'матфея': 'MAT', 'марка': 'MRK', 'луки': 'LUK', 'иоанна': 'JHN',
-                        'деяния': 'ACT',
-                        'иакова': 'JAS', 'петра': '1PE', 'иуды': 'JUD',
-                        'откровение': 'REV',
-
-                        // NEW ALIASES (Fixing missing books)
-                        'есфирь': 'EST', 'есфири': 'EST',
-                        'руфь': 'RUT', 'руфи': 'RUT',
-                        'судей': 'JDG', 'судьи': 'JDG',
-                        'царств': '1KI', // Handle with care, usually needs number prefix
-                        'паралипоменон': '1CH',
-                    };
-
-                    // Check aliases first
-                    for (const [alias, id] of Object.entries(RUSSIAN_ALIASES)) {
-                        if (cleanName.includes(alias)) {
-                            bookId = id;
-                            // Cache the result!
-                            dynamicBookMap[bookNumber] = id;
-                            break;
-                        }
-                    }
-
-                    if (!bookId) {
-                        // Helper to find ID by name in a specific language
-                        const findIdByName = (lang: string) => {
-                            if (!BOOK_NAMES[lang]) return null;
-                            for (const [id, name] of Object.entries(BOOK_NAMES[lang])) {
-                                const n = name.toLowerCase();
-                                // Exact match or simple containment
-                                if (cleanName === n || cleanName.includes(n)) return id;
-                            }
-                            return null;
-                        };
-
-                        bookId = findIdByName(language) || findIdByName('en') || findIdByName('ru') ||
-                            findIdByName('uk') || findIdByName('de') || findIdByName('zh');
-
-                        if (bookId) {
-                            dynamicBookMap[bookNumber] = bookId; // Cache result
-                        }
-                    }
-                }
-
-                if (!bookId) {
-                    // Only log once per book to avoid spam
-                    if (chapter === 1 && verseNumber === 1) {
-                        console.warn(`[MyBibleParser] FAILED to map book #${bookNumber} ("${bookName}") - skipping.`);
-                    }
-                    continue;
-                }
-
-                // Standardize name if possible (consistency)
-                // If we have a standard name for this ID in the *current* language, use it.
-                // This converts "Книга Притчей" -> "Притчи" for consistency, but leaves specific languages alone if we don't have them.
-                if (BOOK_NAMES[language]?.[bookId]) {
-                    bookName = BOOK_NAMES[language][bookId];
-                } else if (!bookName) {
-                    // Fallback if we somehow have ID but no name yet
-                    bookName = getBookName(bookId, language);
-                }
-
-                // Track chapters per book
-                if (!booksMap.has(bookId)) {
-                    booksMap.set(bookId, { chapters: new Set(), name: bookName });
-                }
-                booksMap.get(bookId)!.chapters.add(chapter);
-
-                verses.push({
-                    translationId,
-                    bookId,
-                    chapter,
-                    verseNumber,
-                    text
-                });
-            }
 
             // Convert booksMap to Book array, sorted by canonical order
             const books: Book[] = [];
@@ -350,9 +244,103 @@ export class MyBibleParser {
                     chapters: [...data.chapters].sort((a, b) => a - b)
                 });
             }
-
-            // Sort books by canonical Bible order
             books.sort((a, b) => getBookOrder(a.bookId) - getBookOrder(b.bookId));
+
+            // Emit metadata early if streaming is supported
+            if (onProgress) {
+                onProgress('metadata', { translation, books });
+            }
+
+            const CHUNK_SIZE = 2000;
+            let currentChunk: Verse[] = [];
+
+            for (let i = 0; i < rawVerses.length; i++) {
+                const row = rawVerses[i];
+                const bookNumber = Number(row[0]);
+                const chapter = Number(row[1]);
+                const verseNumber = Number(row[2]);
+                const text = cleanText(String(row[3]));
+
+                // CHECK 1: Standard Static Mapping or Dynamic Cache
+                let bookId = bookMap[bookNumber] || dynamicBookMap[bookNumber];
+
+                // Get book name
+                let bookName = '';
+                if (customBookNames[bookNumber]) {
+                    bookName = customBookNames[bookNumber];
+                } else if (bookId) {
+                    bookName = getBookName(bookId, language);
+                }
+
+                // Fallback: Fuzzy match by name if still no ID
+                if (!bookId && bookName) {
+                    const cleanName = bookName.toLowerCase().trim();
+
+                    // Check aliases
+                    for (const [alias, id] of Object.entries(RUSSIAN_ALIASES)) {
+                        if (cleanName.includes(alias)) {
+                            bookId = id;
+                            dynamicBookMap[bookNumber] = id;
+                            break;
+                        }
+                    }
+
+                    if (!bookId) {
+                        const findIdByName = (lang: string) => {
+                            if (!BOOK_NAMES[lang]) return null;
+                            for (const [id, name] of Object.entries(BOOK_NAMES[lang])) {
+                                const n = name.toLowerCase();
+                                if (cleanName === n || cleanName.includes(n)) return id;
+                            }
+                            return null;
+                        };
+
+                        bookId = findIdByName(language) || findIdByName('en') || findIdByName('ru') ||
+                            findIdByName('uk') || findIdByName('de') || findIdByName('zh');
+
+                        if (bookId) {
+                            dynamicBookMap[bookNumber] = bookId;
+                        }
+                    }
+                }
+
+                if (!bookId) continue;
+
+                if (BOOK_NAMES[language]?.[bookId]) {
+                    bookName = BOOK_NAMES[language][bookId];
+                } else if (!bookName) {
+                    bookName = getBookName(bookId, language);
+                }
+
+                if (!booksMap.has(bookId)) {
+                    booksMap.set(bookId, { chapters: new Set(), name: bookName });
+                }
+                booksMap.get(bookId)!.chapters.add(chapter);
+
+                const verse: Verse = {
+                    translationId,
+                    bookId,
+                    chapter,
+                    verseNumber,
+                    text,
+                    words: extractWords(text)
+                };
+
+                if (onProgress) {
+                    currentChunk.push(verse);
+                    if (currentChunk.length >= CHUNK_SIZE) {
+                        onProgress('verses', currentChunk, (i / rawVerses.length) * 100);
+                        currentChunk = []; // Clear memory
+                    }
+                } else {
+                    verses.push(verse);
+                }
+            }
+
+            // Emit final chunk
+            if (onProgress && currentChunk.length > 0) {
+                onProgress('verses', currentChunk, 100);
+            }
 
             return { translation, books, verses };
         } finally {

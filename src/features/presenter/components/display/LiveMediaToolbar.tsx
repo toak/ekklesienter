@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Play, Pause, Volume2, VolumeX, Gauge, Monitor } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Gauge, Monitor, Music, SkipBack, SkipForward, Circle } from 'lucide-react';
 import { usePresentationStore } from '../../store/presentationStore';
-import { IVideoSlide } from '@/core/types/presentation';
+import { IVideoSlide, ISlide } from '@/core/types/presentation';
 import { LiveSyncService } from '@/core/services/liveSyncService';
 import { cn } from '@/core/utils/cn';
 import { db } from '@/core/db';
@@ -23,11 +23,18 @@ const formatTime = (seconds: number): string => {
 
 /**
  * LiveMediaToolbar — a control strip at the bottom of the timeline for the
- * currently-live video slide. It does NOT own its own \<video\> element.
- * Instead, it reads state by polling any active video elements in the page
- * and sends commands via LiveSyncService + store updates.
+ * Currently-live video slide. It does NOT own its own <video> element.
+ * Instead, it reads state ONLY from the projector's periodic heartbeat.
  */
-export const LiveMediaToolbar: React.FC = () => {
+export interface LiveMediaToolbarProps {
+  liveSlide?: ISlide;
+  presentationId?: string;
+}
+
+export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({ 
+  liveSlide: propLiveSlide, 
+  presentationId: propPresentationId 
+}) => {
   const { t } = useTranslation();
   const liveSlideId = usePresentationStore(s => s.liveSlideId);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
@@ -35,6 +42,7 @@ export const LiveMediaToolbar: React.FC = () => {
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, right: 0 });
   const scrubberRef = useRef<HTMLDivElement>(null);
   const [isDraggingScrubber, setIsDraggingScrubber] = useState(false);
+  const lastInteractionRef = useRef<number>(0);
 
   // Polled playback state from the actual preview video element
   const [playState, setPlayState] = useState<{
@@ -45,13 +53,22 @@ export const LiveMediaToolbar: React.FC = () => {
     timestampAtPlay?: number;
   }>({
     isPlaying: false,
-    currentTime: 0, // Will be corrected by useEffect when settings load
+    currentTime: 0,
     duration: 0,
     buffered: 0,
   });
+  
+  const [audioStatus, setAudioStatus] = useState<{
+    scopeId: string;
+    currentTime: number;
+    duration: number;
+    isPlaying: boolean;
+    fileId: string;
+  } | null>(null);
 
-  // Search for the live slide across all presentations in the DB for maximum robustness.
+  // Optimization: Prefer passed props if available, otherwise fallback to DB query
   const liveSlideData = useLiveQuery(async () => {
+    if (propLiveSlide && propPresentationId) return { slide: propLiveSlide, presentationId: propPresentationId };
     if (!liveSlideId) return null;
     const presentations = await db.presentationFiles.toArray();
     for (const p of presentations) {
@@ -59,12 +76,19 @@ export const LiveMediaToolbar: React.FC = () => {
         if (slide) return { slide, presentationId: p.id };
     }
     return null;
-  }, [liveSlideId]);
+  }, [liveSlideId, propLiveSlide?.id, propPresentationId]);
 
-  const liveSlideInfo = liveSlideData?.slide;
-  const presentationId = liveSlideData?.presentationId;
+  const liveSlideInfo = liveSlideData?.slide || propLiveSlide;
+  const presentationId = liveSlideData?.presentationId || propPresentationId;
 
   const settings = liveSlideInfo?.type === 'video' ? (liveSlideInfo as IVideoSlide).videoSettings : null;
+
+  // Keep a ref to the latest settings so the high-frequency poll loop always has up-to-date
+  // trim boundaries without requiring the effect to restart on every reference change.
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   // Sync playState.currentTime with settings.trimStart when slide changes or trim changes
   useEffect(() => {
@@ -72,6 +96,7 @@ export const LiveMediaToolbar: React.FC = () => {
     const trimStart = settings.trimStart || 0;
     setPlayState(prev => {
       // If we are significantly outside the trim boundaries, reset to trimStart
+      // Safety: Only reset if we actually have a duration, or if we are at 0 when trimStart is > 0
       const trimEnd = settings.trimEnd || prev.duration || 0;
       if (prev.currentTime < trimStart || (trimEnd > 0 && prev.currentTime > trimEnd)) {
         return { ...prev, currentTime: trimStart };
@@ -80,27 +105,71 @@ export const LiveMediaToolbar: React.FC = () => {
     });
   }, [settings?.trimStart, settings?.trimEnd, liveSlideId]);
 
-  // ── Poll the actual video element from the preview viewport ───────────────
-  // The VideoSlideRenderer mounts a <video> with a data attribute we can locate.
-  // This avoids a duplicate hidden <video> element that would fight the real one.
-  const findPreviewVideo = useCallback((): HTMLVideoElement | null => {
-    if (!liveSlideId) return null;
-    const video = document.querySelector<HTMLVideoElement>(`video[data-preview-slide-id="${liveSlideId}"]`);
-    if (!video || video.offsetWidth === 0 || video.offsetHeight === 0 || video.closest('[aria-hidden="true"]')) {
-      return null;
+  // Reset playState completely when the live slide ID changes to avoid stale data
+  useEffect(() => {
+    if (liveSlideId) {
+      setPlayState({
+        isPlaying: false,
+        currentTime: settings?.trimStart || 0,
+        duration: 0,
+        buffered: 0,
+      });
     }
-    return video;
   }, [liveSlideId]);
+
+  // Audio Status Listener
+  useEffect(() => {
+    const unsub = LiveSyncService.onAudioStatus((data) => {
+        // Optimistic UI: Ignore status if we've interacted recently
+        if (performance.now() - lastInteractionRef.current < 1000) return;
+
+        if (!data.scopeId) {
+            setAudioStatus(null);
+        } else {
+            setAudioStatus(data);
+        }
+    });
+    return () => unsub();
+  }, []);
+
+  const isAudioMode = !settings && !!audioStatus;
+  const activePlayState = isAudioMode ? {
+    isPlaying: audioStatus!.isPlaying,
+    currentTime: audioStatus!.currentTime,
+    duration: audioStatus!.duration,
+    buffered: 0
+  } : playState;
+
+
 
   // ── Actions that control the projector virtually ───
   const handleTogglePlayPause = useCallback(() => {
+    // 1. TIMER SLIDE: Redirect toggle to the timer core (which syncs audio automatically)
+    const isTimerSlide = liveSlideInfo?.type === 'timer';
+    if (isTimerSlide && liveSlideId) {
+        lastInteractionRef.current = performance.now();
+        LiveSyncService.sendTimerCommand(liveSlideId, 'toggle');
+        return;
+    }
+
+    if (isAudioMode && audioStatus) {
+        lastInteractionRef.current = performance.now();
+        setAudioStatus(prev => prev ? { ...prev, isPlaying: !prev.isPlaying } : null);
+        LiveSyncService.sendAudioCommand(audioStatus.scopeId, 'toggle');
+        return;
+    }
+
     if (!liveSlideId) return;
     
+    lastInteractionRef.current = performance.now();
     setPlayState(prev => {
-      const trimStart = settings?.trimStart || 0;
-      const trimEnd = settings?.trimEnd || prev.duration || 0;
+      const s = settingsRef.current;
+      const trimStart = s?.trimStart || 0;
+      const trimEnd = s?.trimEnd || prev.duration || 0;
       
-      if (prev.isPlaying) {
+      const isCurrentlyPlaying = prev.isPlaying;
+
+      if (isCurrentlyPlaying) {
         // Pausing
         LiveSyncService.sendVideoCommand(liveSlideId, 'pause', prev.currentTime);
         return { ...prev, isPlaying: false };
@@ -111,61 +180,57 @@ export const LiveMediaToolbar: React.FC = () => {
         const startTime = isNearEnd ? trimStart : prev.currentTime;
         
         LiveSyncService.sendVideoCommand(liveSlideId, 'play', startTime);
-        // We set isPlaying: true immediately for UX responsiveness, 
-        // but the heartbeat will snap it back if the projector fails to start.
         return { ...prev, isPlaying: true, currentTime: startTime };
       }
     });
-  }, [liveSlideId, settings]);
+  }, [liveSlideId, isAudioMode, audioStatus]);
 
-  // ── Sync playState with Actual Media (Preview element or Projector Heartbeat) ──
+  // ── Sync playState with Projector Heartbeat (ground truth) ──
+  // The LiveMediaToolbar is fully independent from the preview viewport.
+  // It reads state ONLY from the projector's periodic heartbeat.
   useEffect(() => {
-    if (!settings || !liveSlideId) return;
+    if (!liveSlideId) return;
 
-    // 1. Listen for ground-truth heartbeats from the Projector
     const unsubStatus = LiveSyncService.onVideoStatus((data) => {
-        if (data.slideId !== liveSlideId) return;
+        // Optimistic UI: Ignore status if we've interacted recently
+        if (performance.now() - lastInteractionRef.current < 1000) return;
+
+        // Diagnostic Log
+        if (data.duration > 0 || Math.random() < 0.05) { // Log every valid duration, of 5% of all heartbeats
+          console.info('🎛️ [Toolbar] Received status:', data);
+        }
+
+        // Relaxed ID check: If we have a liveSlideId, we expect a match,
+        // but since only the 'live' project slide sends status (isLive=true),
+        // we can be more permissive.
+        if (data.slideId && liveSlideId && data.slideId !== liveSlideId) {
+            const shortDataId = String(data.slideId).substring(0, 8);
+            const shortLiveId = String(liveSlideId).substring(0, 8);
+            
+            if (shortDataId !== shortLiveId) {
+                return;
+            }
+        }
         
         setPlayState(prev => {
-            // Priority 1: High-FPS local preview (if actually playing and producing non-zero time)
-            const video = findPreviewVideo();
-            const isLocalActive = video && !video.paused && !video.ended && video.currentTime > 0;
-            
-            if (isLocalActive) return prev; // Local preview is better for smoothness
-
-            // Priority 2: Projector heartbeat ground-truth
+            const hasNewDuration = data.duration && isFinite(data.duration) && data.duration > 0;
             return {
                 ...prev,
                 isPlaying: data.isPlaying,
                 currentTime: data.currentTime,
-                duration: data.duration || prev.duration
+                duration: hasNewDuration ? data.duration : prev.duration
             };
         });
     });
 
-    // 2. Poll the local preview video for high-fps smooth updates
-    let rafId: number;
-    const pollLocalVideo = () => {
-        const video = findPreviewVideo();
-        if (video) {
-            setPlayState(prev => ({
-                ...prev,
-                isPlaying: !video.paused && !video.ended,
-                currentTime: video.currentTime,
-                duration: video.duration || prev.duration,
-                buffered: video.buffered.length ? video.buffered.end(video.buffered.length - 1) : prev.buffered
-            }));
-        }
-        rafId = requestAnimationFrame(pollLocalVideo);
-    };
-
-    rafId = requestAnimationFrame(pollLocalVideo);
+    // Request initial status immediately on mount
+    LiveSyncService.requestVideoStatus();
+    LiveSyncService.sendAudioCommand('', 'request-status' as any);
 
     return () => {
         unsubStatus?.();
-        cancelAnimationFrame(rafId);
     };
-  }, [settings, liveSlideId, findPreviewVideo]);
+  }, [!!settings, liveSlideId]);
 
   // Keyboard Shortcuts: Space to Play/Pause (Interceptor)
   useEffect(() => {
@@ -180,9 +245,9 @@ export const LiveMediaToolbar: React.FC = () => {
         return;
       }
 
-      // Spacebar controls ONLY projector via LiveMediaToolbar
+      // Spacebar toggles whatever media is currently active (Video or Audio)
       if (e.key === ' ' || e.key === 'Spacebar' || e.code === 'Space') {
-        if (liveSlideInfo && liveSlideInfo.type === 'video') {
+        if (!!settings || isAudioMode) {
           e.preventDefault();
           e.stopPropagation();
           handleTogglePlayPause();
@@ -192,11 +257,19 @@ export const LiveMediaToolbar: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown, true);
     return () => window.removeEventListener('keydown', handleKeyDown, true);
-  }, [liveSlideInfo, liveSlideId, handleTogglePlayPause]);
+  }, [settings, isAudioMode, handleTogglePlayPause]);
 
   const updateVideoSettings = usePresentationStore(s => s.updateVideoSettings);
 
   const handleSeek = useCallback((time: number) => {
+    lastInteractionRef.current = performance.now();
+    
+    if (isAudioMode && audioStatus) {
+        setAudioStatus(prev => prev ? { ...prev, currentTime: time } : null);
+        LiveSyncService.sendAudioCommand(audioStatus.scopeId, 'seek', time);
+        return;
+    }
+
     if (!liveSlideId || !settings) return;
     
     setPlayState(prev => {
@@ -209,17 +282,27 @@ export const LiveMediaToolbar: React.FC = () => {
       LiveSyncService.sendVideoCommand(liveSlideId, 'seek', clampedTime);
       return { ...prev, currentTime: clampedTime, timestampAtPlay: performance.now() };
     });
-  }, [liveSlideId, settings]);
+  }, [liveSlideId, settings, isAudioMode, audioStatus]);
 
   const seekFromScrubber = useCallback((clientX: number) => {
     const el = scrubberRef.current;
-    if (!el || !settings) return;
+    if (!el) return;
+    
+    // Safety: we Need either a video slide with settings OR an active audio clip
+    if (!settings && !isAudioMode) return;
+
     const rect = el.getBoundingClientRect();
     const fraction = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-    const trimStart = settings.trimStart || 0;
-    const trimEnd = settings.trimEnd || playState.duration || 1;
-    handleSeek(trimStart + fraction * (trimEnd - trimStart));
-  }, [settings, playState.duration, handleSeek]);
+    
+    if (isAudioMode && audioStatus) {
+        const time = fraction * audioStatus.duration;
+        handleSeek(time);
+    } else if (settings) {
+        const trimStart = settings.trimStart || 0;
+        const trimEnd = settings.trimEnd || playState.duration || 1;
+        handleSeek(trimStart + fraction * (trimEnd - trimStart));
+    }
+  }, [settings, isAudioMode, audioStatus, playState.duration, handleSeek]);
 
   const handleScrubberMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -240,22 +323,36 @@ export const LiveMediaToolbar: React.FC = () => {
     };
   }, [isDraggingScrubber, seekFromScrubber]);
 
-  if (!settings || !liveSlideId) return null;
+  // Note: We no longer return null here to keep the toolbar always visible in the layout
+  // if (!settings && !isAudioMode) return null;
 
-  const trimStart = settings.trimStart || 0;
-  const trimEnd = settings.trimEnd && settings.trimEnd > 0 ? settings.trimEnd : (playState.duration || 0);
+  const hasPlaylist = (liveSlideInfo?.type === 'timer' && !!(liveSlideInfo as any).playlist?.length) || 
+                     (liveSlideInfo?.type === 'normal' && !!(liveSlideInfo as any).timerSettings?.playlist?.length);
+
+  const hasMedia = !!settings || isAudioMode || hasPlaylist || liveSlideInfo?.type === 'timer';
+
+  const handlePlaylistNext = useCallback(() => {
+    if (liveSlideId) LiveSyncService.sendPlaylistCommand(liveSlideId, 'next');
+  }, [liveSlideId]);
+
+  const handlePlaylistPrev = useCallback(() => {
+    if (liveSlideId) LiveSyncService.sendPlaylistCommand(liveSlideId, 'prev');
+  }, [liveSlideId]);
+
+  const trimStart = settings?.trimStart || 0;
+  const trimEnd = (isAudioMode ? audioStatus?.duration : (settings?.trimEnd && settings.trimEnd > 0 ? settings.trimEnd : (playState.duration || 0))) || 0;
   const effectiveDuration = Math.max(0, trimEnd - trimStart);
-  const displayCurrentTime = Math.max(0, (playState.currentTime || 0) - trimStart);
+  const displayCurrentTime = hasMedia ? Math.max(0, (activePlayState.currentTime || 0) - trimStart) : 0;
+
+  const scrubberRefValue = isAudioMode ? (audioStatus?.duration || 0) : (playState.duration || settings?.trimEnd || 0);
 
   const progressFraction = Math.max(0, Math.min(1, 
-    effectiveDuration > 0 ? (playState.currentTime - trimStart) / effectiveDuration : 0
+    (hasMedia && effectiveDuration > 0) ? (activePlayState.currentTime - trimStart) / effectiveDuration : 0
   ));
 
   const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4];
 
   const handleSpeedChange = (s: number) => {
-    const video = findPreviewVideo();
-    if (video) video.playbackRate = s;
     LiveSyncService.sendVideoCommand(liveSlideId, 'speed', s);
     if (presentationId) {
       updateVideoSettings(liveSlideId, { speed: s }, presentationId);
@@ -264,9 +361,8 @@ export const LiveMediaToolbar: React.FC = () => {
   };
 
   const handleMuteToggle = () => {
+    if (!settings) return; // Mute for audio not implemented via this bridge
     const newMuted = !settings.muted;
-    const video = findPreviewVideo();
-    if (video) video.muted = newMuted;
     LiveSyncService.sendVideoCommand(liveSlideId, 'mute', newMuted);
     if (presentationId) {
       updateVideoSettings(liveSlideId, { muted: newMuted }, presentationId);
@@ -274,14 +370,8 @@ export const LiveMediaToolbar: React.FC = () => {
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!settings) return;
     const val = parseFloat(e.target.value);
-    const video = findPreviewVideo();
-    if (video) {
-      video.volume = val;
-      if (val > 0 && video.muted) {
-        video.muted = false;
-      }
-    }
     LiveSyncService.sendVideoCommand(liveSlideId, 'volume', val);
     if (presentationId) {
       updateVideoSettings(liveSlideId, { volume: val, muted: val === 0 }, presentationId);
@@ -294,20 +384,59 @@ export const LiveMediaToolbar: React.FC = () => {
   return (
     <div className="w-full flex h-12 bg-[#171717] border-t border-[#262626] relative z-20 shrink-0 select-none">
       {/* Track Header (Aligned with main timeline tracks) */}
-      <div className="w-20 shrink-0 flex flex-col items-center justify-center gap-0.5 border-r border-[#262626] bg-[#1a1a1a] text-accent/80">
-        <Monitor className="w-3.5 h-3.5" />
-        <span className="text-[9px] font-bold uppercase tracking-[0.05em]">{t('live', 'Live')}</span>
+      <div className={cn(
+        "w-20 shrink-0 flex flex-col items-center justify-center gap-0.5 border-r border-[#262626] bg-[#1a1a1a] transition-colors",
+        isAudioMode ? "text-amber-500/80" : "text-accent/80"
+      )}>
+        {isAudioMode ? <Music className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+        <span className="text-[9px] font-bold uppercase tracking-[0.05em] opacity-80">
+          {isAudioMode ? t('audio', 'Audio') : t('live', 'Live')}
+        </span>
       </div>
 
-      <div className="flex-1 flex items-center gap-4 px-4 text-stone-300">
-        {/* Play/Pause */}
-        <button
-          onClick={handleTogglePlayPause}
-          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 text-stone-300 hover:text-white transition-colors shrink-0 cursor-pointer"
-          aria-label={playState.isPlaying ? t('pause', 'Pause') : t('play', 'Play')}
-        >
-          {playState.isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-        </button>
+      <div className={cn(
+        "flex-1 flex items-center gap-4 px-4 transition-all duration-500",
+        hasMedia ? "text-stone-300 opacity-100" : "text-stone-600 opacity-40 grayscale pointer-events-none"
+      )}>
+        {/* Name / Metadata - Removed audio filename per user request */}
+        {!hasMedia && (
+            <div className="flex items-center gap-2 shrink-0">
+                <div className="w-px h-3 bg-white/5" />
+            </div>
+        )}
+        {/* Play/Pause Group */}
+        <div className="flex items-center gap-0.5 shrink-0">
+          {hasPlaylist && (
+            <button
+              onClick={handlePlaylistPrev}
+              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 text-stone-400 hover:text-white transition-colors cursor-pointer"
+              title={t('prev_track', 'Previous Track')}
+            >
+              <SkipBack className="w-3.5 h-3.5 fill-current" />
+            </button>
+          )}
+          
+          <button
+            onClick={handleTogglePlayPause}
+            className={cn(
+                "w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors cursor-pointer",
+                activePlayState.isPlaying ? "text-accent" : "text-stone-300 hover:text-white"
+            )}
+            aria-label={activePlayState.isPlaying ? t('pause', 'Pause') : t('play', 'Play')}
+          >
+            {activePlayState.isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 ml-0.5 fill-current" />}
+          </button>
+
+          {hasPlaylist && (
+            <button
+              onClick={handlePlaylistNext}
+              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 text-stone-400 hover:text-white transition-colors cursor-pointer"
+              title={t('next_track', 'Next Track')}
+            >
+              <SkipForward className="w-3.5 h-3.5 fill-current" />
+            </button>
+          )}
+        </div>
 
         {/* Time display */}
         <div className="text-[11px] font-mono font-bold tabular-nums shrink-0 mt-0.5 min-w-[70px]">
@@ -328,15 +457,19 @@ export const LiveMediaToolbar: React.FC = () => {
           )}>
             <div
               className="absolute inset-y-0 left-0 bg-white/15 rounded-full"
-              style={{ width: `${(playState.buffered / (playState.duration || 1)) * 100}%` }}
+              style={{ width: `${(activePlayState.buffered / (isAudioMode ? (audioStatus?.duration || 1) : (playState.duration || 1))) * 100}%` }}
             />
             <div
-              className="absolute inset-y-0 left-0 bg-accent rounded-full"
+              className={cn(
+                  "absolute inset-y-0 left-0 rounded-full",
+                  isAudioMode ? "bg-amber-500" : "bg-accent"
+              )}
               style={{ width: `${progressFraction * 100}%` }}
             />
             <div
               className={cn(
-                "absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-accent rounded-full shadow-lg ring-[1.5px] ring-black/30 transition-all z-10",
+                "absolute top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full shadow-lg ring-[1.5px] ring-black/30 transition-all z-10",
+                isAudioMode ? "bg-amber-500" : "bg-accent",
                 isDraggingScrubber 
                   ? "opacity-100 scale-110" 
                   : "opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100"
@@ -346,69 +479,73 @@ export const LiveMediaToolbar: React.FC = () => {
           </div>
         </div>
 
-        {/* Speed & Volume Tools */}
-        <div className="flex items-center gap-1 shrink-0 ml-2">
-          <div className="relative">
-            <button
-              ref={speedButtonRef}
-              onClick={() => {
-                const rect = speedButtonRef.current?.getBoundingClientRect();
-                if (rect) {
-                  setMenuPosition({ 
-                    bottom: window.innerHeight - rect.top + 8,
-                    right: window.innerWidth - rect.right
-                  });
-                }
-                setShowSpeedMenu(!showSpeedMenu);
-              }}
-              className="h-8 px-2 flex items-center gap-1.5 rounded-md hover:bg-white/10 transition-colors text-[11px] font-medium cursor-pointer"
-            >
-              <Gauge className="w-3.5 h-3.5 opacity-70" />
-              {settings.speed}x
-            </button>
-            {showSpeedMenu && createPortal(
-              <div 
-                className="fixed bg-[#171717] border border-[#262626] rounded-lg shadow-xl py-1 min-w-[100px] z-100 animate-in fade-in zoom-in-95"
-                style={{ 
-                  bottom: menuPosition.bottom,
-                  right: menuPosition.right
+        {/* Speed & Volume Tools (Hide speed for audio mode for now as it's less common) */}
+        {!isAudioMode && (
+            <div className="flex items-center gap-1 shrink-0 ml-2">
+            <div className="relative">
+                <button
+                ref={speedButtonRef}
+                onClick={() => {
+                    const rect = speedButtonRef.current?.getBoundingClientRect();
+                    if (rect) {
+                    setMenuPosition({ 
+                        bottom: window.innerHeight - rect.top + 8,
+                        right: window.innerWidth - rect.right
+                    });
+                    }
+                    setShowSpeedMenu(!showSpeedMenu);
                 }}
-              >
-                {SPEED_OPTIONS.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => handleSpeedChange(s)}
-                    className={cn(
-                      "w-auto min-w-[100px] px-3 py-1.5 text-left text-[11px] font-medium transition-colors cursor-pointer block",
-                      s === settings.speed ? "text-accent bg-accent/10" : "text-stone-400 hover:text-white hover:bg-white/5"
-                    )}
-                  >
-                    {s}x
-                  </button>
-                ))}
-              </div>,
-              document.body
-            )}
-          </div>
+                className="h-8 px-2 flex items-center gap-1.5 rounded-md hover:bg-white/10 transition-colors text-[11px] font-medium cursor-pointer"
+                >
+                <Gauge className="w-3.5 h-3.5 opacity-70" />
+                {settings?.speed}x
+                </button>
+                {showSpeedMenu && createPortal(
+                <div 
+                    className="fixed bg-[#171717] border border-[#262626] rounded-lg shadow-xl py-1 min-w-[100px] z-100 animate-in fade-in zoom-in-95"
+                    style={{ 
+                    bottom: menuPosition.bottom,
+                    right: menuPosition.right
+                    }}
+                >
+                    {SPEED_OPTIONS.map((s) => (
+                    <button
+                        key={s}
+                        onClick={() => handleSpeedChange(s)}
+                        className={cn(
+                        "w-auto min-w-[100px] px-3 py-1.5 text-left text-[11px] font-medium transition-colors cursor-pointer block",
+                        s === (settings?.speed || 1) ? "text-accent bg-accent/10" : "text-stone-400 hover:text-white hover:bg-white/5"
+                        )}
+                    >
+                        {s}x
+                    </button>
+                    ))}
+                </div>,
+                document.body
+                )}
+            </div>
+            </div>
+        )}
 
-          <div className="flex items-center gap-2 px-1">
-            <button
-              onClick={handleMuteToggle}
-              className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors cursor-pointer"
-              aria-label={settings.muted ? t('unmute', 'Unmute') : t('mute', 'Mute')}
-            >
-              {settings.muted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4" />}
-            </button>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              value={settings.muted ? 0 : settings.volume}
-              onChange={handleVolumeChange}
-              className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-accent hover:bg-white/20 transition-colors"
-            />
-          </div>
+        <div className="flex items-center gap-2 px-1">
+          <button
+            onClick={handleMuteToggle}
+            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors cursor-pointer"
+            aria-label={settings?.muted ? t('unmute', 'Unmute') : t('mute', 'Mute')}
+          >
+            {settings?.muted ? <VolumeX className="w-4 h-4 text-red-500" /> : <Volume2 className="w-4 h-4" />}
+          </button>
+          {!isAudioMode && (
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={settings?.muted ? 0 : (settings?.volume ?? 1)}
+                onChange={handleVolumeChange}
+                className="w-16 h-1 bg-white/10 rounded-full appearance-none cursor-pointer accent-accent hover:bg-white/20 transition-colors"
+              />
+          )}
         </div>
       </div>
     </div>

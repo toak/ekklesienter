@@ -64,3 +64,6 @@ export const slideEditorPendingUpdateAtom = atom(false);
 export const slidePreviewHoveredAtom = atom(false);
 export const slideDesignHoveredAtom = atom(false);
 export const presenterPanelHoveredAtom = atom(false);
+
+// Editor Toolbar visibility (hide/show the floating tools bar)
+export const editorToolbarVisibleAtom = atomWithStorage('editor-toolbar-visible', true);

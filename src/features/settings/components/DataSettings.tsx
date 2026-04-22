@@ -7,6 +7,7 @@ import BibleManager from './BibleManager';
 import { AlertCircle, Database, Trash2, Info, Layers } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import DropdownSelector from '@/shared/ui/DropdownSelector';
 
 const DataSettings: React.FC = () => {
     const { t } = useTranslation();
@@ -60,16 +61,17 @@ const DataSettings: React.FC = () => {
                 </div>
 
                 <div className="relative z-10">
-                    <select
+                    <DropdownSelector
                         value={secondTranslationId || ''}
-                        onChange={(e) => setSecondTranslation(e.target.value || null)}
-                        className="w-full bg-stone-950/60 border border-white/5 rounded-2xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/20 transition-all appearance-none cursor-pointer"
-                    >
-                        <option value="">{t('none')}</option>
-                        {translations.map(tr => (
-                            <option key={tr.id} value={tr.id}>{tr.name} ({tr.id})</option>
-                        ))}
-                    </select>
+                        onChange={(val) => setSecondTranslation(val || null)}
+                        options={[
+                            { value: '', label: t('none') },
+                            ...translations.map(tr => ({
+                                value: tr.id,
+                                label: `${tr.name} (${tr.id})`
+                            }))
+                        ]}
+                    />
                 </div>
             </div>
 

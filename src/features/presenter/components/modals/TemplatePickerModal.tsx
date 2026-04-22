@@ -2,7 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/core/db';
+import { PresentationDataService } from '@/features/presenter/services/PresentationDataService';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { ITemplate } from '@/core/types';
@@ -10,6 +10,7 @@ import { X, LayoutTemplate, ChevronLeft, Search, Settings2, Upload, Plus } from 
 import { cn } from '@/core/utils/cn';
 import { EktmpService } from '@/features/presenter/services/ektmpService';
 import ConfirmDialog from '@/shared/ui/ConfirmDialog';
+import DropdownSelector from '@/shared/ui/DropdownSelector';
 import { toast } from '@/core/utils/toast';
 
 // Hooks
@@ -39,7 +40,7 @@ const TemplatePickerModal: React.FC = () => {
     const { activePresentationId, updatePresentationSlides, setPreviewSlide } = usePresentationStore();
 
     const presentation = useLiveQuery(
-        () => activePresentationId ? db.presentationFiles.get(activePresentationId) : undefined,
+        () => activePresentationId ? PresentationDataService.getPresentation(activePresentationId) : undefined,
         [activePresentationId]
     );
 
@@ -129,7 +130,7 @@ const TemplatePickerModal: React.FC = () => {
                             const input = document.createElement('input'); input.type = 'file'; input.accept = '.ektmp';
                             input.onchange = async (e) => {
                                 const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
-                                try { const imported = await EktmpService.unpack(file); await db.templates.add(imported); toast.success(t('import')); } catch { toast.error('Failed to import.'); }
+                                try { const imported = await EktmpService.unpack(file); await PresentationDataService.addTemplate(imported); toast.success(t('import')); } catch { toast.error('Failed to import.'); }
                             }; input.click();
                         }} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-[10px] font-bold uppercase tracking-wider text-stone-300 cursor-pointer">
                             <Upload className="w-3.5 h-3.5" /> {t('import')}
@@ -253,16 +254,18 @@ const TemplatePickerModal: React.FC = () => {
                 {actions.confirmState.kind === 'template' && actions.confirmState.template?.templateSlides?.length ? (
                     <div className="space-y-2">
                         <label className="text-[9px] font-bold uppercase tracking-wider text-stone-500 block">{t('move_slides_before_delete')}</label>
-                        <select
+                        <DropdownSelector
                             value={actions.confirmState.migrationTargetId || ''}
-                            onChange={(e) => actions.setConfirmState(prev => ({ ...prev, migrationTargetId: e.target.value || undefined }))}
-                            className="w-full min-w-0 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:border-accent/40 outline-hidden cursor-pointer"
-                        >
-                            <option value="">{t('select_target_template')}</option>
-                            {allTemplates.filter(t => t.id !== actions.confirmState.template?.id && t.id !== 'blank-dark').map(tmpl => (
-                                <option key={tmpl.id} value={tmpl.id}>{isRu ? tmpl.nameRu : tmpl.name}</option>
-                            ))}
-                        </select>
+                            onChange={(val) => actions.setConfirmState(prev => ({ ...prev, migrationTargetId: val || undefined }))}
+                            options={[
+                                { value: '', label: t('select_target_template') },
+                                ...allTemplates.filter(t => t.id !== actions.confirmState.template?.id && t.id !== 'blank-dark').map(tmpl => ({
+                                    value: tmpl.id,
+                                    label: isRu ? tmpl.nameRu : tmpl.name
+                                }))
+                            ]}
+                            className="py-2.5"
+                        />
                     </div>
                 ) : null}
             </ConfirmDialog>

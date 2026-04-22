@@ -68,41 +68,38 @@ export const MediaPoolPanel: React.FC = () => {
 
             if (!files) return;
             const filePaths = Array.isArray(files) ? files : [files];
-            const newItems: IMediaItem[] = [];
-
-            const existingItems = await db.mediaPool.toArray();
-            const existingPaths = new Set(existingItems.map(item => item.path));
-
+            
+            const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+            
+            let importedCount = 0;
             let skippedCount = 0;
 
             for (const filePath of filePaths) {
-                if (existingPaths.has(filePath)) {
-                    skippedCount++;
-                    continue;
-                }
-
-                const name = filePath.split(/[/\\]/).pop() || 'Untitled';
-                const ext = filePath.split('.').pop()?.toLowerCase();
-
+                const ext = filePath.split('.').pop()?.toLowerCase() || '';
                 let type: MediaType = 'image';
-                if (['mp4', 'webm', 'mov'].includes(ext || '')) type = 'video';
-                if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext || '')) type = 'audio';
+                if (['mp4', 'webm', 'mov'].includes(ext)) type = 'video';
+                if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) type = 'audio';
 
-                newItems.push({
-                    id: crypto.randomUUID(),
-                    name,
-                    path: filePath,
-                    type,
-                    binId: activeBinId ?? undefined,
-                    createdAt: Date.now() + newItems.length
+                // Check for existing binary data or path to avoid duplicate hashing if possible, 
+                // but importMediaFromPath is robust enough to handle it.
+                // For better UX with large lists, we could check paths first as a hint.
+                const newId = await MediaPersistenceService.importMediaFromPath(filePath, type, { 
+                    binId: activeBinId ?? undefined 
                 });
+
+                if (newId) {
+                    importedCount++;
+                } else {
+                    skippedCount++;
+                }
             }
 
-            if (newItems.length > 0) {
-                await db.mediaPool.bulkAdd(newItems);
-                toast.success(t('media_imported', 'Imported {{count}} files', { count: newItems.length }) + (skippedCount > 0 ? ` (${skippedCount} skipped)` : ''));
+            if (importedCount > 0) {
+                const message = t('media_imported', 'Imported {{count}} files', { count: importedCount }) + 
+                    (skippedCount > 0 ? ` (${t('skipped_count', '{{count}} skipped', { count: skippedCount })})` : '');
+                toast.success(message);
             } else if (skippedCount > 0) {
-                toast.info(`Skipped ${skippedCount} already imported files`);
+                toast.info(t('media_skipped', 'Skipped {{count}} already imported files', { count: skippedCount }));
             }
         } catch (error) {
             console.error('Failed to import media:', error);

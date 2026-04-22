@@ -113,8 +113,15 @@ body {
 
 input,
 textarea,
+button,
+select,
 [contenteditable="true"] {
     user-select: text;
+    outline: none !important;
+}
+
+:focus {
+    outline: none !important;
 }
 
 /* --- Global Custom Utility Classes --- */

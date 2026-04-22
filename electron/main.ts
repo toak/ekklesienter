@@ -1,8 +1,9 @@
-import { app, BrowserWindow, screen, ipcMain, dialog, protocol, net, Menu } from 'electron';
+import { app, BrowserWindow, screen, ipcMain, dialog, protocol, net, Menu, powerSaveBlocker } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import crypto from 'crypto';
+import { remoteServerInfo } from './remote-server';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -36,6 +37,7 @@ process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirnam
 
 let mainWindow: BrowserWindow | null;
 let projectorWindow: BrowserWindow | null;
+let wakeLockId: number | null = null;
 
 const gotTheLock = app.requestSingleInstanceLock();
 
@@ -275,7 +277,8 @@ function createProjectorWindow(displaySettings?: any) {
     console.log('Main Process: Preload Path:', path.join(__dirname, 'preload.cjs'));
 
     if (VITE_DEV_SERVER_URL) {
-        projectorWindow.loadURL(`${VITE_DEV_SERVER_URL}/projector.html`);
+        const baseUrl = VITE_DEV_SERVER_URL.replace(/\/+$/, '');
+        projectorWindow.loadURL(`${baseUrl}/projector.html`);
     } else {
         projectorWindow.loadFile(path.join(process.env.DIST, 'projector.html'));
     }
@@ -333,11 +336,21 @@ app.whenReady().then(() => {
             // On Windows, url.host might be 'c:'
             if (url.host && url.host !== 'localhost' && !/^[a-zA-Z]:$/.test(url.host)) {
                 filePath = url.host + filePath;
+            } else if (url.host && /^[a-zA-Z]:$/.test(url.host)) {
+                filePath = url.host + filePath;
             }
+
+            // Standardize separator
+            filePath = filePath.replace(/\\/g, '/');
 
             // Ensure leading slash on Unix systems if missing
             if (process.platform !== 'win32' && !filePath.startsWith('/')) {
                 filePath = '/' + filePath;
+            }
+
+            // Remove double slashes on Unix (sometimes url.pathname for localhost can start with //)
+            if (process.platform !== 'win32' && filePath.startsWith('//')) {
+                filePath = filePath.substring(1);
             }
 
             // Robust Windows path handling
@@ -345,7 +358,13 @@ app.whenReady().then(() => {
                 filePath = filePath.slice(1);
             }
 
-            console.log(`[Protocol] Loading: ${filePath}`);
+            // macOS uses NFD for file names. Chromium might send NFC.
+            // Normalizing to NFD helps resolve paths with Cyrillic/Accents on Mac.
+            if (process.platform === 'darwin') {
+                filePath = filePath.normalize('NFD');
+            }
+
+            console.log(`[Protocol] Serving standardized path: ${filePath}`);
 
             const { pathToFileURL } = await import('url');
             const fileUrl = pathToFileURL(filePath).href;
@@ -358,6 +377,29 @@ app.whenReady().then(() => {
     });
 
     createMainWindow();
+
+    // --- Remote Server IPCs ---
+    ipcMain.handle('remote:start', async () => {
+        if (!mainWindow) return { error: 'Main window not ready' };
+        try {
+            const info = await remoteServerInfo.start(mainWindow);
+            return { success: true, ...info };
+        } catch (error: any) {
+            return { success: false, error: error.message || 'Failed to start remote server' };
+        }
+    });
+
+    ipcMain.handle('remote:stop', () => {
+        remoteServerInfo.stop();
+        return true;
+    });
+
+    ipcMain.handle('remote:get-info', () => {
+        return {
+            pin: remoteServerInfo.currentPin
+            // Add ip/port if needed, but 'remote:start' already returns them
+        };
+    });
 
     ipcMain.handle('open-projector', (event, displaySettings) => {
         createProjectorWindow(displaySettings);
@@ -619,5 +661,22 @@ app.whenReady().then(() => {
         } catch (error) {
             return null;
         }
+    });
+
+    ipcMain.handle('power:set-wake-lock', (event, enabled: boolean) => {
+        console.log(`[Power] Set wake lock: ${enabled}`);
+        if (enabled) {
+            if (wakeLockId === null) {
+                wakeLockId = powerSaveBlocker.start('prevent-display-sleep');
+                console.log(`[Power] Wake lock started (ID: ${wakeLockId})`);
+            }
+        } else {
+            if (wakeLockId !== null) {
+                powerSaveBlocker.stop(wakeLockId);
+                console.log(`[Power] Wake lock stopped (ID: ${wakeLockId})`);
+                wakeLockId = null;
+            }
+        }
+        return true;
     });
 });

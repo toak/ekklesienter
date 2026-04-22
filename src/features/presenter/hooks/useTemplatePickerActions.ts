@@ -101,7 +101,7 @@ export function useTemplatePickerActions({
     presentation: { slides: ISlide[] },
     slideId: string,
     updatePresentationSlides: (id: string, slides: ISlide[]) => Promise<void>,
-    setPreviewSlide: (id: string, presId: string) => void,
+    setPreviewSlide: (id: string | null, pid?: string, rootId?: string, parentId?: string | null) => void,
     closeModal: (type: string) => void,
     modalType: string
   ) => {

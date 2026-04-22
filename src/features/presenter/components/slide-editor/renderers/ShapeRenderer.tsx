@@ -60,18 +60,26 @@ export const RoundedRect: React.FC<{
   className?: string,
   fill?: string,
   stroke?: string,
-  strokeWidth?: number | string
+  strokeWidth?: number | string,
+  strokeLinejoin?: 'round' | 'bevel' | 'miter',
+  strokeLinecap?: 'butt' | 'round' | 'square',
+  strokeDasharray?: string,
 }> = ({ x, y, width, height, radii, ...props }) => {
   const rx = typeof x === 'number' ? x : 0;
   const ry = typeof y === 'number' ? y : 0;
   const rw = typeof width === 'number' ? width : 100;
   const rh = typeof height === 'number' ? height : 100;
 
-  if (radii.tl === radii.tr && radii.tr === radii.br && radii.br === radii.bl) {
-    return <rect x={x} y={y} width={width} height={height} rx={radii.tl} {...props} />;
-  }
+  const { tl, tr, br, bl } = {
+    tl: Math.max(0, radii.tl),
+    tr: Math.max(0, radii.tr),
+    br: Math.max(0, radii.br),
+    bl: Math.max(0, radii.bl),
+  };
 
-  const { tl, tr, br, bl } = radii;
+  if (tl === tr && tr === br && br === bl) {
+    return <rect x={x} y={y} width={width} height={height} rx={tl} {...props} />;
+  }
   const path = `
     M ${rx + tl},${ry}
     h ${rw - tl - tr}
@@ -85,5 +93,5 @@ export const RoundedRect: React.FC<{
     z
   `;
 
-  return <path d={path} {...props} />;
+  return <path d={path} strokeLinejoin={props.strokeLinejoin} strokeLinecap={props.strokeLinecap} strokeDasharray={props.strokeDasharray} {...props} />;
 };

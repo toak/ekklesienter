@@ -5,7 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
-import { X, Music, Search, Plus } from 'lucide-react';
+import { X, Music, Search, Plus, Import } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { IMediaItem, IAudioScope, ISlide } from '@/core/types';
 import { findOverlappingScopes } from '../../utils/timelineUtils';
@@ -43,22 +43,23 @@ const AudioPickerModal: React.FC = () => {
     if (!isOpen) return null;
 
     const handleSelect = async (item: IMediaItem) => {
+        const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+        const stableId = await MediaPersistenceService.ensureMediaInDb(item);
+
         if (onSelect) {
             if (multi) {
-                const newSelected = selectedIds.includes(item.id)
-                    ? selectedIds.filter(id => id !== item.id)
-                    : [...selectedIds, item.id];
+                const newSelected = selectedIds.includes(stableId)
+                    ? selectedIds.filter(id => id !== stableId)
+                    : [...selectedIds, stableId];
                 setSelectedIds(newSelected);
             } else {
-                onSelect([item.id]);
+                onSelect([stableId]);
                 closeModal(ModalType.AUDIO_PICKER);
             }
             return;
         }
 
         if (targetSlideId) {
-            const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
-            const stableId = await MediaPersistenceService.ensureMediaInDb(item);
 
             const { activePresentation } = usePresentationStore.getState();
             if (activePresentation) {
@@ -93,6 +94,8 @@ const AudioPickerModal: React.FC = () => {
     };
 
     const handleImport = async () => {
+        const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+
         // Use Electron's native file picker if available for persistent absolute paths
         if (IpcService.isElectron()) {
             try {
@@ -105,23 +108,9 @@ const AudioPickerModal: React.FC = () => {
 
                 if (!filePath) return;
 
-                // selectFile can return string or string[] depending on implementation, 
-                // but the current bridge seems to return a single string or null based on electron/main.ts.
-                // Wait, electron/main.ts:278 returns result.filePaths[0].
-                // Let's check if we can handle multiple.
                 const paths = Array.isArray(filePath) ? filePath : [filePath];
-
-                for (const path of paths) {
-                    const name = path.split(/[/\\]/).pop() || 'Unknown Audio';
-                    const item: IMediaItem = {
-                        id: crypto.randomUUID(),
-                        name: name,
-                        path: path,
-                        type: 'audio',
-                        createdAt: Date.now()
-                    };
-                    await db.mediaPool.add(item);
-                }
+                const batchItems = paths.map(path => ({ path, type: 'audio' as const }));
+                await MediaPersistenceService.importMediaBatch(batchItems);
                 return;
             } catch (error) {
                 console.error('Failed to import via Electron:', error);
@@ -138,13 +127,13 @@ const AudioPickerModal: React.FC = () => {
             const files = (e.target as HTMLInputElement).files;
             if (!files) return;
 
-            for (let i = 0; i < files.length; i++) {
-                const file = files[i];
-                // Use path if available (Electron) to allow local-resource:// resolution, 
-                // otherwise let importMediaBlob handle it as a naked Blob which is safer than a temporary blob: URL.
-                const path = (file as any).path || null;
-                await MediaPersistenceService.importMediaBlob(file, path, 'audio');
-            }
+            const batchItems = Array.from(files).map(file => ({
+                file,
+                path: (file as any).path || null,
+                type: 'audio' as const
+            }));
+
+            await MediaPersistenceService.importMediaBatch(batchItems);
         };
 
         input.click();
@@ -164,7 +153,7 @@ const AudioPickerModal: React.FC = () => {
                                 {t('select_audio', 'Select Audio')}
                             </h2>
                             <p className="text-[10px] text-stone-500 font-bold uppercase tracking-[0.2em] mt-0.5">
-                                {t('media_pool', 'Media Pool')}
+                                {t('media_pool.title', 'Media Pool')}
                             </p>
                         </div>
                     </div>
@@ -192,7 +181,7 @@ const AudioPickerModal: React.FC = () => {
                         onClick={handleImport}
                         className="px-4 py-2 bg-purple-500/20 text-purple-400 border border-purple-500/20 rounded-xl hover:bg-purple-500/30 transition-all flex items-center gap-2 font-black text-[10px] uppercase tracking-widest whitespace-nowrap"
                     >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Import className="w-3.5 h-3.5" />
                         {t('import', 'Import')}
                     </button>
                 </div>

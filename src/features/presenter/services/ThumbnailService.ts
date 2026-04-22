@@ -1,6 +1,7 @@
 import { db } from '@/core/db';
 import { IStyleLayer, ISlide, ICanvasSlide } from '@/core/types';
 import { ensureLayers } from '@/core/utils/styleMigration';
+import { isOpaqueNormalLayer } from '@/core/utils/blendEngine';
 
 /**
  * Service for generating lightweight thumbnails for presentations.
@@ -23,8 +24,10 @@ export class ThumbnailService {
             const ctx = canvas.getContext('2d');
             if (!ctx) return null;
 
-            // 1. Render Background Layers
-            const layers = ensureLayers(firstSlide.type === 'normal' ? (firstSlide as ICanvasSlide).backgroundOverride : undefined);
+            // 1. Render Background Layers (with occlusion optimization)
+            const layers = this.getVisibleLayers(
+                ensureLayers(firstSlide.type === 'normal' ? (firstSlide as ICanvasSlide).backgroundOverride : undefined)
+            );
             for (const layer of layers) {
                 if (!layer.visible) continue;
                 await this.renderLayer(ctx, layer, canvas.width, canvas.height);
@@ -60,8 +63,8 @@ export class ThumbnailService {
             const ctx = canvas.getContext('2d');
             if (!ctx) return null;
 
-            // Render Template Background
-            const layers = ensureLayers(template.background);
+            // Render Template Background (with occlusion optimization)
+            const layers = this.getVisibleLayers(ensureLayers(template.background));
             for (const layer of layers) {
                 if (!layer.visible) continue;
                 await this.renderLayer(ctx, layer, canvas.width, canvas.height);
@@ -78,13 +81,29 @@ export class ThumbnailService {
     }
 
     /**
+     * Applies occlusion optimization: returns only the layers that are actually
+     * visible (skips everything below a fully opaque Normal-mode layer).
+     */
+    private static getVisibleLayers(layers: IStyleLayer[]): IStyleLayer[] {
+        if (layers.length <= 1) return layers;
+
+        // Layers are stored top-first. Find the first opaque Normal layer.
+        for (let i = 0; i < layers.length; i++) {
+            if (isOpaqueNormalLayer(layers[i])) {
+                return layers.slice(0, i + 1);
+            }
+        }
+        return layers;
+    }
+
+    /**
      * Renders a style layer to the canvas context.
+     * Supports solid colors, multi-stop/radial/conic gradients, images, and videos.
      */
     private static async renderLayer(ctx: CanvasRenderingContext2D, layer: IStyleLayer, width: number, height: number) {
         ctx.save();
         ctx.globalAlpha = layer.opacity ?? 1;
 
-        // Simplistic blend mode mapping
         if (layer.blendMode && layer.blendMode !== 'normal') {
             ctx.globalCompositeOperation = layer.blendMode as GlobalCompositeOperation;
         }
@@ -93,10 +112,36 @@ export class ThumbnailService {
             ctx.fillStyle = layer.color;
             ctx.fillRect(0, 0, width, height);
         } else if (layer.type === 'gradient' && layer.gradient) {
-            const g = ctx.createLinearGradient(0, 0, 0, height);
-            g.addColorStop(0, layer.gradient.from);
-            g.addColorStop(1, layer.gradient.to);
-            ctx.fillStyle = g;
+            const gDef = layer.gradient;
+            const angleRad = ((gDef.angle ?? 0) * Math.PI) / 180;
+            const cx = width / 2;
+            const cy = height / 2;
+            const len = Math.max(width, height);
+
+            let grad: CanvasGradient;
+            if (gDef.type === 'radial') {
+                grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, len / 2);
+            } else {
+                // Linear and conic (Canvas2D has no native conic, approximate with linear)
+                grad = ctx.createLinearGradient(
+                    cx - Math.cos(angleRad) * len,
+                    cy - Math.sin(angleRad) * len,
+                    cx + Math.cos(angleRad) * len,
+                    cy + Math.sin(angleRad) * len,
+                );
+            }
+
+            // Apply multi-stop or simple two-stop gradient
+            if (gDef.stops && gDef.stops.length > 0) {
+                gDef.stops.forEach(s => grad.addColorStop(
+                    Math.max(0, Math.min(1, s.offset / 100)), s.color
+                ));
+            } else {
+                grad.addColorStop(0, gDef.from);
+                grad.addColorStop(1, gDef.to);
+            }
+
+            ctx.fillStyle = grad;
             ctx.fillRect(0, 0, width, height);
         } else if (layer.type === 'image') {
             const mediaId = layer.image?.id;
@@ -110,12 +155,12 @@ export class ThumbnailService {
                 }
             }
         } else if (layer.type === 'video') {
-            // For video, we just draw a neutral dark placeholder or attempt to show a frame if we had one
+            // For video, draw a neutral dark placeholder
             ctx.fillStyle = 'rgba(0,0,0,0.4)';
             ctx.fillRect(0, 0, width, height);
         }
 
-        // Apply basic adjustments (Simplified)
+        // Apply per-layer adjustments (simplified for thumbnails)
         if (layer.adjustments?.dimmingOpacity && layer.adjustments.dimmingOpacity > 0) {
             ctx.globalAlpha = layer.adjustments.dimmingOpacity;
             ctx.fillStyle = layer.adjustments.dimmingColor || '#000000';
@@ -157,7 +202,6 @@ export class ThumbnailService {
         return new Promise((resolve) => {
             const img = new Image();
             const url = URL.createObjectURL(blob);
-            console.log(`[ThumbnailService] Created internal load URL: ${url} (Origin: ${window.location.origin})`);
             img.onload = () => {
                 URL.revokeObjectURL(url);
                 resolve(img);
@@ -170,8 +214,11 @@ export class ThumbnailService {
         });
     }
 
-    private static drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, width: number, height: number) {
-        const imgRatio = img.width / img.height;
+    private static drawCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement | HTMLVideoElement, width: number, height: number) {
+        const sourceWidth = img instanceof HTMLImageElement ? img.width : img.videoWidth;
+        const sourceHeight = img instanceof HTMLImageElement ? img.height : img.videoHeight;
+        
+        const imgRatio = sourceWidth / sourceHeight;
         const canvasRatio = width / height;
         let drawWidth, drawHeight, offsetX, offsetY;
 
@@ -187,5 +234,60 @@ export class ThumbnailService {
             offsetY = (height - drawHeight) / 2;
         }
         ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+    }
+
+    /**
+     * Generates a sequence of thumbnails from a video for an animated history preview.
+     */
+    static async generateVideoSequence(mediaId: string, frames: number = 5): Promise<string[]> {
+        return new Promise(async (resolve) => {
+            try {
+                const entry = await db.backgrounds.get(mediaId) || await db.mediaPool.get(mediaId);
+                if (!entry || !entry.data) return resolve([]);
+
+                const url = URL.createObjectURL(entry.data);
+                const video = document.createElement('video');
+                video.muted = true;
+                video.src = url;
+
+                video.onloadedmetadata = async () => {
+                    const duration = video.duration;
+                    const sequence: string[] = [];
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 160; // Lightweight thumbs for history
+                    canvas.height = 90;
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) return resolve([]);
+
+                    const intervals = frames > 1 ? duration / (frames - 1) : 0;
+
+                    for (let i = 0; i < frames; i++) {
+                        video.currentTime = i * intervals;
+                        await new Promise(r => {
+                            const onSeeked = () => {
+                                video.removeEventListener('seeked', onSeeked);
+                                r(null);
+                            };
+                            video.onseeked = onSeeked;
+                        });
+                        
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        this.drawCover(ctx, video, canvas.width, canvas.height);
+                        sequence.push(canvas.toDataURL('image/jpeg', 0.6));
+                    }
+
+                    URL.revokeObjectURL(url);
+                    resolve(sequence);
+                };
+
+                video.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    resolve([]);
+                };
+            } catch (error) {
+                console.error('Failed to generate video sequence:', error);
+                resolve([]);
+            }
+        });
     }
 }

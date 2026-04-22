@@ -2,11 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { GripVertical, Eye, EyeOff, Trash2, Check, Video } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import { IStyleLayer } from '@/core/types';
+import { IStyleLayer, BLEND_MODES } from '@/core/types/style';
 import { FloatingPopover } from '@/components/FloatingPopover';
 import { BackgroundPicker } from '../slide-properties/BackgroundPicker';
+import { SlideBackground } from '../display/SlideBackground';
+import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 
 interface ILayerItemProps {
     layer: IStyleLayer;
@@ -40,6 +42,7 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
     };
     const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
+    const [blendMenu, setBlendMenu] = useState<{ x: number, y: number } | null>(null);
     const triggerRef = useRef<HTMLDivElement>(null);
     const [opacityStr, setOpacityStr] = useState(`${Math.round((layer.opacity ?? 1) * 100)}% `);
 
@@ -91,11 +94,11 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
             if (type === 'radial') return `radial-gradient(circle, ${stopsStr})`;
             if (type === 'conic') return `conic-gradient(from ${g.angle}deg at 50% 50%, ${stopsStr})`;
         }
-        if (layer.type === 'image' && layer.image) return `url(${layer.image.url}) center / cover`;
-        return '#000';
+        return '#171717';
     };
 
     const getDisplayText = () => {
+        if (!layer.type) return 'LAYER';
         if (layer.type === 'color') return (layer.color || '#000').toUpperCase().replace('#', '');
         return layer.type.toUpperCase();
     };
@@ -131,8 +134,18 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                     className="w-12 h-full border-r border-white/5 shrink-0 flex items-center justify-center bg-black/20 overflow-hidden p-0.5 cursor-pointer"
                     onClick={() => setIsOpen(!isOpen)}
                 >
-                    <div className="w-full h-full rounded-md border border-white/10 shadow-inner relative overflow-hidden" style={{ background: getBackgroundValue() }}>
-                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjMzMzIj48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiMzMzMiPjwvcmVjdD4KPC9zdmc+')] opacity-20 -z-10 mix-blend-overlay" />
+                    <div className="w-full h-full rounded-md border border-white/10 shadow-inner relative overflow-hidden bg-stone-900" style={{ background: getBackgroundValue() }}>
+                        {(layer.type === 'image') && (layer.image?.url || layer.image?.id) && (
+                            <div className="absolute inset-0">
+                                <SlideBackground background={[layer]} showOverlay={false} />
+                            </div>
+                        )}
+                        {(layer.type === 'video') && (layer.video?.url || layer.video?.id) && (
+                            <div className="absolute inset-0 bg-black flex items-center justify-center">
+                                <Video className="w-4 h-4 text-white/50" />
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjMzMzIj48L3JlY3Q+CjxyZWN0IHg9IjQiIHk9IjQiIHdpZHRoPSI0IiBoZWlnaHQ9IjQiIGZpbGw9IiMzMzMiPjwvcmVjdD4KPC9zdmc+')] opacity-20 -z-10 mix-blend-overlay pointer-events-none" />
                     </div>
                 </div>
 
@@ -140,8 +153,15 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                     <span className="text-[10px] font-mono font-bold text-stone-200 uppercase truncate">
                         {getDisplayText()}
                     </span>
-                    <span className="text-[8px] font-bold text-stone-500 uppercase tracking-widest truncate">
-                        {layer.blendMode}
+                    <span 
+                        className="text-[8px] font-bold text-stone-500 hover:text-accent uppercase tracking-widest truncate cursor-pointer transition-colors"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            setBlendMenu({ x: rect.left, y: rect.bottom + 4 });
+                        }}
+                    >
+                        {t(`blend_mode.${layer.blendMode}`, layer.blendMode)}
                     </span>
                 </div>
 
@@ -169,7 +189,7 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                     onClick={() => onUpdate({ visible: !layer.visible })}
                     onMouseDown={(e) => e.preventDefault()}
                     className={cn("p-1.5 transition-colors rounded-md", layer.visible ? "text-stone-500 hover:text-stone-300 hover:bg-white/5 active:bg-white/10" : "text-stone-700 hover:text-stone-500 hover:bg-white/5 bg-black/20")}
-                    title={layer.visible ? 'Hide Layer' : 'Show Layer'}
+                    title={layer.visible ? t('hide_layer') : t('show_layer')}
                 >
                     {layer.visible ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
                 </button>
@@ -180,7 +200,7 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                     onClick={onRemove}
                     onMouseDown={(e) => e.preventDefault()}
                     className="p-1.5 text-stone-600 hover:text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors rounded-md cursor-pointer"
-                    title="Remove Layer"
+                    title={t('remove_layer')}
                 >
                     <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -190,7 +210,7 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                 isOpen={isOpen}
                 onClose={() => setIsOpen(false)}
                 anchorRef={triggerRef}
-                title="Fill Settings"
+                title={t('fill_settings')}
                 width={360}
             >
                 <div className="h-[560px] max-h-[85vh]">
@@ -204,6 +224,28 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                     />
                 </div>
             </FloatingPopover>
+
+            {blendMenu && (
+                <ContextMenu
+                    x={blendMenu.x}
+                    y={blendMenu.y}
+                    onClose={() => setBlendMenu(null)}
+                >
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                        {BLEND_MODES.map(m => (
+                            <ContextMenuItem
+                                key={m.value}
+                                label={t(`blend_mode.${m.value}`, m.label)}
+                                icon={layer.blendMode === m.value ? <Check className="w-3.5 h-3.5" /> : <div className="w-3.5 h-3.5" />}
+                                onClick={() => {
+                                    onUpdate({ blendMode: m.value as any });
+                                    setBlendMenu(null);
+                                }}
+                            />
+                        ))}
+                    </div>
+                </ContextMenu>
+            )}
         </div>
     );
 });

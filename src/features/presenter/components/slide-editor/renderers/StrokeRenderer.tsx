@@ -20,15 +20,17 @@ export const StrokeRenderer: React.FC<StrokeRendererProps> = ({ item, strokes, a
       return { tl: r, tr: r, br: r, bl: r };
     }
     return {
-      tl: (item.borderRadiusTL || 0) + offset,
-      tr: (item.borderRadiusTR || 0) + offset,
-      br: (item.borderRadiusBR || 0) + offset,
-      bl: (item.borderRadiusBL || 0) + offset,
+      tl: Math.max(0, (item.borderRadiusTL || 0) + offset),
+      tr: Math.max(0, (item.borderRadiusTR || 0) + offset),
+      br: Math.max(0, (item.borderRadiusBR || 0) + offset),
+      bl: Math.max(0, (item.borderRadiusBL || 0) + offset),
     };
   };
 
   const radii = getRadii();
   const expansion = align === 'outside' ? borderWidth : align === 'center' ? borderWidth / 2 : 0;
+  const strokeJoin = item.strokeJoin || 'round';
+  const dashArray = item.strokeDashArray || undefined;
 
   return (
     <div className="absolute overflow-visible pointer-events-none" style={{
@@ -36,7 +38,7 @@ export const StrokeRenderer: React.FC<StrokeRendererProps> = ({ item, strokes, a
       width: `calc(100% + ${expansion * 2}px)`,
       height: `calc(100% + ${expansion * 2}px)`,
     }}>
-      <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+      <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible" overflow="visible">
         <defs>
           <mask id={maskId} maskUnits="userSpaceOnUse">
             <g>
@@ -55,6 +57,7 @@ export const StrokeRenderer: React.FC<StrokeRendererProps> = ({ item, strokes, a
                   x={expansion} y={expansion}
                   width={`calc(100% - ${expansion * 2}px)`} height={`calc(100% - ${expansion * 2}px)`}
                   radii={radii} fill="none" stroke="white" strokeWidth={borderWidth}
+                  strokeLinejoin={strokeJoin} strokeLinecap={item.strokeLinecap} strokeDasharray={dashArray}
                 />
               )}
             </g>

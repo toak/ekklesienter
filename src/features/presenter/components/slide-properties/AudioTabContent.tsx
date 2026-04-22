@@ -10,6 +10,13 @@ import { db } from '@/core/db';
 import { toast } from '@/core/utils/toast';
 import { ffmpegService } from '@/core/services/FFmpegService';
 import { useState, useCallback } from 'react';
+import { Play, Clock } from 'lucide-react';
+
+const STRATEGY_OPTIONS: Array<{ value: IAudioScope['strategy']; label: string; icon: React.ElementType }> = [
+    { value: 'auto', label: 'Auto-play', icon: Play },
+    { value: 'delay', label: 'Play after delay', icon: Clock },
+    { value: 'manual', label: 'Manual', icon: Music },
+];
 
 interface IAudioTabContentProps {
     scope: IAudioScope | undefined;
@@ -44,23 +51,25 @@ export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
                 throw new Error("Failed to trim media");
             }
 
-            // Add as a new trimmed copy to the pool
+            // Add as a new trimmed copy to the pool via centralized service for hashing & dedup
             const original = await db.mediaPool.get(scope.fileId);
-            const newMediaId = crypto.randomUUID();
             const newName = original ? `${original.name} (Trimmed)` : 'Trimmed Audio';
 
-            await db.mediaPool.add({
-                id: newMediaId,
-                name: newName,
-                path: `Trimmed/${newName}`,
-                type: 'audio',
-                data: trimmedBlob,
-                createdAt: Date.now(),
-            });
+            const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+            const newMediaId = await MediaPersistenceService.importMediaBlob(
+                trimmedBlob, 
+                newName, 
+                'audio'
+            );
+
+            if (!newMediaId) {
+                throw new Error("Failed to persist trimmed media");
+            }
 
             // Update scope with the new media, resetting the conceptual trim boundaries
             await updateAudioScope(scope.id, { 
                 fileId: newMediaId,
+                fileName: newName,
                 trimStart: 0,
                 trimEnd: 0
             });
@@ -91,7 +100,35 @@ export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
             {/* Identity */}
             <div className="flex items-center gap-4 p-5 rounded-3xl bg-black/40 border border-white/5 shadow-inner">
                 <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center border border-accent/20 shadow-lg shadow-accent/5"><Music className="w-6 h-6 text-accent" /></div>
-                <div className="min-w-0 flex-1"><p className="text-[10px] text-stone-500 font-black uppercase tracking-[0.2em] leading-none mb-1.5 px-0.5">{t('audio_clip')}</p><h3 className="text-sm font-bold text-white truncate px-0.5">{mediaItem?.name || t('unknown_file')}</h3></div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-[10px] text-stone-500 font-black uppercase tracking-[0.2em] leading-none mb-1.5 px-0.5">{t('audio_clip')}</p>
+                    <h3 className="text-sm font-bold text-white truncate px-0.5">
+                        {(() => {
+                            const isTechnicalId = (val: string) => {
+                                if (!val) return true;
+                                const clean = val.trim().replace(/\.(mp3|wav|ogg|m4a|aac|flac|bin)$/i, '');
+                                return /^[a-fA-F0-9]{64}$/.test(clean) || 
+                                       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean) ||
+                                       /^[0-9a-f]{32}$/i.test(clean) ||
+                                       clean.startsWith('imported_');
+                            };
+
+                            const name = mediaItem?.name || scope?.fileName || '';
+                            if (name && !isTechnicalId(name)) return name;
+                            
+                            // Try path extraction
+                            const path = (mediaItem as any)?.path || scope?.fileId || '';
+                            if (path) {
+                                const extracted = path.replace(/^local-resource:\/\//, '').split(/[/\\]/).pop();
+                                if (extracted && !isTechnicalId(extracted)) return extracted;
+                            }
+
+                            // FALLBACK: If we're here, all names/paths were technical IDs.
+                            // Return localized 'unknown' or 'untitled' instead of returning the hash.
+                            return t('unknown_file');
+                        })()}
+                    </h3>
+                </div>
             </div>
 
             {/* Volume */}
@@ -139,9 +176,61 @@ export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
                 </div>
             </div>
 
-            {/* Playback */}
+            {/* Playback Strategy */}
             <div className="space-y-4 px-1">
-                <div className="flex items-center gap-2"><div className="w-1 h-3 bg-accent/40 rounded-full" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-500">{t('playback', 'Playback')}</span></div>
+                <div className="flex items-center gap-2">
+                    <div className="w-1 h-3 bg-accent/40 rounded-full" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-500">
+                        {t('playback_strategy', 'Playback Strategy')}
+                    </span>
+                </div>
+                
+                <div className="grid grid-cols-1 gap-2">
+                    {STRATEGY_OPTIONS.map((opt) => {
+                        const Icon = opt.icon;
+                        return (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => updateAudioScope(scope.id, { strategy: opt.value })}
+                                className={cn(
+                                    "w-full flex items-center gap-3 p-4 rounded-3xl border transition-all cursor-pointer active:scale-[0.98]",
+                                    (scope.strategy || 'auto') === opt.value
+                                        ? "bg-accent/10 border-accent/30 text-accent font-bold"
+                                        : "bg-black/40 border-white/5 text-stone-500 hover:border-white/10 hover:text-stone-300"
+                                )}
+                            >
+                                <Icon className="w-4 h-4 shrink-0" />
+                                <span className="text-[11px] font-bold uppercase tracking-widest leading-none mt-0.5">
+                                    {t(`strategy_${opt.value}`, opt.label)}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* Delay input */}
+                {(scope.strategy || 'auto') === 'delay' && (
+                    <div className="bg-black/40 p-4 rounded-3xl border border-white/5 animate-in fade-in slide-in-from-top-2 duration-200">
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-stone-600 block px-0.5 mb-2">
+                            {t('delay_seconds', 'Delay (seconds)')}
+                        </span>
+                        <ScrubbableInput
+                            label={t('delay')}
+                            value={scope.delaySeconds ?? 1}
+                            onChange={(v: number) => updateAudioScope(scope.id, { delaySeconds: v })}
+                            min={0.5}
+                            max={30}
+                            step={0.5}
+                            className="bg-stone-900/50 rounded-xl px-3 py-2 border border-white/5"
+                        />
+                    </div>
+                )}
+            </div>
+
+            {/* Loop Playback */}
+            <div className="space-y-4 px-1">
+                <div className="flex items-center gap-2"><div className="w-1 h-3 bg-accent/40 rounded-full" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-500">{t('playback', 'Loop')}</span></div>
                 <button onClick={() => updateAudioScope(scope.id, { loop: !scope.loop })} className={cn("w-full flex items-center justify-between p-5 rounded-3xl border transition-all active:scale-[0.98] cursor-pointer", scope.loop ? "bg-accent/10 border-accent/30 text-accent font-bold" : "bg-black/40 border-white/5 text-stone-500 hover:border-white/10 hover:text-stone-300")}>
                     <div className="flex items-center gap-3"><div className={cn("p-2 rounded-xl border transition-colors", scope.loop ? "bg-accent/20 border-accent/20" : "bg-white/5 border-white/5")}><Repeat className={cn("w-4 h-4", scope.loop ? "text-accent" : "text-stone-600")} /></div><span className="text-[11px] font-bold uppercase tracking-widest">{t('loop_playback', 'Loop Playback')}</span></div>
                     <div className={cn("w-9 h-5 rounded-full relative transition-colors duration-300 flex items-center px-1", scope.loop ? "bg-accent" : "bg-stone-800")}><div className={cn("w-3 h-3 rounded-full bg-white transition-all duration-300 shadow-sm", scope.loop ? "ml-4" : "ml-0")} /></div>

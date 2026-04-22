@@ -1,21 +1,22 @@
 import { IStyleLayer } from './style';
 
-export type TimerTriggerType = 'start' | 'finish' | 'remaining' | 'elapsed' | 'percentage';
-export type TimerActionType = 'next_slide' | 'play_sound' | 'change_bg' | 'blackout' | 'flash' | 'volume_fade';
+export type TimerTriggerType = 'on_start' | 'on_end' | 'remaining' | 'elapsed' | 'percentage' | 'on_keypress';
+export type TimerActionType = 'next_slide' | 'prev_slide' | 'navigate_to' | 'play_sound' | 'change_bg' | 'blackout' | 'flash' | 'volume_fade' | 'apply_override' | 'close_override' | 'wait' | 'key_halt';
 
-export interface ITimerAction {
-  id: string;
-  type: TimerActionType;
-  payload?: any;
-}
+export type ITimerAction =
+  | { id: string; type: 'next_slide' | 'prev_slide' | 'blackout' | 'flash' | 'close_override' }
+  | { id: string; type: 'navigate_to'; payload: { slideId: string } }
+  | { id: string; type: 'play_sound'; payload: { soundId: string; volume?: number; mediaId?: string } }
+  | { id: string; type: 'change_bg'; payload: { background: IStyleLayer[] } }
+  | { id: string; type: 'volume_fade'; payload: { duration: number } }
+  | { id: string; type: 'apply_override'; payload: { override: 'blackout' | 'whiteout' | 'logo' } }
+  | { id: string; type: 'wait'; payload: { duration: number } }
+  | { id: string; type: 'key_halt'; payload: { key: string } };
 
-export interface ITimerTrigger {
-  id: string;
-  type: TimerTriggerType;
-  value: number; // seconds or percentage
-  actions: ITimerAction[];
-  fired?: boolean; // internal state to prevent double firing
-}
+export type ITimerTrigger =
+  | { id: string; type: 'on_start' | 'on_end'; actions: ITimerAction[]; fired?: boolean }
+  | { id: string; type: 'remaining' | 'elapsed' | 'percentage'; value: number; actions: ITimerAction[]; fired?: boolean }
+  | { id: string; type: 'on_keypress'; triggerValue: string; actions: ITimerAction[]; fired?: boolean };
 
 export interface ITimerSettings {
   duration: number; // in seconds

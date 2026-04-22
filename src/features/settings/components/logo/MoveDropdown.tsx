@@ -23,7 +23,7 @@ export const MoveDropdown: React.FC<MoveDropdownProps> = ({ groups, currentGroup
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-stone-300 hover:bg-white/5 rounded-xl transition-colors cursor-pointer"
                 >
                     <ImageIcon className="w-3.5 h-3.5 text-stone-500" />
-                    {t('ungrouped_logos', 'Ungrouped')}
+                    {t('ungrouped_logos')}
                 </button>
             )}
             {groups
@@ -42,7 +42,7 @@ export const MoveDropdown: React.FC<MoveDropdownProps> = ({ groups, currentGroup
             }
             {groups.filter(g => g.id !== currentGroupId).length === 0 && !currentGroupId && (
                 <p className="px-3 py-2 text-[10px] text-stone-600 italic">
-                    {t('no_groups_to_move', 'Create a collection first')}
+                    {t('no_groups_to_move')}
                 </p>
             )}
         </div>

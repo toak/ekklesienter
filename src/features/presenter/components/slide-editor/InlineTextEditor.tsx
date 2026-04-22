@@ -9,6 +9,9 @@ import { sanitizePasteHtml } from '@/core/utils/sanitizePaste';
 import { useTextFit } from '@/features/presenter/hooks/useTextFit';
 import { textCommandAtom, fontPreviewFamilyAtom, fontPreviewWeightAtom } from '@/core/store/uiAtoms';
 import { normalizeHtml } from '@/features/presenter/utils/normalizeContentEditableHtml';
+import { getComputedColor } from '@/core/utils/blendEngine';
+import { mediaCache } from '@/core/utils/mediaCache';
+import { IStyleLayer } from '@/core/types/style';
 
 interface InlineTextEditorProps {
     item: ICanvasItem;
@@ -61,6 +64,99 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({
             window.removeEventListener('keyup', handleGlobalKeyUp);
         };
     }, []);
+
+    // --- Synchronized CSS Logic from TextRenderer ---
+    const [dynamicCSS, setDynamicCSS] = React.useState<React.CSSProperties | null>(null);
+
+    useEffect(() => {
+        let active = true;
+
+        const compileBackgroundStyles = async () => {
+            const hasRichMedia = fills.some(f => f.type !== 'color');
+            if (!hasRichMedia) {
+                if (active) setDynamicCSS(null);
+                return;
+            }
+
+            const bgImages: string[] = [];
+            const bgBlendModes: string[] = [];
+            const bgSizes: string[] = [];
+            const bgPositions: string[] = [];
+
+            for (const layer of fills) {
+                if (layer.visible === false) continue;
+
+                const opacity = layer.opacity ?? 1;
+                const blendMode = layer.blendMode || 'normal';
+
+                if (layer.type === 'color' && layer.color) {
+                    let alphaHex = Math.round(opacity * 255).toString(16).padStart(2, '0');
+                    let baseHex = layer.color.length === 9 ? layer.color.substring(0, 7) : layer.color.padEnd(7, '0');
+                    let finalOutputColor = baseHex + alphaHex;
+                    
+                    bgImages.push(`linear-gradient(${finalOutputColor}, ${finalOutputColor})`);
+                    bgBlendModes.push(blendMode);
+                    bgSizes.push('100% 100%');
+                    bgPositions.push('left top');
+                } 
+                else if (layer.type === 'image' && layer.image) {
+                    let resolvedUrl = layer.image.url;
+                    const isRemote = !window.electron?.ipcRenderer;
+                    let dbUrl: string | null = null;
+                    
+                    if (!isRemote && layer.image.isFromDb && layer.image.id) {
+                        try {
+                            const cachedUrl = await mediaCache.getBackgroundUrl(layer.image.id);
+                            if (cachedUrl) dbUrl = cachedUrl;
+                        } catch (e) {
+                            console.error("Failed caching text editor background layer", e);
+                        }
+                    }
+
+                    const displayUrl = (isRemote && resolvedUrl && !resolvedUrl.startsWith('blob:')) 
+                        ? resolvedUrl 
+                        : (dbUrl || (resolvedUrl && !resolvedUrl.startsWith('blob:') ? resolvedUrl : null));
+
+                    if (displayUrl && String(displayUrl).toLowerCase() !== 'null') {
+                        let imgToken = `url("${displayUrl}")`;
+                        if (opacity < 1) {
+                            imgToken = `cross-fade(transparent ${(1 - opacity) * 100}%, url("${displayUrl}") ${opacity * 100}%)`;
+                        }
+                        bgImages.push(imgToken);
+                        bgBlendModes.push(blendMode);
+                        bgSizes.push('cover');
+                        bgPositions.push('center center');
+                    }
+                }
+            }
+
+            if (!active) return;
+
+            if (bgImages.length > 0) {
+                setDynamicCSS({
+                    backgroundImage: bgImages.join(', '),
+                    backgroundBlendMode: bgBlendModes.join(', '),
+                    backgroundSize: bgSizes.join(', '),
+                    backgroundPosition: bgPositions.join(', '),
+                    backgroundRepeat: 'no-repeat',
+                    WebkitBackgroundClip: 'text',
+                    backgroundClip: 'text',
+                    WebkitTextFillColor: 'transparent',
+                    color: 'transparent',
+                });
+            } else {
+                setDynamicCSS(null);
+            }
+        };
+
+        compileBackgroundStyles();
+        return () => { active = false; };
+    }, [fills]);
+
+    const finalColor = React.useMemo(() => {
+        if (isRichFill || fills.length === 0) return 'transparent';
+        return getComputedColor(fills, textData.color || 'white');
+    }, [fills, isRichFill, textData.color]);
 
     // Initialize content and auto-focus
     useEffect(() => {
@@ -134,19 +230,8 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({
             case 'redo':
                 document.execCommand('redo', false);
                 break;
-            case 'scriptStyle':
-                if (value === 'subscript') document.execCommand('subscript', false);
-                else if (value === 'superscript') document.execCommand('superscript', false);
-                else {
-                    document.execCommand('subscript', false); // toggle off
-                    document.execCommand('superscript', false); // toggle off
-                }
-                break;
             case 'textCase':
                 applyCustomStyle({ textTransform: value === 'none' ? 'none' : value === 'titlecase' ? 'capitalize' : value });
-                break;
-            case 'underlineStyle':
-                applyCustomStyle({ textDecorationStyle: value });
                 break;
             case 'fontWeight':
                 applyCustomStyle({ fontWeight: value });
@@ -207,10 +292,61 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({
         }
     };
 
+    const textStrokes = React.useMemo(() => {
+        return textData.textStrokes?.filter(s => s.visible !== false) || [];
+    }, [textData.textStrokes]);
+
+    const hasTextStrokes = textStrokes.length > 0;
+    const globalStrokeJoin = item.strokeJoin || 'round';
+    const globalStrokeDash = item.strokeDashArray;
+    const globalAlign = item.strokeAlign || 'center';
+
+    const [currentContent, setCurrentContent] = React.useState(textData.content);
+
     const handleInput = (e: React.FormEvent<HTMLDivElement>) => {
         const content = e.currentTarget.innerHTML;
+        setCurrentContent(content); // Sync stroke layers
         onInput?.(item.id, content);
     };
+
+    const vAlignCss = (textData.alignVertical || 'middle') === 'top' ? 'flex-start'
+        : (textData.alignVertical || 'middle') === 'bottom' ? 'flex-end' : 'center';
+
+    const listClasses = cn(
+        '[&_ul]:list-inside [&_ol]:list-inside [&_ul]:pl-2 [&_ol]:pl-2',
+        textData.listType === 'circle' ? '[&_ul]:list-[circle]' :
+        textData.listType === 'square' ? '[&_ul]:list-[square]' :
+        '[&_ul]:list-disc',
+        textData.listType === 'decimal' ? '[&_ol]:list-decimal' :
+        textData.listType === 'lower-alpha' ? '[&_ol]:list-[lower-alpha]' :
+        textData.listType === 'upper-alpha' ? '[&_ol]:list-[upper-alpha]' :
+        textData.listType === 'lower-roman' ? '[&_ol]:list-[lower-roman]' :
+        textData.listType === 'upper-roman' ? '[&_ol]:list-[upper-roman]' :
+        '[&_ol]:list-decimal'
+    );
+
+    const commonTextStyle: React.CSSProperties = {
+        fontFamily: activeFontFamily,
+        fontSize: `${fittedFontSize}px`,
+        fontWeight: activeFontWeight,
+        textAlign: (textData.alignHorizontal || textData.textAlign || 'center') as React.CSSProperties['textAlign'],
+        lineHeight: textData.lineHeight || 1.3,
+        letterSpacing: typeof textData.letterSpacing === 'number' 
+            ? `${textData.letterSpacing}px` 
+            : (parseFloat(textData.letterSpacing as string) || 0) + 'px',
+        fontStyle: textData.isItalic ? 'italic' : 'normal',
+        textDecorationLine: [textData.isStrikethrough ? 'line-through' : '', textData.isUnderline ? 'underline' : ''].filter(Boolean).join(' ') || 'none',
+        textTransform: textData.textCase === 'uppercase' ? 'uppercase' : textData.textCase === 'lowercase' ? 'lowercase' : textData.textCase === 'titlecase' ? 'capitalize' : 'none',
+        whiteSpace: resizingMode === 'auto-width' ? 'pre' : 'pre-wrap',
+        wordBreak: resizingMode === 'auto-width' ? 'normal' : 'break-word',
+        '--list-style': textData.listType === 'circle' ? 'circle' :
+                      textData.listType === 'square' ? 'square' :
+                      textData.listType === 'lower-alpha' ? 'lower-alpha' :
+                      textData.listType === 'upper-alpha' ? 'upper-alpha' :
+                      textData.listType === 'lower-roman' ? 'lower-roman' :
+                      textData.listType === 'upper-roman' ? 'upper-roman' :
+                      textData.listType === 'decimal' ? 'decimal' : 'disc'
+    } as any;
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
         e.stopPropagation();
@@ -220,22 +356,11 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({
             return;
         }
 
-        // Chrome adds <div><br></div> which breaks layouts. Force <br> insertion.
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            const selection = window.getSelection();
-            if (selection && selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0);
-                range.deleteContents();
-                const br = document.createElement('br');
-                range.insertNode(br);
-                range.setStartAfter(br);
-                range.setEndAfter(br);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            }
-            return;
-        }
+        // Disable Chrome's default wrapping with <div> if possible, but let contentEditable handle basic newlines
+        // Setting defaultParagraphSeparator to 'div' or 'p' usually fixes double enter.
+        // Actually, we'll let the native browser behavior work without intercepting Enter
+        // unless it's Mod+Enter to save.
+        
         if (e.key === 'Escape') {
             e.preventDefault();
             onCancel();
@@ -287,14 +412,13 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({
         onSave(item.id, normalizeHtml(editorRef.current?.innerHTML || ''));
     };
 
-    const vAlignCss = (textData.alignVertical || 'middle') === 'top' ? 'flex-start'
-        : (textData.alignVertical || 'middle') === 'bottom' ? 'flex-end' : 'center';
+    const filteredStrokes = textStrokes.filter(s => s.visible !== false);
 
     return (
         <div
             className={cn(
                 isFlowMode ? (isAutoHeight ? 'w-full relative' : 'relative') : 'w-full h-full relative',
-                "flex flex-col"
+                "flex flex-col overflow-visible"
             )}
             style={{
                 justifyContent: vAlignCss,
@@ -302,52 +426,104 @@ const InlineTextEditor: React.FC<InlineTextEditorProps> = ({
                 pointerEvents: 'none',
             }}
         >
-            <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                className={cn(
-                    isAutoWidth ? '' : 'w-full',
-                    "bg-transparent border-none outline-none p-0 m-0 relative",
-                    "caret-accent pointer-events-auto",
-                    "[&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside [&_ul]:pl-2 [&_ol]:pl-2",
-                )}
-                style={{
-                    fontFamily: activeFontFamily,
-                    fontSize: `${fittedFontSize}px`,
-                    fontWeight: activeFontWeight,
-                    // If rich fill is behind, we make text transparent so user sees the fill but still has a cursor
-                    color: isRichFill ? 'transparent' : textData.color,
-                    textAlign: (textData.alignHorizontal || textData.textAlign || 'center') as React.CSSProperties['textAlign'],
-                    lineHeight: textData.lineHeight || 1.3,
-                    letterSpacing: typeof textData.letterSpacing === 'number' && textData.letterSpacing !== 0
-                        ? `${textData.letterSpacing}px` : undefined,
-                    fontStyle: textData.isItalic ? 'italic' : 'normal',
-                    textDecorationLine: [textData.isStrikethrough ? 'line-through' : '', textData.isUnderline ? 'underline' : ''].filter(Boolean).join(' ') || 'none',
-                    textDecorationStyle: textData.underlineStyle === 'wavy' ? 'wavy' : 'solid',
-                    textDecorationSkipInk: textData.underlineSkipInk === 'none' ? 'none' : 'auto',
-                    textTransform: textData.textCase === 'uppercase' ? 'uppercase' : textData.textCase === 'lowercase' ? 'lowercase' : textData.textCase === 'titlecase' ? 'capitalize' : 'none',
-                    whiteSpace: resizingMode === 'auto-width' ? 'pre' : 'pre-wrap',
-                    wordBreak: resizingMode === 'auto-width' ? 'normal' : 'break-word',
-                    overflowWrap: 'break-word',
-                    overflowX: 'visible',
-                    overflowY: 'visible',
-                    // Faux bold
-                    ...(needsFauxBold(textData.isBold, activeFontWeight) ? {
-                        textShadow: `0 0 ${Math.max(0.3, fittedFontSize * 0.015)}px currentColor`,
-                        paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'],
-                    } : {}),
-                    // Paragraph spacing
-                    ...(textData.paragraphSpacing ? { paddingBottom: `${textData.paragraphSpacing}px` } : {}),
-                    minWidth: '1px',
-                    minHeight: '1px',
-                }}
-                onInput={handleInput}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onBlur={handleBlur}
-                onMouseDown={(e) => e.stopPropagation()}
-            />
+            <div className="relative w-full" style={{ overflow: 'visible' }}>
+                {/* Stroke Layers pinned exactly to the editable text bounding height */}
+                {hasTextStrokes && filteredStrokes.slice().reverse().map((stroke, idx) => {
+                    const baseWidth = stroke.width || item.borderWidth || 2;
+                    
+                    return (
+                        <div 
+                            key={stroke.id || idx}
+                            className={cn(
+                                isAutoWidth ? '' : 'w-full',
+                                "absolute inset-0 pointer-events-none stroke-layer-content"
+                            )}
+                                style={{
+                                    ...commonTextStyle,
+                                    textDecorationSkipInk: 'auto',
+                                    overflowWrap: 'break-word',
+                                overflowX: 'visible',
+                                overflowY: 'visible',
+                                minWidth: '1px',
+                                minHeight: '1px',
+                                // Stroke specifics
+                                color: 'transparent',
+                                WebkitTextFillColor: 'transparent',
+                                WebkitTextStroke: `${baseWidth}px ${stroke.color || '#000000'}`,
+                                paintOrder: 'fill stroke',
+                                opacity: stroke.opacity ?? 1,
+                                mixBlendMode: (stroke.blendMode || 'normal') as any,
+                                zIndex: 0
+                            }}
+                            dangerouslySetInnerHTML={{ __html: currentContent }}
+                        />
+                    );
+                })}
+
+                <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    className={cn(
+                        isAutoWidth ? '' : 'w-full',
+                        "bg-transparent border-none outline-none p-0 m-0 relative",
+                        "caret-accent pointer-events-auto z-10",
+                        isRichFill ? 'rich-media-text-fill' : ''
+                    )}
+                    style={{
+                        ...commonTextStyle,
+                        textDecorationSkipInk: 'auto',
+                        overflowWrap: 'break-word',
+                        overflowX: 'visible',
+                        overflowY: 'visible',
+                        // Faux bold
+                        ...(needsFauxBold(textData.isBold, activeFontWeight) ? {
+                            textShadow: `0 0 ${Math.max(0.3, fittedFontSize * 0.015)}px currentColor`,
+                            WebkitTextFillColor: 'currentColor',
+                            paintOrder: 'stroke fill' as React.CSSProperties['paintOrder'],
+                        } : {}),
+                        // Paragraph spacing
+                        ...(textData.paragraphSpacing ? { paddingBottom: `${textData.paragraphSpacing}px` } : {}),
+                        // Merge Rich Fill styles
+                        ...(isRichFill && dynamicCSS ? dynamicCSS : { color: finalColor }),
+                        minWidth: '1px',
+                        minHeight: '1px',
+                    }}
+                    onInput={handleInput}
+                    onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
+                    onBlur={handleBlur}
+                    onMouseDown={(e) => e.stopPropagation()}
+                />
+
+                {/* Force child elements to respect rich media fill transparency while editing */}
+                <style dangerouslySetInnerHTML={{ __html: `
+                    .stroke-layer-content * { 
+                        color: transparent !important; 
+                        -webkit-text-fill-color: transparent !important; 
+                        text-decoration: none !important;
+                    }
+                    .stroke-layer-content *::marker {
+                        color: transparent !important; 
+                    }
+                    ${isRichFill ? '.rich-media-text-fill * { color: transparent !important; -webkit-text-fill-color: transparent !important; }' : ''}
+                    ul, ol { 
+                        margin-top: 0.5em !important; 
+                        margin-bottom: 0.5em !important; 
+                        padding-left: 1.5em !important; 
+                        list-style-position: outside !important;
+                        display: block !important;
+                    }
+                    ul { list-style-type: var(--list-style, disc) !important; }
+                    ol { list-style-type: var(--list-style, decimal) !important; }
+                    li { margin-bottom: 0.2em !important; display: list-item !important; }
+                    li::marker { 
+                        /* Ensure list markers are visible even when using background-clip: text */
+                        color: ${isRichFill ? 'white' : 'inherit'} !important; 
+                        -webkit-text-fill-color: ${isRichFill ? 'white' : 'inherit'} !important;
+                    }
+                ` }} />
+            </div>
         </div>
     );
 };

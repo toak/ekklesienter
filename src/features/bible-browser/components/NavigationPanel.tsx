@@ -15,6 +15,7 @@ import { BookList } from './navigation/BookList';
 import { ChapterGrid } from './navigation/ChapterGrid';
 import { GraceLibPanel } from './navigation/GraceLibPanel';
 import { NavigationFooter } from './navigation/NavigationFooter';
+import ModePicker from './navigation/ModePicker';
 import ServicePicker from '@/features/presenter/components/library/ServicePicker';
 import TranslationPicker from '@/shared/ui/TranslationPicker';
 
@@ -101,7 +102,8 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
     if (!searchQuery.trim() || parseResult.type === 'keyword') return sortedBooks;
 
     const query = searchQuery.toLowerCase();
-    const bookSearchPart = parseResult.bookId || parseResult.query.split(/\d/)[0].trim().toLowerCase();
+    const primaryItem = parseResult.items[0];
+    const bookSearchPart = primaryItem?.bookId || parseResult.originalQuery.split(/\d/)[0].trim().toLowerCase();
 
     return sortedBooks.filter(book => {
       const bName = getBookName(book.bookId, lang).toLowerCase();
@@ -115,12 +117,13 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
   // 3. Callbacks
   const handleBookSelect = (bookId: string) => {
     setBook(bookId);
-    if (parseResult.type === 'reference' && parseResult.bookId === bookId && parseResult.chapter) {
-      setChapter(parseResult.chapter);
-      if (parseResult.verse) {
+    const primaryItem = parseResult.items[0];
+    if (primaryItem?.type === 'reference' && primaryItem.bookId === bookId && primaryItem.chapter) {
+      setChapter(primaryItem.chapter);
+      if (primaryItem.verse) {
         db.verses.where('[translationId+bookId+chapter]')
-          .equals([currentTranslationId, bookId, parseResult.chapter])
-          .and(v => v.verseNumber === parseResult.verse)
+          .equals([currentTranslationId, bookId, primaryItem.chapter])
+          .and(v => v.verseNumber === primaryItem.verse)
           .first()
           .then(v => v && setActiveVerse(v));
       }
@@ -128,7 +131,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
   };
 
   return (
-    <div ref={resizer.containerRef} className="flex flex-col h-full bg-stone-900/80 backdrop-blur-xl border-r border-white/5 relative">
+    <div ref={resizer.containerRef} className="flex flex-col h-full bg-stone-900/80 backdrop-blur-xl border-r border-white/5 relative z-20 @container">
       <NavigationHeader
         appMode={appMode}
         isModePickerOpen={isModePickerOpen}
@@ -142,7 +145,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
 
       <div className="flex-1 flex flex-col min-h-0 relative">
         {/* Search Results Overlay */}
-        {parseResult.type === 'keyword' && parseResult.query.length >= 2 && (
+        {parseResult.type === 'keyword' && parseResult.originalQuery.length >= 2 && (
           <SearchOverlay
             isSearching={isSearching}
             searchResults={searchResults}
@@ -219,6 +222,15 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
           currentServiceId={activeServiceId}
           onSelect={(id) => usePresentationStore.getState().setActiveService(id)}
           onClose={() => setIsPickerOpen(false)}
+          triggerRect={triggerRect}
+        />
+      )}
+
+      {isModePickerOpen && (
+        <ModePicker
+          appMode={appMode}
+          onSetAppMode={setAppMode}
+          onClose={closeModePicker}
           triggerRect={triggerRect}
         />
       )}

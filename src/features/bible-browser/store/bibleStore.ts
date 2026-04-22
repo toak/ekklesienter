@@ -4,6 +4,7 @@ import { Verse } from '@/core/types';
 import { db } from '@/core/db';
 import { useHistoryStore } from '@/core/store/historyStore';
 import { LiveSyncService } from '@/core/services/liveSyncService';
+import { BibleService } from '@/core/services/BibleService';
 
 interface BibleStoreState {
   currentTranslationId: string;
@@ -12,6 +13,9 @@ interface BibleStoreState {
 
   // What's shown on preview (updates on every click)
   activeVerse: Verse | null;
+
+  // What's currently on the projector
+  liveVerse: Verse | null;
 
   // true = projector is currently showing a single verse (not multiverse, not blank)
   // When true, single-verse clicks also go to projector immediately
@@ -43,8 +47,8 @@ interface BibleStoreState {
   // Direct commit (used by history panel, external callers)
   setActiveVerse: (verse: Verse, emitIpc?: boolean) => void;
 
-  navigateNext: (detached?: boolean) => Promise<void>;
-  navigatePrev: (detached?: boolean) => Promise<void>;
+  navigateNext: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
+  navigatePrev: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
   updateVerseText: (verse: Verse, newText: string) => Promise<void>;
 
   // Multi-selection actions
@@ -62,6 +66,7 @@ export const useBibleStore = create<BibleStoreState>()(
       currentBookId: 'GEN',
       currentChapter: 1,
       activeVerse: null,
+      liveVerse: null,
       projectorIsLive: false,
       isMultiVerseMode: false,
       secondTranslationId: null,
@@ -96,6 +101,7 @@ export const useBibleStore = create<BibleStoreState>()(
 
         // Update projector immediately ONLY if projector is live in single-verse mode
         if (projectorIsLive && !isMultiVerseMode) {
+          set({ liveVerse: verse });
           LiveSyncService.showVerse(verse, secondTranslationId);
         }
       },
@@ -105,10 +111,10 @@ export const useBibleStore = create<BibleStoreState>()(
         const { selectedVerses, activeVerse, secondTranslationId } = get();
 
         if (selectedVerses.length >= 2) {
-          set({ isMultiVerseMode: true, projectorIsLive: false });
+          set({ isMultiVerseMode: true, projectorIsLive: false, liveVerse: null });
           LiveSyncService.showMultiVerses(selectedVerses, secondTranslationId);
         } else if (activeVerse) {
-          set({ isMultiVerseMode: false, projectorIsLive: true });
+          set({ isMultiVerseMode: false, projectorIsLive: true, liveVerse: activeVerse });
           LiveSyncService.showVerse(activeVerse, secondTranslationId);
         }
       },
@@ -117,6 +123,7 @@ export const useBibleStore = create<BibleStoreState>()(
       setActiveVerse: (verse: Verse, emitIpc = true) => {
         set({
           activeVerse: verse,
+          liveVerse: emitIpc ? verse : get().liveVerse,
           isMultiVerseMode: false,
           selectedVerses: [verse],
           projectorIsLive: emitIpc ? true : get().projectorIsLive,
@@ -127,43 +134,61 @@ export const useBibleStore = create<BibleStoreState>()(
         }
       },
 
-      navigateNext: async (detached = false) => {
-        const { activeVerse, secondTranslationId } = get();
-        if (!activeVerse) return;
-        const nextVerse = await db.verses
-          .where('[translationId+bookId+chapter]')
-          .equals([activeVerse.translationId, activeVerse.bookId, activeVerse.chapter])
-          .and(v => v.verseNumber === activeVerse.verseNumber + 1)
-          .first();
+      navigateNext: async (detached = false, preferLiveAnchor = false) => {
+        const { activeVerse, liveVerse, secondTranslationId, projectorIsLive } = get();
+        // Remote uses liveVerse anchor, PC uses activeVerse anchor
+        const anchor = (preferLiveAnchor && liveVerse) ? liveVerse : activeVerse;
+        if (!anchor) return;
+
+        const nextVerse = await BibleService.getNextVerse(anchor);
+
         if (nextVerse) {
-          set({ activeVerse: nextVerse, isMultiVerseMode: false, selectedVerses: [nextVerse] });
-          if (!detached) {
-            set({ projectorIsLive: true });
+          if (preferLiveAnchor) {
+            set({ liveVerse: nextVerse, isMultiVerseMode: false, projectorIsLive: true });
             LiveSyncService.showVerse(nextVerse, secondTranslationId);
+            // If they were synced, update preview too
+            if (!detached && activeVerse?.id === liveVerse?.id) {
+              set({ activeVerse: nextVerse, selectedVerses: [nextVerse] });
+            }
+          } else {
+            set({ activeVerse: nextVerse, isMultiVerseMode: false, selectedVerses: [nextVerse] });
+            if (!detached) {
+              set({ projectorIsLive: true, liveVerse: nextVerse });
+              LiveSyncService.showVerse(nextVerse, secondTranslationId);
+            }
           }
         }
       },
 
-      navigatePrev: async (detached = false) => {
-        const { activeVerse, secondTranslationId } = get();
-        if (!activeVerse) return;
-        const prevVerse = await db.verses
-          .where('[translationId+bookId+chapter]')
-          .equals([activeVerse.translationId, activeVerse.bookId, activeVerse.chapter])
-          .and(v => v.verseNumber === activeVerse.verseNumber - 1)
-          .first();
+      navigatePrev: async (detached = false, preferLiveAnchor = false) => {
+        const { activeVerse, liveVerse, secondTranslationId, projectorIsLive } = get();
+        // Remote uses liveVerse anchor, PC uses activeVerse anchor
+        const anchor = (preferLiveAnchor && liveVerse) ? liveVerse : activeVerse;
+        if (!anchor) return;
+
+        const prevVerse = await BibleService.getPrevVerse(anchor);
+
         if (prevVerse) {
-          set({ activeVerse: prevVerse, isMultiVerseMode: false, selectedVerses: [prevVerse] });
-          if (!detached) {
-            set({ projectorIsLive: true });
+          if (preferLiveAnchor) {
+            set({ liveVerse: prevVerse, isMultiVerseMode: false, projectorIsLive: true });
             LiveSyncService.showVerse(prevVerse, secondTranslationId);
+            // If they were synced, update preview too
+            if (!detached && activeVerse?.id === liveVerse?.id) {
+              set({ activeVerse: prevVerse, selectedVerses: [prevVerse] });
+            }
+          } else {
+            set({ activeVerse: prevVerse, isMultiVerseMode: false, selectedVerses: [prevVerse] });
+            if (!detached) {
+              set({ projectorIsLive: true, liveVerse: prevVerse });
+              LiveSyncService.showVerse(prevVerse, secondTranslationId);
+            }
           }
         }
       },
 
       updateVerseText: async (verse, newText) => {
         if (verse.id) {
-          await db.verses.update(verse.id, { text: newText });
+          await BibleService.updateVerseText(verse.id, newText);
           const { activeVerse } = get();
           if (activeVerse && activeVerse.id === verse.id) {
             set({ activeVerse: { ...activeVerse, text: newText } });

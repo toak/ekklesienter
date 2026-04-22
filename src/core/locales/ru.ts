@@ -5,6 +5,7 @@ import design from './ru/design';
 import app from './ru/app';
 import presentation from './ru/presentation';
 import changelog from './ru/changelog';
+import remote from './ru/remote';
 
 export default {
     ...common,
@@ -13,5 +14,6 @@ export default {
     ...design,
     ...app,
     ...presentation,
-    ...changelog
+    ...changelog,
+    remote
 };

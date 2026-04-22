@@ -125,7 +125,7 @@ export const FloatingPopover: React.FC<FloatingPopoverProps> = ({
         <div
             ref={popoverRef}
             className={cn(
-                "floating-popover fixed z-9999 flex flex-col bg-stone-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden transition-opacity duration-75",
+                "floating-popover fixed z-[99999] flex flex-col bg-stone-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden transition-opacity duration-75",
                 isInitialized ? "opacity-100 animate-in fade-in zoom-in-95 duration-200" : "opacity-0 pointer-events-none"
             )}
             style={{

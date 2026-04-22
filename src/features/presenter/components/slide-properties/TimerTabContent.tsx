@@ -1,18 +1,20 @@
 import React from 'react';
 import { db } from '@/core/db';
+import DropdownSelector from '@/shared/ui/DropdownSelector';
 import {
-    Music, Type, Clock, Trash2, Plus, Palette, Zap, Sun,
+    Music, Type, Clock, Trash2, Plus, Palette, Zap, Sun, Keyboard, ArrowRight, CornerDownRight, ShieldAlert, GripVertical, MousePointer2, FileAudio, Import
 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import { ISlide, ITimerSettings, IStyleLayer, ITimerSlide } from '@/core/types';
+import { ISlide, ITimerSettings, IStyleLayer, ITimerSlide, ICanvasSlide } from '@/core/types';
 import { ModalType } from '@/core/store/modalStore';
 import type { TFunction } from 'i18next';
-import { PlaylistItemRow } from '../slide-properties/PlaylistItemRow';
-import { BackgroundPicker } from '../slide-properties/BackgroundPicker';
+import { PlaylistItemRow } from './PlaylistItemRow';
+import { BackgroundPicker } from './BackgroundPicker';
 import { FloatingPopover } from '@/components/FloatingPopover';
 import { ensureLayers } from '@/core/utils/styleMigration';
 import { SlideBackground } from '../display/SlideBackground';
 import { MediaPersistenceService } from '../../services/MediaPersistenceService';
+import { usePresentationStore } from '../../store/presentationStore';
 import {
     DndContext,
     closestCenter,
@@ -29,59 +31,9 @@ import {
     verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 
-interface ITimerFillPickerProps {
-    label: string;
-    fill: IStyleLayer[] | undefined;
-    defaultColor?: string;
-    onChange: (fill: IStyleLayer[]) => void;
-}
-
-const TimerFillPicker: React.FC<ITimerFillPickerProps> = ({ label, fill, defaultColor = '#1c1917', onChange }) => {
-    const [isOpen, setIsOpen] = React.useState(false);
-    const triggerRef = React.useRef<HTMLDivElement>(null);
-    const layers = ensureLayers(fill);
-
-    const effectiveLayers: IStyleLayer[] = layers.length > 0 ? layers : [{
-        id: crypto.randomUUID(),
-        type: 'color' as const,
-        visible: true,
-        opacity: 1,
-        blendMode: 'normal',
-        color: defaultColor,
-        adjustments: { brightness: 100, contrast: 100, exposure: 0, saturation: 100, vibrance: 0, hue: 0, blur: 0 }
-    }];
-
-    return (
-        <div
-            ref={triggerRef}
-            onClick={() => setIsOpen(true)}
-            className="flex items-center justify-between bg-black/20 p-3 rounded-2xl border border-white/5 hover:border-white/10 hover:bg-black/30 transition-all cursor-pointer group"
-        >
-            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 group-hover:text-stone-300 transition-colors">{label}</span>
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl border border-white/10 shrink-0 shadow-inner relative overflow-hidden bg-stone-900 group-hover:scale-105 transition-transform">
-                    <SlideBackground background={effectiveLayers} />
-                </div>
-            </div>
-
-            <FloatingPopover
-                isOpen={isOpen}
-                onClose={() => setIsOpen(false)}
-                anchorRef={triggerRef}
-                title={label}
-                width={320}
-            >
-                <div className="h-[450px]">
-                    <BackgroundPicker
-                        background={effectiveLayers}
-                        onChange={onChange}
-                        hideLayerStack={true}
-                    />
-                </div>
-            </FloatingPopover>
-        </div>
-    );
-};
+import { ITimerAction, ITimerTrigger } from '@/core/types/timer';
+import { TimerTriggerItem } from './TimerTriggerItem';
+import { TimerFillPicker } from './TimerFillPicker';
 
 interface ITimerTabContentProps {
     selectedSlide: ISlide;
@@ -93,12 +45,16 @@ interface ITimerTabContentProps {
 export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
     selectedSlide, updateTimerSettings, openModal, t,
 }) => {
+    const slides = usePresentationStore(state => state.activePresentation?.slides || []);
     // TimerTabContent is primarily designed for normal slides with timer overlays
     if (selectedSlide.type !== 'normal' && selectedSlide.type !== 'timer') return null;
-    
-    // Casting to any to access timerSettings which should be present on normal slides
-    // or we might need to handle ITimerSlide separately if it evolves
-    const ts = (selectedSlide as any).timerSettings as ITimerSettings | undefined;
+
+    // Timer settings are present on normal slides (as overlay) and timer slides (as core)
+    const ts = selectedSlide.type === 'normal' 
+        ? (selectedSlide as ICanvasSlide).timerSettings 
+        : selectedSlide.type === 'timer' 
+            ? (selectedSlide as unknown as ITimerSettings)
+            : undefined;
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -106,6 +62,9 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
             coordinateGetter: sortableKeyboardCoordinates,
         })
     );
+
+    const [localMins, setLocalMins] = React.useState<string | null>(null);
+    const [localSecs, setLocalSecs] = React.useState<string | null>(null);
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
@@ -142,15 +101,15 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
             const files = e.dataTransfer.files;
             if (files && files.length > 0) {
                 const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
-                const newIds: string[] = [];
+                if (audioFiles.length === 0) return;
 
-                for (const file of audioFiles) {
-                    // Use path if available (Electron) to allow local-resource:// resolution, 
-                    // otherwise let importMediaBlob handle it as a naked Blob which is safer than a temporary blob: URL.
-                    const path = (file as any).path || null;
-                    const id = await MediaPersistenceService.importMediaBlob(file, path, 'audio');
-                    if (id) newIds.push(id);
-                }
+                const batchItems = audioFiles.map(file => ({
+                    file,
+                    path: (file as File & { path?: string }).path || null,
+                    type: 'audio' as const
+                }));
+
+                const newIds = await MediaPersistenceService.importMediaBatch(batchItems);
 
                 if (newIds.length > 0) {
                     const current = ts?.playlist || [];
@@ -192,14 +151,16 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                         <input
                             type="text"
                             inputMode="numeric"
-                            value={Math.floor((ts?.duration || 0) / 60) === 0 ? '' : Math.floor((ts?.duration || 0) / 60)}
+                            value={localMins !== null ? localMins : Math.floor((ts?.duration || 0) / 60)}
                             placeholder="0"
                             onChange={(e) => {
                                 const val = e.target.value.replace(/[^0-9]/g, '');
+                                setLocalMins(val);
                                 const mins = parseInt(val) || 0;
                                 const secs = (ts?.duration || 0) % 60;
                                 updateTimerSettings(selectedSlide.id, { duration: mins * 60 + secs });
                             }}
+                            onBlur={() => setLocalMins(null)}
                             className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none placeholder:text-white/10"
                         />
                     </div>
@@ -208,15 +169,17 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                         <input
                             type="text"
                             inputMode="numeric"
-                            value={(ts?.duration || 0) % 60 === 0 ? '' : (ts?.duration || 0) % 60}
+                            value={localSecs !== null ? localSecs : (ts?.duration || 0) % 60}
                             placeholder="0"
                             onChange={(e) => {
                                 const val = e.target.value.replace(/[^0-9]/g, '');
+                                setLocalSecs(val);
                                 let secs = parseInt(val) || 0;
                                 if (secs > 59) secs = 59;
                                 const mins = Math.floor((ts?.duration || 0) / 60);
                                 updateTimerSettings(selectedSlide.id, { duration: mins * 60 + secs });
                             }}
+                            onBlur={() => setLocalSecs(null)}
                             className="w-full bg-transparent text-sm font-mono font-bold text-white focus:outline-none placeholder:text-white/10"
                         />
                     </div>
@@ -342,9 +305,11 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                                 updateTimerSettings(selectedSlide.id, { playlist: Array.from(new Set([...current, ...ids])) });
                             }
                         })}
-                        className="p-1.5 hover:bg-accent/10 rounded-lg text-accent transition-all active:scale-95 group cursor-pointer"
+                        className="p-1.5 bg-accent/10 border border-accent/20 rounded-lg text-accent hover:bg-accent/20 transition-all active:scale-95 cursor-pointer"
+                        title={t('import_file', 'Import File')}
+                        aria-label={t('import_file', 'Import File')}
                     >
-                        <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                        <Import className="w-4 h-4" />
                     </button>
                 </div>
                 <div
@@ -377,7 +342,7 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                                                 updateTimerSettings(selectedSlide.id, { playlist: p });
                                             }}
                                             onReplace={handleReplaceAudio}
-                                            t={t as never}
+                                            t={(key, fallback) => t(key, fallback) as string}
                                         />
                                     ))}
                                 </div>
@@ -406,9 +371,8 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                             updateTimerSettings(selectedSlide.id, {
                                 triggers: [...current, {
                                     id: crypto.randomUUID(),
-                                    type: 'on_end' as never,
-                                    value: 0,
-                                    actions: [{ id: crypto.randomUUID(), type: 'next_slide' as never }]
+                                    type: 'on_end',
+                                    actions: [{ id: crypto.randomUUID(), type: 'next_slide' }]
                                 }]
                             });
                         }}
@@ -418,58 +382,18 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
                     </button>
                 </div>
                 {(ts?.triggers || []).map((trigger, idx) => (
-                    <div key={idx} className="bg-black/40 rounded-3xl border border-white/5 overflow-hidden shadow-inner p-4 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="w-6 h-6 rounded-lg bg-accent/10 flex items-center justify-center border border-accent/20">
-                                    <Zap className="w-3 h-3 text-accent" />
-                                </div>
-                                <span className="text-[11px] font-black uppercase tracking-widest text-white">#{idx + 1}</span>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    const p = [...(ts?.triggers || [])];
-                                    p.splice(idx, 1);
-                                    updateTimerSettings(selectedSlide.id, { triggers: p });
-                                }}
-                                className="p-1.5 hover:bg-red-500/20 text-stone-600 hover:text-red-400 rounded-lg transition-all cursor-pointer"
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase tracking-widest text-stone-600 px-1">{t('trigger', 'When')}</label>
-                                <select
-                                    value={trigger.type || 'on_end'}
-                                    onChange={(e) => {
-                                        const p = [...(ts?.triggers || [])];
-                                        p[idx] = { ...p[idx], type: e.target.value as never };
-                                        updateTimerSettings(selectedSlide.id, { triggers: p });
-                                    }}
-                                    className="w-full bg-stone-900/50 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-accent/40"
-                                >
-                                    <option value="on_start">{t('on_start', 'On Start')}</option>
-                                    <option value="on_end">{t('on_end', 'On End')}</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[9px] font-black uppercase tracking-widest text-stone-600 px-1">{t('action', 'Do')}</label>
-                                <select
-                                    value={trigger.actions?.[0]?.type || 'next_slide'}
-                                    onChange={(e) => {
-                                        const p = [...(ts?.triggers || [])];
-                                        p[idx] = { ...p[idx], actions: [{ id: crypto.randomUUID(), type: e.target.value as never }] };
-                                        updateTimerSettings(selectedSlide.id, { triggers: p });
-                                    }}
-                                    className="w-full bg-stone-900/50 border border-white/5 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-accent/40"
-                                >
-                                    <option value="next_slide">{t('next_slide', 'Next Slide')}</option>
-                                    <option value="change_bg">{t('change_bg', 'Change Background')}</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
+                    <TimerTriggerItem
+                        key={trigger.id || idx}
+                        trigger={trigger}
+                        idx={idx}
+                        ts={ts}
+                        selectedSlideId={selectedSlide.id}
+                        updateTimerSettings={updateTimerSettings}
+                        sensors={sensors}
+                        openModal={openModal}
+                        t={t}
+                        slides={slides}
+                    />
                 ))}
             </div>
         </div>

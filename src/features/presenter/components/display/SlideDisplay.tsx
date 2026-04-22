@@ -144,7 +144,9 @@ const SlideDisplay: React.FC<SlideDisplayProps> = (props) => {
     const baseGap = 32;
     let pr = baseGap;
     let pt = 80;
-    let pb = 276;
+    // In presentation mode the timeline is always 300px (252+48).
+    // Add baseGap so the slide preview never overlaps the timeline.
+    let pb = appMode === 'presentation' ? 300 + baseGap : 48;
     let pl = baseGap;
 
     if (appMode === 'presentation') {
@@ -223,11 +225,11 @@ const SlideDisplay: React.FC<SlideDisplayProps> = (props) => {
         <SlideBackground background={settings?.background} />
         <div className="relative z-10 w-full h-full">
           {prevSlideState && (
-            <div key={prevSlideState.key} className="absolute inset-0 z-0 pointer-events-none">
+            <div key={prevSlideState.key} className="absolute inset-0 z-0 pointer-events-none overflow-visible">
               {prevSlideState.content}
             </div>
           )}
-          <div key={currentKey} className="absolute inset-0 z-10 pointer-events-auto">
+          <div key={currentKey} className="absolute inset-0 z-10 pointer-events-auto overflow-visible">
             {content}
           </div>
         </div>

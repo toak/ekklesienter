@@ -98,51 +98,6 @@ export const AdvancedTextSettings: React.FC<IAdvancedTextSettingsProps> = ({
                             ))}
                         </div>
                     </div>
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{t('underline_style', 'Underline Style')}</span>
-                            <div className="flex bg-black/40 p-1 rounded-lg border border-white/5 gap-0.5 min-w-[100px]">
-                                {(['straight', 'wavy'] as const).map((val) => (
-                                    <button
-                                        key={val}
-                                        onClick={() => {
-                                            if (editingId && selectedIds.includes(editingId)) {
-                                                setTextCommand({ command: 'underlineStyle', value: val, timestamp: Date.now() });
-                                            }
-                                            updateCanvasItems(selectedIds, { text: { ...txt, underlineStyle: val as never } });
-                                        }}
-                                        onMouseDown={(e) => e.preventDefault()}
-                                        className={cn(
-                                            "flex-1 py-1 rounded-[4px] text-[8px] font-bold transition-all uppercase tracking-tight cursor-pointer",
-                                            (txt.underlineStyle || 'straight') === val ? "bg-accent text-white" : "text-stone-500 hover:text-stone-300"
-                                        )}
-                                        title={val}
-                                    >
-                                        {val}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="flex items-center justify-between pt-1">
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{t('skip_ink', 'Skip Ink')}</span>
-                                <p className="text-[8px] text-stone-600 leading-tight max-w-[140px]">{t('skip_ink_desc', 'Skips underline under descenders (g, p, y)')}</p>
-                            </div>
-                            <button
-                                onClick={() => {
-                                    const next = txt.underlineSkipInk === 'none' ? 'ink' : 'none';
-                                    updateCanvasItems(selectedIds, { text: { ...txt, underlineSkipInk: next } });
-                                }}
-                                onMouseDown={(e) => e.preventDefault()}
-                                className={cn(
-                                    "w-7 h-4 rounded-full transition-colors relative shrink-0 cursor-pointer",
-                                    txt.underlineSkipInk === 'none' ? "bg-stone-700" : "bg-accent"
-                                )}
-                            >
-                                <div className={cn("absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform", txt.underlineSkipInk !== 'none' && "translate-x-3")} />
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </FloatingPopover>
         </>

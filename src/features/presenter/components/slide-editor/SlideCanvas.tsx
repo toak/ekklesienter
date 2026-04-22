@@ -210,7 +210,7 @@ const SlideCanvas: React.FC<SlideCanvasProps> = ({ slideId, canvasItems }) => {
                         key={item.id}
                         id={`item-${item.id}`}
                         className={cn(
-                            "absolute",
+                            "absolute overflow-visible",
                             (item.locked || canvasTool === 'pan') && "pointer-events-none opacity-60",
                             isEditing && "z-50"
                         )}

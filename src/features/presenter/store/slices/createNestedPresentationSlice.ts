@@ -5,6 +5,7 @@ import { toast } from '@/core/utils/toast';
 import i18n from '@/core/i18n';
 
 export const createNestedPresentationSlice: PresentationSliceCreator = (set, get) => ({
+    nestedPresentationsCache: {},
     toggleSlideExpansion: async (slideId) => {
         const { activePresentationId, activePresentation } = get();
         if (!activePresentationId || !activePresentation) return;
@@ -45,18 +46,37 @@ export const createNestedPresentationSlice: PresentationSliceCreator = (set, get
         const { activePresentationId, activePresentation, activeServiceId } = get();
         if (!activePresentationId || !activePresentation || !activeServiceId) return;
 
+        // Prevent recursive nesting (adding current presentation to its own timeline)
+        if (presentationId === activePresentationId) {
+            toast.error(i18n.t('error_recursive_nesting', 'Cannot add a presentation to itself'));
+            return;
+        }
+
         const libraryPres = await db.presentationFiles.get(presentationId);
         if (!libraryPres) return;
 
         try {
-            const snapshotPresId = await get().createPresentation(`${libraryPres.name} (Snapshot)`, { serviceId: activeServiceId });
-            
-            const processedSlides = libraryPres.slides.map((s, i) => ({
-                ...s,
-                id: crypto.randomUUID(),
-                order: i
-            }));
-            await get().updatePresentationSlides(snapshotPresId, processedSlides);
+            let masterPresentationId: string;
+            let linkedPresentationId: string | undefined;
+
+            // If this presentation already belongs to the current service, use it directly
+            if (libraryPres.serviceId === activeServiceId) {
+                masterPresentationId = presentationId;
+                linkedPresentationId = undefined; // Already in service, no need to link for sync
+            } else {
+                // Otherwise create a snapshot to "import" it into this service
+                const snapshotPresId = await get().createPresentation(`${libraryPres.name} (Snapshot)`, { serviceId: activeServiceId });
+                
+                const processedSlides = libraryPres.slides.map((s, i) => ({
+                    ...s,
+                    id: crypto.randomUUID(),
+                    order: i
+                }));
+                await get().updatePresentationSlides(snapshotPresId, processedSlides);
+                
+                masterPresentationId = snapshotPresId;
+                linkedPresentationId = presentationId;
+            }
 
             const newSlide: ISlide = {
                 id: crypto.randomUUID(),
@@ -65,8 +85,8 @@ export const createNestedPresentationSlice: PresentationSliceCreator = (set, get
                 blockId: 'master-presentation',
                 templateId: 'default',
                 content: { variables: {} },
-                masterPresentationId: snapshotPresId,
-                linkedPresentationId: presentationId,
+                masterPresentationId,
+                linkedPresentationId,
                 lastSyncedAt: libraryPres.updatedAt ? new Date(libraryPres.updatedAt).toISOString() : new Date().toISOString(),
                 isExpanded: true
             } as any;
@@ -123,5 +143,14 @@ export const createNestedPresentationSlice: PresentationSliceCreator = (set, get
 
     saveNestedChanges: async (options) => {
         const { syncBack } = options;
+    },
+    
+    setCachedNestedPresentation: (id, presentation) => {
+        set((state) => ({
+            nestedPresentationsCache: {
+                ...state.nestedPresentationsCache,
+                [id]: presentation
+            }
+        }));
     },
 });

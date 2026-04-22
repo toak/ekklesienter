@@ -1,7 +1,7 @@
 export type CanvasItemType = 'text' | 'image' | 'video' | 'shape' | 'stroke' | 'effect';
 export type ShapeType = 'rect' | 'circle' | 'triangle' | 'star' | 'diamond';
 export type EffectType = 'glow' | 'shadow' | 'blur' | 'vignette';
-export type CanvasEffectType = 'drop-shadow' | 'inner-shadow' | 'layer-blur' | 'background-blur';
+export type CanvasEffectType = 'drop-shadow' | 'inner-shadow' | 'layer-blur' | 'background-blur' | 'noise';
 
 export type TextResizingMode = 'auto-width' | 'auto-height' | 'fixed' | 'shrink-to-fit';
 export type TextAlignHorizontal = 'left' | 'center' | 'right' | 'justify';
@@ -83,6 +83,8 @@ export interface ICanvasEffect {
   blur?: number;
   spread?: number;
   color?: string;
+  noiseScale?: number;
+  noiseSoftness?: number;
 }
 
 export interface ICanvasItem {
@@ -106,6 +108,9 @@ export interface ICanvasItem {
   borderColor?: string;
   borderWidth?: number;
   strokeAlign?: 'inside' | 'center' | 'outside';
+  strokeJoin?: 'round' | 'bevel' | 'miter';
+  strokeLinecap?: 'butt' | 'round' | 'square';
+  strokeDashArray?: string;
   strokes: IStyleLayer[];
   zIndex: number;
   locked: boolean;
@@ -121,4 +126,7 @@ export interface ICanvasItem {
   shape?: ICanvasItemShape;
   stroke?: ICanvasItemStroke;
   effect?: ICanvasItemEffect;
+  // Media references for image/video canvas items
+  image?: { id: string; url?: string; name?: string; isFromDb?: boolean };
+  video?: { id: string; url?: string; name?: string; isFromDb?: boolean };
 }

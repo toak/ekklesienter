@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { ICanvasItem } from '@/core/types';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -27,6 +28,7 @@ export interface ILayerRowProps {
 }
 
 export const LayerRow: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect, onUpdate, onRemove }) => {
+    const { t } = useTranslation();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
 
@@ -35,9 +37,9 @@ export const LayerRow: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect,
     const getLabel = () => {
         if (item.type === 'text' && item.text?.content) {
             const stripped = item.text.content.replace(/<[^>]*>/g, '').trim();
-            return stripped.length > 22 ? stripped.slice(0, 22) + '…' : stripped || 'Text';
+            return stripped.length > 22 ? stripped.slice(0, 22) + '…' : stripped || t('type_text');
         }
-        return item.type.charAt(0).toUpperCase() + item.type.slice(1);
+        return t(`layer_type_${item.type}`, { defaultValue: item.type.charAt(0).toUpperCase() + item.type.slice(1) });
     };
 
     return (
@@ -94,7 +96,7 @@ export const LayerRow: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect,
                             ? "text-stone-600 hover:text-stone-400"
                             : "text-stone-400 hover:text-stone-200 hover:bg-white/5"
                     )}
-                    title={item.visible === false ? 'Show' : 'Hide'}
+                    title={item.visible === false ? t('show') : t('hide')}
                 >
                     {item.visible === false
                         ? <EyeOff className="w-3 h-3" />
@@ -109,14 +111,14 @@ export const LayerRow: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect,
                             ? "text-accent"
                             : "text-stone-500 hover:text-stone-300 hover:bg-white/5"
                     )}
-                    title={item.locked ? 'Unlock' : 'Lock'}
+                    title={item.locked ? t('unlock') : t('lock')}
                 >
                     {item.locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
                 </button>
                 <button
                     onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
                     className="p-1 rounded-md text-stone-600 hover:text-red-400 hover:bg-red-500/10 transition-all cursor-pointer"
-                    title="Delete"
+                    title={t('delete')}
                 >
                     <Trash2 className="w-3 h-3" />
                 </button>

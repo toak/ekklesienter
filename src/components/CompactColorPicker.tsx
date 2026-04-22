@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/core/utils/cn';
 import { FloatingPopover } from './FloatingPopover';
 
@@ -71,6 +72,7 @@ export const CompactColorPicker: React.FC<CompactColorPickerProps> = ({
     label,
     className
 }) => {
+    const { t } = useTranslation();
     const [isOpen, setIsOpen] = useState(false);
     const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -98,7 +100,7 @@ export const CompactColorPicker: React.FC<CompactColorPickerProps> = ({
                 isOpen={isOpen}
                 onClose={() => setIsOpen(false)}
                 anchorRef={triggerRef}
-                title="Pick Color"
+                title={t('pick_color')}
                 width={280}
             >
                 <div className="p-1">

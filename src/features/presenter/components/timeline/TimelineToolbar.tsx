@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layers, Plus, BookOpen, Timer, Unlink2, Film } from 'lucide-react';
+import { Layers, Plus, BookOpen, Timer, Unlink2, Film, Smartphone } from 'lucide-react';
 import { TFunction } from 'i18next';
 import { ModalType } from '@/core/store/modalStore';
 

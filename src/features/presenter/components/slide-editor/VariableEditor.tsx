@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { ICanvasSlide } from '@/core/types';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '@/core/db';
+import { PresentationDataService } from '@/features/presenter/services/PresentationDataService';
 import { Type, Subtitles, AlignLeft, Layout, Settings2, Layers, Music, Plus } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 
@@ -12,7 +12,7 @@ const VariableEditor: React.FC = () => {
     const { activePresentationId, selectedPresentationId, previewSlideId, updateSlideVariable } = usePresentationStore();
 
     const presentation = useLiveQuery(
-        () => selectedPresentationId ? db.presentationFiles.get(selectedPresentationId) : undefined,
+        () => selectedPresentationId ? PresentationDataService.getPresentation(selectedPresentationId) : undefined,
         [selectedPresentationId]
     );
 

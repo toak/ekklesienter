@@ -67,22 +67,22 @@ export const getSystemFonts = async (): Promise<string[]> => {
 /**
  * Maps a weight value (e.g. '700', '400 italic') to a human-readable name (e.g. 'Bold', 'Italic').
  */
-export const getWeightName = (weight: string) => {
-    if (!weight) return 'Regular';
+export const getWeightName = (weight: string, t?: (key: string) => string) => {
+    if (!weight) return t ? t('weight_regular') : 'Regular';
     const parts = weight.toString().toLowerCase().split(' ');
     const w = parts[0];
     const isItalic = parts.includes('italic') || parts.includes('oblique');
 
     const weightMap: Record<string, string> = {
-        '100': 'Thin',
-        '200': 'Extra Light',
-        '300': 'Light',
-        '400': 'Regular',
-        '500': 'Medium',
-        '600': 'Semi Bold',
-        '700': 'Bold',
-        '800': 'Extra Bold',
-        '900': 'Black',
+        '100': 'thin',
+        '200': 'extra_light',
+        '300': 'light',
+        '400': 'regular',
+        '500': 'medium',
+        '600': 'semi_bold',
+        '700': 'bold',
+        '800': 'extra_bold',
+        '900': 'black',
     };
 
     // If it's already a name (for system fonts), just return it
@@ -90,10 +90,12 @@ export const getWeightName = (weight: string) => {
         return weight;
     }
 
-    let name = weightMap[w] || w;
+    const key = weightMap[w];
+    let name = (t && key) ? t(`weight_${key}`) : (key ? key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : w);
+
     if (isItalic) {
-        if (name === 'Regular') return 'Italic';
-        return `${name} Italic`;
+        if (key === 'regular') return t ? t('italic') : 'Italic';
+        return t ? `${name} ${t('italic')}` : `${name} Italic`;
     }
     return name;
 };

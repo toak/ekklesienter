@@ -13,9 +13,14 @@ import { useLogoUrl } from '@/core/hooks/useLogoUrl';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
 import { PresenterService } from '../../services/presenterService';
 import { IpcService } from '@/core/services/IpcService';
+import { useAudioSync } from '@/app/hooks/useAudioSync';
+import { usePresentationStore } from '../../store/presentationStore';
 
 const ProjectorView: React.FC = () => {
     const { t } = useTranslation();
+    
+    // Background Audio Sync (Active playback on projector)
+    useAudioSync(true);
     const [verse, setVerse] = useState<Verse | null>(null);
     const [multiVerses, setMultiVerses] = useState<Verse[] | null>(null);
     const [isMultiVerseMode, setIsMultiVerseMode] = useState(false);
@@ -116,12 +121,24 @@ const ProjectorView: React.FC = () => {
                     setVerse(null);
                     setMultiVerses(null);
                     setIsMultiVerseMode(false);
-                    // When a slide goes live, it might have been the preview slide.
-                    // We don't cleared previewSlide here to avoid unmounting it if it's the same,
-                    // but usually the master will send a new preview slide anyway.
+                    // Update store locally so useAudioSync knows what's live
+                    usePresentationStore.getState().setLiveSlide(
+                        payload.slide.id, 
+                        payload.presentationId,
+                        payload.rootPresentationId,
+                        payload.navigationParentSlideId
+                    );
                     break;
                 case 'show-preview-slide':
                     setPreviewSlide(payload.slide);
+                    if (payload.slide) {
+                        usePresentationStore.getState().setPreviewSlide(
+                            payload.slide.id, 
+                            payload.presentationId,
+                            payload.rootPresentationId,
+                            payload.navigationParentSlideId
+                        );
+                    }
                     break;
                 case 'set-app-mode':
                     setAppMode(payload);
@@ -147,7 +164,7 @@ const ProjectorView: React.FC = () => {
                     break;
                 case 'sync-state':
                 case 'update-settings':
-                    console.log('[Projector] Received settings update:', payload);
+                    // Receive settings update
                     const logoId = payload.logo?.activeLogoId;
                     if (logoId) {
                         const active = findLogo(logoId, payload.logo);

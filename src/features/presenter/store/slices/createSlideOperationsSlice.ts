@@ -40,9 +40,10 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         await Promise.all(pres.slides.map(s => get().takeSnapshot(s.id)));
 
         const original = pres.slides[slideIdx];
+        const newId = crypto.randomUUID();
         const newSlide: ISlide = {
             ...original,
-            id: crypto.randomUUID(),
+            id: newId,
             order: slideIdx + 1,
             isExpanded: false,
         };
@@ -61,6 +62,21 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const newSlides = [...pres.slides];
         newSlides.splice(slideIdx + 1, 0, newSlide);
 
+        // Duplicate associated audio scopes
+        const scopes = await db.audioScopes.where({ startSlideId: slideId }).toArray();
+        for (const scope of scopes) {
+            const length = pres.slides.findIndex(s => s.id === scope.endSlideId) - pres.slides.findIndex(s => s.id === scope.startSlideId);
+            const targetEndIdx = (slideIdx + 1) + (length > 0 ? length : 0);
+            const finalEndIdx = Math.min(newSlides.length - 1, targetEndIdx);
+            
+            await db.audioScopes.add({
+                ...structuredClone(scope),
+                id: crypto.randomUUID(),
+                startSlideId: newId,
+                endSlideId: newSlides[finalEndIdx].id
+            });
+        }
+
         const ordered = newSlides.map((s, i) => ({ ...s, order: i }));
         await get().updatePresentationSlides(presentationId, ordered);
 
@@ -78,21 +94,23 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
 
         const newSlides = [...pres.slides];
         const createdSlideIds: string[] = [];
+        const slideIdMap = new Map<string, string>();
 
-        const sortedSlideIds = [...slideIds].sort((a, b) => {
-            return pres.slides.findIndex(s => s.id === a) - pres.slides.findIndex(s => s.id === b);
-        });
-
-        const sortedIndices = sortedSlideIds.map(id => pres.slides.findIndex(s => s.id === id)).sort((a, b) => a - b);
+        const sortedIndices = slideIds.map(id => pres.slides.findIndex(s => s.id === id)).sort((a, b) => a - b);
         const lastIdx = sortedIndices[sortedIndices.length - 1];
         let insertionIdx = lastIdx + 1;
 
-        for (const slideId of sortedSlideIds) {
+        // Collect scopes to potentially duplicate
+        const allScopes = await db.audioScopes.where('presentationId').equals(presentationId).toArray();
+
+        for (const slideId of slideIds.sort((a, b) => pres.slides.findIndex(s => s.id === a) - pres.slides.findIndex(s => s.id === b))) {
             const original = pres.slides.find(s => s.id === slideId);
             if (!original) continue;
 
+            const newId = crypto.randomUUID();
+            slideIdMap.set(slideId, newId);
             const newSlide: ISlide = structuredClone(original);
-            newSlide.id = crypto.randomUUID();
+            newSlide.id = newId;
             newSlide.isExpanded = false;
 
             if (newSlide.type === 'normal' && newSlide.content && newSlide.content.canvasItems) {
@@ -105,6 +123,35 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
             newSlides.splice(insertionIdx, 0, newSlide);
             createdSlideIds.push(newSlide.id);
             insertionIdx++;
+        }
+
+        // Duplicate audio scopes that start on duplicated slides
+        for (const slideId of slideIdMap.keys()) {
+            const scopes = allScopes.filter(s => s.startSlideId === slideId);
+            for (const scope of scopes) {
+                const startIdx = pres.slides.findIndex(s => s.id === scope.startSlideId);
+                const endIdx = pres.slides.findIndex(s => s.id === scope.endSlideId);
+                const length = endIdx - startIdx;
+                
+                const newStartId = slideIdMap.get(slideId)!;
+                // If the end slide is also being duplicated, link it to the new end slide
+                // Otherwise, link it by distance in the NEW total list
+                let newEndId: string;
+                if (slideIdMap.has(scope.endSlideId)) {
+                    newEndId = slideIdMap.get(scope.endSlideId)!;
+                } else {
+                    const newStartInTotal = newSlides.findIndex(s => s.id === newStartId);
+                    const targetEndInTotal = Math.min(newSlides.length - 1, newStartInTotal + length);
+                    newEndId = newSlides[targetEndInTotal].id;
+                }
+
+                await db.audioScopes.add({
+                    ...structuredClone(scope),
+                    id: crypto.randomUUID(),
+                    startSlideId: newStartId,
+                    endSlideId: newEndId
+                });
+            }
         }
 
         const ordered = newSlides.map((s, i) => ({ ...s, order: i }));
@@ -201,9 +248,16 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const slidesToPaste = sourcePres.slides.filter(s => clipboard.slideIds.includes(s.id));
         if (slidesToPaste.length === 0) return;
 
+        // Fetch related audio scopes from source
+        const sourceScopes = await db.audioScopes.where('presentationId').equals(clipboard.presentationId).toArray();
+        const relatedScopes = sourceScopes.filter(s => clipboard.slideIds.includes(s.startSlideId));
+
+        const slideIdMap = new Map<string, string>();
         const newSlidesToInsert: ISlide[] = slidesToPaste.map(s => {
             const cloned: ISlide = structuredClone(s);
-            cloned.id = crypto.randomUUID();
+            const newId = crypto.randomUUID();
+            slideIdMap.set(s.id, newId);
+            cloned.id = newId;
             if (cloned.type === 'normal' && cloned.content && cloned.content.canvasItems) {
                 cloned.content.canvasItems = cloned.content.canvasItems.map((item: any) => ({
                     ...item,
@@ -216,6 +270,32 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const updatedTargetSlides = [...targetPres.slides];
         const pasteIdx = targetIndex !== undefined ? targetIndex : updatedTargetSlides.length;
         updatedTargetSlides.splice(pasteIdx, 0, ...newSlidesToInsert);
+
+        // Paste audio scopes
+        for (const scope of relatedScopes) {
+            const startIdx = sourcePres.slides.findIndex(s => s.id === scope.startSlideId);
+            const endIdx = sourcePres.slides.findIndex(s => s.id === scope.endSlideId);
+            const length = endIdx - startIdx;
+
+            const newStartId = slideIdMap.get(scope.startSlideId)!;
+            let newEndId: string;
+
+            if (slideIdMap.has(scope.endSlideId)) {
+                newEndId = slideIdMap.get(scope.endSlideId)!;
+            } else {
+                const newStartIdxInTarget = updatedTargetSlides.findIndex(s => s.id === newStartId);
+                const targetEndIdxInTarget = Math.min(updatedTargetSlides.length - 1, newStartIdxInTarget + length);
+                newEndId = updatedTargetSlides[targetEndIdxInTarget].id;
+            }
+
+            await db.audioScopes.add({
+                ...structuredClone(scope),
+                id: crypto.randomUUID(),
+                presentationId,
+                startSlideId: newStartId,
+                endSlideId: newEndId
+            });
+        }
 
         const ordered = updatedTargetSlides.map((s, i) => ({ ...s, order: i }));
         await get().updatePresentationSlides(presentationId, ordered);

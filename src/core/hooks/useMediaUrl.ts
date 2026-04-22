@@ -45,7 +45,6 @@ export function useMediaUrl(item: IMediaItem | null | undefined) {
                 const dbItem = await db.mediaPool.get(item.id);
                 if (dbItem?.data) {
                     const blobUrl = URL.createObjectURL(dbItem.data);
-                    console.log(`[useMediaUrl] Created Blob URL: ${blobUrl} (Origin: ${window.location.origin}, ID: ${item.id})`);
                     currentUrl = blobUrl;
                     setUrl(blobUrl);
                     return;

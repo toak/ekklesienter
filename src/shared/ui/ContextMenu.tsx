@@ -64,7 +64,7 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, onClose, children }) =>
         <div
             ref={menuRef}
             className={cn(
-                "fixed z-100 min-w-[200px] bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl py-2 overflow-hidden transition-opacity duration-200",
+                "fixed z-[1000000] min-w-[200px] bg-stone-900/80 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl py-2 overflow-hidden transition-opacity duration-200",
                 isVisible ? "opacity-100" : "opacity-0",
                 "animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200"
             )}
@@ -87,7 +87,8 @@ export const ContextMenuItem: React.FC<{
     shortcut?: string;
     danger?: boolean;
     disabled?: boolean;
-}> = ({ icon, label, onClick, shortcut, danger, disabled }) => (
+    active?: boolean;
+}> = ({ icon, label, onClick, shortcut, danger, disabled, active }) => (
     <button
         onClick={(e) => {
             e.stopPropagation();
@@ -98,14 +99,19 @@ export const ContextMenuItem: React.FC<{
             "group w-full text-left px-4 py-2.5 text-xs font-bold transition-all duration-200 flex items-center gap-3 relative overflow-hidden",
             disabled
                 ? "opacity-40 cursor-not-allowed text-stone-500"
-                : danger
-                    ? "text-red-400 hover:bg-red-500/10 hover:text-red-300 pointer-events-auto"
-                    : "text-stone-300 hover:bg-accent/10 hover:text-accent pointer-events-auto"
+                : active
+                    ? "text-accent bg-accent/10 pointer-events-auto"
+                    : danger
+                        ? "text-red-400 hover:bg-red-500/10 hover:text-red-300 pointer-events-auto"
+                        : "text-stone-300 hover:bg-accent/10 hover:text-accent pointer-events-auto"
         )}
     >
         {/* Hover Indicator */}
         {!danger && !disabled && (
-            <div className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-accent rounded-r-full scale-y-0 group-hover:scale-y-100 transition-transform duration-200" />
+            <div className={cn(
+                "absolute left-0 top-1.5 bottom-1.5 w-1 bg-accent rounded-r-full transition-transform duration-200",
+                active ? "scale-y-100" : "scale-y-0 group-hover:scale-y-100"
+            )} />
         )}
 
         {icon && (

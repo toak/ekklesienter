@@ -12,6 +12,8 @@ import { CustomColorPicker } from '@/components/CustomColorPicker';
 import { CompactColorPicker } from '@/components/CompactColorPicker';
 import { GradientPicker } from '@/components/GradientPicker';
 import { db } from '@/core/db';
+import { BLEND_MODES } from '@/core/types/style';
+import DropdownSelector from '@/shared/ui/DropdownSelector';
 
 
 const PRESET_GRADIENTS = [
@@ -28,24 +30,6 @@ const PRESET_SOLID_COLORS = [
     '#064e3b', '#422006', '#451a03', '#7c2d12', '#991b1b', '#111827'
 ];
 
-const BLEND_MODES = [
-    { value: 'normal', label: 'Normal' },
-    { value: 'multiply', label: 'Multiply' },
-    { value: 'screen', label: 'Screen' },
-    { value: 'overlay', label: 'Overlay' },
-    { value: 'darken', label: 'Darken' },
-    { value: 'lighten', label: 'Lighten' },
-    { value: 'color-dodge', label: 'Color Dodge' },
-    { value: 'color-burn', label: 'Color Burn' },
-    { value: 'hard-light', label: 'Hard Light' },
-    { value: 'soft-light', label: 'Soft Light' },
-    { value: 'difference', label: 'Difference' },
-    { value: 'exclusion', label: 'Exclusion' },
-    { value: 'hue', label: 'Hue' },
-    { value: 'saturation', label: 'Saturation' },
-    { value: 'color', label: 'Color' },
-    { value: 'luminosity', label: 'Luminosity' },
-];
 
 import { SlideBackground } from './display/SlideBackground';
 
@@ -373,15 +357,16 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
                             <div className="flex items-center justify-between mb-1">
                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-500">{t('blending_mode', 'Blending Mode')}</label>
                             </div>
-                            <select
+                            <DropdownSelector
                                 value={activeLayer.blendMode}
-                                onChange={(e) => updateLayer(activeLayer.id, { blendMode: e.target.value })}
-                                className="w-full bg-black/40 border border-white/5 rounded-xl px-3 py-2 text-xs text-stone-300 focus:outline-none"
-                            >
-                                {BLEND_MODES.map(m => (
-                                    <option key={m.value} value={m.value}>{m.label}</option>
-                                ))}
-                            </select>
+                                onChange={(val) => updateLayer(activeLayer.id, { blendMode: val })}
+                                options={BLEND_MODES.map(m => ({
+                                    value: m.value,
+                                    label: t(`blend_mode.${m.value}`, m.label)
+                                }))}
+                                icon={<Layers className="w-4 h-4" />}
+                                className="py-2"
+                            />
 
                             <CustomSlider
                                 label={t('opacity')}
@@ -426,22 +411,17 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
                                     {/* Framing Options */}
                                     <div className="space-y-2">
                                         <label className="text-[9px] font-black uppercase tracking-[0.2em] text-stone-500">{t('framing', 'Framing')}</label>
-                                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 gap-0.5">
-                                            {(['fit', 'fill', 'stretch', 'tile'] as const).map((frame) => (
-                                                <button
-                                                    key={frame}
-                                                    onClick={() => updateLayer(activeLayer.id, { media: { ...activeLayer.media, framing: frame } })}
-                                                    className={cn(
-                                                        "flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer",
-                                                        (activeLayer.media?.framing || 'fill') === frame
-                                                            ? "bg-accent/10 text-accent shadow-[0_0_10px_rgba(234,179,8,0.1)] border border-accent/20"
-                                                            : "text-stone-500 hover:bg-white/2 hover:text-stone-300 border border-transparent"
-                                                    )}
-                                                >
-                                                    {t(frame, frame)}
-                                                </button>
-                                            ))}
-                                        </div>
+                                        <DropdownSelector
+                                            value={activeLayer.media?.framing || 'fill'}
+                                            onChange={(val) => updateLayer(activeLayer.id, { media: { ...activeLayer.media, framing: val as any } })}
+                                            options={[
+                                                { value: 'fill', label: t('fill', 'Fill') },
+                                                { value: 'fit', label: t('fit', 'Fit') },
+                                                { value: 'stretch', label: t('stretch', 'Stretch') },
+                                                { value: 'tile', label: t('tile', 'Tile') },
+                                            ]}
+                                            className="px-3 py-2"
+                                        />
                                     </div>
 
                                     {activeLayer.type === 'video' && (
@@ -509,16 +489,6 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({ background, 
                 )}
             </div>
 
-            {/* FIGMA-LIKE FOOTER */}
-            {!hideLayerStack && (
-                <div className="p-3 bg-black/40 border-t border-white/5 flex items-center justify-between mt-auto">
-                    <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                        <span className="text-[9px] font-bold text-stone-500 uppercase tracking-widest">{layers.length} {t('layers', 'Layers')}</span>
-                    </div>
-                    <div className="text-[9px] font-black text-stone-600 uppercase tracking-tighter">Ekklesienter Pro</div>
-                </div>
-            )}
         </div>
     );
 };

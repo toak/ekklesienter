@@ -108,7 +108,8 @@ export const VideoTabContent: React.FC<IVideoTabContentProps> = ({ settings, onU
    */
   const handleImportFile = useCallback(async () => {
     try {
-      let file: File | null = null;
+      const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+      let mediaId: string | null = null;
 
       if (IpcService.isElectron()) {
         const files = await IpcService.selectFile({
@@ -116,51 +117,40 @@ export const VideoTabContent: React.FC<IVideoTabContentProps> = ({ settings, onU
         });
         if (!files || files.length === 0) return;
         
-        const filePath = files[0];
-        const name = filePath.split(/[/\\]/).pop() || 'video.mp4';
-        
-        const fileData = await IpcService.invoke<{ data: Uint8Array; mimeType: string } | null>('read-file-data', filePath);
-        if (!fileData) throw new Error("Failed to read video file data");
-
-        file = new File([new Uint8Array(fileData.data)], name, { type: fileData.mimeType });
+        mediaId = await MediaPersistenceService.importMediaFromPath(files[0], 'video');
       } else {
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'video/*';
-        const picked = await new Promise<File | null>((resolve) => {
+        const file = await new Promise<File | null>((resolve) => {
           input.onchange = () => resolve(input.files?.[0] || null);
           input.click();
         });
-        file = picked;
+
+        if (!file) return;
+
+        // Size check (optional here as MediaPersistenceService doesn't enforce but we can)
+        if (file.size > VIDEO_MAX_FILE_SIZE) {
+          toast.error(t('video_too_large', 'Video file exceeds the 500 MB limit'));
+          return;
+        }
+
+        mediaId = await MediaPersistenceService.importMediaBlob(file, null, 'video');
       }
 
-      if (!file) return;
+      if (!mediaId) return;
 
-      // Size check
-      if (file.size > VIDEO_MAX_FILE_SIZE) {
-        toast.error(t('video_too_large', 'Video file exceeds the 500 MB limit'));
-        return;
+      // Extract poster frame for the UI
+      const item = await db.mediaPool.get(mediaId);
+      if (item?.data) {
+        const tempUrl = URL.createObjectURL(item.data);
+        const posterFrame = await extractPosterFrame(tempUrl);
+        URL.revokeObjectURL(tempUrl);
+        onUpdate({ mediaId, posterFrame });
+      } else {
+        onUpdate({ mediaId });
       }
 
-      // Store in media pool
-      const mediaId = crypto.randomUUID();
-      const blob = new Blob([await file.arrayBuffer()], { type: file.type || 'video/mp4' });
-
-      await db.mediaPool.add({
-        id: mediaId,
-        name: file.name,
-        path: `Imported/${file.name}`,
-        type: 'video',
-        data: blob,
-        createdAt: Date.now(),
-      });
-
-      // Extract poster frame
-      const tempUrl = URL.createObjectURL(blob);
-      const posterFrame = await extractPosterFrame(tempUrl);
-      URL.revokeObjectURL(tempUrl);
-
-      onUpdate({ mediaId, posterFrame });
       toast.success(t('video_imported', 'Video imported successfully'));
     } catch (error) {
       console.error('[VideoTabContent] Import failed:', error);
@@ -207,17 +197,18 @@ export const VideoTabContent: React.FC<IVideoTabContentProps> = ({ settings, onU
 
       // Add as a new trimmed copy to the pool
       const original = await db.mediaPool.get(settings.mediaId);
-      const newMediaId = crypto.randomUUID();
       const newName = original ? `${original.name} (Trimmed)` : 'Trimmed Video';
 
-      await db.mediaPool.add({
-        id: newMediaId,
-        name: newName,
-        path: `Trimmed/${newName}`,
-        type: 'video',
-        data: trimmedBlob,
-        createdAt: Date.now(),
-      });
+      const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
+      const newMediaId = await MediaPersistenceService.importMediaBlob(
+        trimmedBlob, 
+        newName, 
+        'video'
+      );
+
+      if (!newMediaId) {
+        throw new Error("Failed to persist trimmed video");
+      }
 
       // Extract new poster frame
       const tempUrl = URL.createObjectURL(trimmedBlob);

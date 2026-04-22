@@ -12,6 +12,7 @@ export interface Verse {
   chapter: number;
   verseNumber: number;
   text: string; // Markdown supported
+  words?: string[]; // Tokenized words for fast indexing
 }
 
 export interface Book {

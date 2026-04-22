@@ -37,5 +37,9 @@ export default {
     "no_results": "No results found",
     "search_hint": "Hint: Try \"Jn 3 16\"",
     "navigate": "Navigate",
-    "no_verse_selected_short": "No verse selected"
+    "no_verse_selected_short": "No verse selected",
+    "edit_verse": "Edit Verse",
+    "set_as_primary": "Set as Primary",
+    "set_as_secondary": "Set as Secondary",
+    "remove_secondary": "Remove Secondary"
 };

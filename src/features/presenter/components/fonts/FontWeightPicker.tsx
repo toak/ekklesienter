@@ -14,22 +14,22 @@ interface FontWeightPickerProps {
     className?: string;
 }
 
-const BUNDLED_WEIGHTS = [
-    { name: 'Thin', value: '100' },
-    { name: 'Extra Light', value: '200' },
-    { name: 'Light', value: '300' },
-    { name: 'Regular', value: '400' },
-    { name: 'Medium', value: '500' },
-    { name: 'Semi Bold', value: '600' },
-    { name: 'Bold', value: '700' },
-    { name: 'Extra Bold', value: '800' },
-    { name: 'Black', value: '900' },
-    { name: 'Thin Italic', value: '100 italic' },
-    { name: 'Light Italic', value: '300 italic' },
-    { name: 'Italic', value: '400 italic' },
-    { name: 'Medium Italic', value: '500 italic' },
-    { name: 'Bold Italic', value: '700 italic' },
-    { name: 'Black Italic', value: '900 italic' },
+const getBundledWeights = (t: any) => [
+    { name: t('weight_thin'), value: '100' },
+    { name: t('weight_extra_light'), value: '200' },
+    { name: t('weight_light'), value: '300' },
+    { name: t('weight_regular'), value: '400' },
+    { name: t('weight_medium'), value: '500' },
+    { name: t('weight_semi_bold'), value: '600' },
+    { name: t('weight_bold'), value: '700' },
+    { name: t('weight_extra_bold'), value: '800' },
+    { name: t('weight_black'), value: '900' },
+    { name: `${t('weight_thin')} ${t('italic')}`, value: '100 italic' },
+    { name: `${t('weight_light')} ${t('italic')}`, value: '300 italic' },
+    { name: t('italic'), value: '400 italic' },
+    { name: `${t('weight_medium')} ${t('italic')}`, value: '500 italic' },
+    { name: `${t('weight_bold')} ${t('italic')}`, value: '700 italic' },
+    { name: `${t('weight_black')} ${t('italic')}`, value: '900 italic' },
 ];
 
 export const FontWeightPicker: React.FC<FontWeightPickerProps> = ({
@@ -51,14 +51,19 @@ export const FontWeightPicker: React.FC<FontWeightPickerProps> = ({
 
             if (isBundled) {
                 const def = AVAILABLE_FONTS.find(f => f.name === family);
-                setAvailableStyles(def?.weights || BUNDLED_WEIGHTS);
+                // Map weights to localized names
+                const mappedWeights = (def?.weights || getBundledWeights(t)).map(w => ({
+                    ...w,
+                    name: getWeightName(w.value, t)
+                }));
+                setAvailableStyles(mappedWeights);
             } else {
                 const allData = await getSystemFontData();
                 const familyData = allData.filter(f => f.family === family);
 
                 if (familyData.length > 0) {
                     const styles = familyData.map(f => ({
-                        name: getWeightName(f.style),
+                        name: getWeightName(f.style, t),
                         value: f.style
                     }));
                     // De-duplicate if necessary and sort
@@ -70,7 +75,7 @@ export const FontWeightPicker: React.FC<FontWeightPickerProps> = ({
                     });
                     setAvailableStyles(uniqueStyles);
                 } else {
-                    setAvailableStyles(BUNDLED_WEIGHTS); // Fallback
+                    setAvailableStyles(getBundledWeights(t)); // Fallback
                 }
             }
             setLoading(false);
@@ -93,7 +98,7 @@ export const FontWeightPicker: React.FC<FontWeightPickerProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder={t('search_styles_placeholder') || "Search styles..."}
+                    placeholder={t('search_styles_placeholder')}
                     className="w-full bg-black/40 border border-white/5 rounded-lg py-1.5 pl-9 pr-8 text-[11px] text-stone-200 placeholder:text-stone-600 focus:outline-hidden focus:border-accent/40 transition-all font-sans"
                 />
                 {searchQuery && (
@@ -137,7 +142,7 @@ export const FontWeightPicker: React.FC<FontWeightPickerProps> = ({
                     </div>
                 ) : (
                     <div className="py-6 text-center opacity-30">
-                        <span className="text-[10px] uppercase tracking-widest font-black">No Styles Found</span>
+                        <span className="text-[10px] uppercase tracking-widest font-black">{t('no_styles_found')}</span>
                     </div>
                 )}
             </div>

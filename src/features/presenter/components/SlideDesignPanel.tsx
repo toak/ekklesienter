@@ -47,10 +47,10 @@ import { BackgroundPicker } from './slide-properties/BackgroundPicker';
 // ─── Tab definitions ───────────────────────────────────────────────────────
 type PanelTab = 'properties' | 'background' | 'layers' | 'audio' | 'timer' | 'transition' | 'video';
 
-const ALWAYS_TABS: { id: PanelTab; icon: React.ElementType; title: string }[] = [
-    { id: 'properties', icon: Palette, title: 'Properties' },
-    { id: 'background', icon: ImageIcon, title: 'Background' },
-    { id: 'layers', icon: Layers, title: 'Layers' },
+const getAlwaysTabs = (t: any): { id: PanelTab; icon: React.ElementType; title: string }[] => [
+    { id: 'properties', icon: Palette, title: t('properties', { defaultValue: 'Properties' }) },
+    { id: 'background', icon: ImageIcon, title: t('background', { defaultValue: 'Background' }) },
+    { id: 'layers', icon: Layers, title: t('layers', { defaultValue: 'Layers' }) },
 ];
 
 // ─── Main Panel ────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ const SlideDesignPanel: React.FC = () => {
         selectedAudioScopeId, selectAudioScope, activePresentation, selectedPresentation,
         updateAudioScope, removeAudioScope, applyBackgroundToAll, updateTimerSettings,
         updateSlideTransition, triggerTransitionPreview, updatePresentationEndTransition,
-        activePresentationId, updateVideoSettings,
+        activePresentationId, updateVideoSettings, takeSnapshot,
     } = usePresentationStore();
 
     const sensors = useSensors(
@@ -130,7 +130,8 @@ const SlideDesignPanel: React.FC = () => {
         if (!scope?.fileId) return undefined;
         const byId = await db.mediaPool.get(scope.fileId);
         if (byId) return byId;
-        return db.mediaPool.filter(item => item.path === scope.fileId).first();
+        // Optimization: use where('path').equals() instead of filter()
+        return db.mediaPool.where('path').equals(scope.fileId).first();
     }, [scope?.fileId]);
 
     // ─── Selection styles ───
@@ -139,11 +140,52 @@ const SlideDesignPanel: React.FC = () => {
         [selectedIds, localItems]
     );
 
+    // ─── Handlers ───
+    const handleUpdateItem = (id: string, updates: Partial<ICanvasItem>) => {
+        setLocalItems(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const newItem = { ...item, ...updates };
+            // Ensure nested objects are merged correctly in local state to prevent content loss
+            if (updates.text && item.text) {
+                newItem.text = { ...item.text, ...updates.text };
+            }
+            if (updates.shape && item.shape) {
+                newItem.shape = { ...item.shape, ...updates.shape };
+            }
+            return newItem;
+        }));
+        if (previewSlideId) updateCanvasItem(previewSlideId, id, updates);
+    };
+
+    const handleBatchUpdateByArray = useCallback(async (updates: Array<{ id: string; updates: Partial<ICanvasItem> }>) => {
+        // 1. Optimistic UI update — immediate feedback
+        setLocalItems(prev => prev.map(item => {
+            const update = updates.find(u => u.id === item.id);
+            if (!update) return item;
+
+            const newItem = { ...item, ...update.updates };
+            // Ensure nested objects are merged correctly in local state to prevent content loss
+            if (update.updates.text && item.text) {
+                newItem.text = { ...item.text, ...update.updates.text };
+            }
+            if (update.updates.shape && item.shape) {
+                newItem.shape = { ...item.shape, ...update.updates.shape };
+            }
+            return newItem;
+        }));
+
+        // 2. Background persistence with undo/redo support
+        if (previewSlideId) {
+            await takeSnapshot(previewSlideId);
+            batchUpdateCanvasItems(previewSlideId, updates);
+        }
+    }, [previewSlideId, takeSnapshot, batchUpdateCanvasItems]);
+
     const handleSelectionStyleUpdate = useCallback((oldLayer: IStyleLayer, updates: Partial<IStyleLayer>) => {
         if (!previewSlideId) return;
         const allUpdates = calculateStyleUpdates(selectedIds, localItems, oldLayer, updates);
-        if (allUpdates.length > 0) batchUpdateCanvasItems(previewSlideId, allUpdates);
-    }, [previewSlideId, selectedIds, localItems, batchUpdateCanvasItems]);
+        if (allUpdates.length > 0) handleBatchUpdateByArray(allUpdates);
+    }, [previewSlideId, selectedIds, localItems, handleBatchUpdateByArray]);
 
     // ─── Auto-tab switching ───
     useEffect(() => {
@@ -173,11 +215,6 @@ const SlideDesignPanel: React.FC = () => {
     // ─── Handlers ───
     const handleBgChange = (bg: IStyleLayer[]) => {
         if (previewSlideId) updateSlideBackground(previewSlideId, bg as never);
-    };
-
-    const handleUpdateItem = (id: string, updates: Partial<ICanvasItem>) => {
-        setLocalItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
-        if (previewSlideId) updateCanvasItem(previewSlideId, id, updates);
     };
 
     const handleRemoveItem = (itemId: string) => {
@@ -256,12 +293,12 @@ const SlideDesignPanel: React.FC = () => {
         (selectedSlide?.type === 'normal' && !!(selectedSlide as ICanvasSlide).timerSettings);
     const isVideoSlide = selectedSlide?.type === 'video';
     const contextTabs: { id: PanelTab; icon: React.ElementType; title: string }[] = [
-        ...(hasTimer ? [{ id: 'timer' as PanelTab, icon: Clock, title: 'Timer' }] : []),
-        ...(isVideoSlide ? [{ id: 'video' as PanelTab, icon: Film, title: 'Video' }] : []),
-        ...(selectedAudioScopeId ? [{ id: 'audio' as PanelTab, icon: Music, title: 'Audio' }] : []),
-        ...(selectedTransId ? [{ id: 'transition' as PanelTab, icon: ArrowRightLeft, title: 'Transition' }] : []),
+        ...(hasTimer ? [{ id: 'timer' as PanelTab, icon: Clock, title: t('timer', { defaultValue: 'Timer' }) }] : []),
+        ...(isVideoSlide ? [{ id: 'video' as PanelTab, icon: Film, title: t('video', { defaultValue: 'Video' }) }] : []),
+        ...(selectedAudioScopeId ? [{ id: 'audio' as PanelTab, icon: Music, title: t('audio', { defaultValue: 'Audio' }) }] : []),
+        ...(selectedTransId ? [{ id: 'transition' as PanelTab, icon: ArrowRightLeft, title: t('transition', { defaultValue: 'Transition' }) }] : []),
     ];
-    const allTabs = [...ALWAYS_TABS, ...contextTabs];
+    const allTabs = [...getAlwaysTabs(t), ...contextTabs];
     const safeTab = allTabs.some(t => t.id === activeTab as string) ? activeTab as string : 'properties';
 
     // Display items reversed (top layer first in UI, matching Figma convention)
@@ -278,7 +315,7 @@ const SlideDesignPanel: React.FC = () => {
             {/* ─── Header ─── */}
             <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-white/6 shrink-0">
                 <span className="text-[10px] font-black text-stone-500 uppercase tracking-[0.25em]">
-                    Design
+                    {t('design', { defaultValue: 'Design' })}
                 </span>
                 <button
                     onClick={() => {
@@ -340,8 +377,16 @@ const SlideDesignPanel: React.FC = () => {
                                             canvasItems={localItems}
                                             updateCanvasItems={(idList, updates) => {
                                                 setLocalItems(prev => prev.map(item => {
-                                                    if (idList.includes(item.id)) return { ...item, ...updates };
-                                                    return item;
+                                                    if (!idList.includes(item.id)) return item;
+                                                    const newItem = { ...item, ...updates };
+                                                    // Ensure nested objects are merged correctly in local state to prevent content loss
+                                                    if (updates.text && item.text) {
+                                                        newItem.text = { ...item.text, ...updates.text };
+                                                    }
+                                                    if (updates.shape && item.shape) {
+                                                        newItem.shape = { ...item.shape, ...updates.shape };
+                                                    }
+                                                    return newItem;
                                                 }));
                                                 
                                                 const allUpdates = idList.map(id => {
@@ -359,6 +404,7 @@ const SlideDesignPanel: React.FC = () => {
                                                 }).filter(Boolean) as Array<{ id: string; updates: Partial<ICanvasItem> }>;
                                                 if (allUpdates.length > 0) batchUpdateCanvasItems(previewSlideId!, allUpdates);
                                             }}
+                                            onBatchUpdate={handleBatchUpdateByArray}
                                             isPreview={true}
                                             t={t as never}
                                         />
@@ -435,10 +481,10 @@ const SlideDesignPanel: React.FC = () => {
                                             <Layers className="w-5 h-5 text-stone-700" />
                                         </div>
                                         <p className="text-[10px] text-stone-600 font-bold uppercase tracking-widest text-center">
-                                            No layers yet
+                                            {t('no_layers_yet', { defaultValue: 'No layers yet' })}
                                         </p>
                                         <p className="text-[9px] text-stone-700 text-center leading-relaxed max-w-[180px]">
-                                            Use the toolbar to add text, shapes, and images to this slide
+                                            {t('use_toolbar_hint', { defaultValue: 'Use the toolbar to add text, shapes, and images to this slide' })}
                                         </p>
                                     </div>
                                 ) : (
@@ -447,13 +493,13 @@ const SlideDesignPanel: React.FC = () => {
                                         {selectedIds.length > 1 && (
                                             <div className="flex items-center justify-between px-2 py-1.5 mb-2 bg-accent/8 border border-accent/15 rounded-xl">
                                                 <span className="text-[9px] font-bold text-accent uppercase tracking-wider">
-                                                    {selectedIds.length} selected
+                                                    {selectedIds.length} {t('selected', { defaultValue: 'selected' })}
                                                 </span>
                                                 <button
                                                     onClick={() => setSelectedIds([])}
                                                     className="text-[9px] text-stone-500 hover:text-stone-300 transition-colors cursor-pointer"
                                                 >
-                                                    Clear
+                                                    {t('clear', { defaultValue: 'Clear' })}
                                                 </button>
                                             </div>
                                         )}

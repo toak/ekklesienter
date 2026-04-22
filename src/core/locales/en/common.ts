@@ -1,4 +1,5 @@
 export default {
+    "loading": "Loading...",
     "cancel": "Cancel",
     "close": "Close",
     "none": "None",
@@ -121,5 +122,35 @@ export default {
     "category": "Category",
     "background": "Background",
     "select_block_hint_templates": "Select a block in the left panel to see its templates",
-    "type_here": "Type here..."
+    "type_here": "Type here...",
+    "search": {
+        "placeholder": "Search Bible, topics or phrases...",
+        "auto_corrected": "Auto-resolved reference:",
+        "undo": "Original query",
+        "range": "Passage Range",
+        "direct_jump": "Direct Jump",
+        "passages": "scripture passages",
+        "found_in": "Matched in",
+        "searching": "Searching...",
+        "no_results": "No matches found in this translation",
+        "recent": "Recent Activity",
+        "active": "Active",
+        "close": "Close",
+        "navigate": "Navigate",
+        "sections": {
+            "references": "References",
+            "topics": "Topics & Themes",
+            "keywords": "Keyword Matches"
+        },
+        "smart_tips": {
+            "title": "Smart Bible Intelligence"
+        },
+        "tips": {
+            "shorthand": "Type \"J316\" for John 3:16 or \"1 J 3 1\"",
+            "ranges": "Type \"Rom 8:28-39\" to select a passage",
+            "batch": "Use commas: \"Ps 23, Ps 91\" for multiple results",
+            "discovery": "Finding words in other translations works automatically!"
+        }
+    },
+    "file_missing": "File Missing"
 };

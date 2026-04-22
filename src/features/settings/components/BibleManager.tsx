@@ -2,11 +2,13 @@ import React, { useRef, useState, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
+import { BibleService } from '@/core/services/BibleService';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { Upload, Trash2, CheckCircle, AlertCircle, Loader2, BookOpen, Plus, Search, ChevronDown, ChevronRight, X } from 'lucide-react';
 import { BibleData } from '@/core/types';
 import ParserWorker from '@/core/workers/parser.worker?worker';
 import { cn } from '@/core/utils/cn';
+import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 
 /**
  * Helper to highlight search matches
@@ -28,23 +30,38 @@ const SearchHighlight: React.FC<{ text: string; query: string }> = ({ text, quer
 interface BibleRowProps {
     translation: any;
     isSelected: boolean;
+    isSecondary: boolean;
     searchQuery: string;
     onSelect: () => void;
+    onSelectSecondary: () => void;
     onDelete: (tId: string) => Promise<void>;
+    onContextMenu: (e: React.MouseEvent, translation: any) => void;
 }
 
-const BibleRow: React.FC<BibleRowProps> = ({ translation, isSelected, searchQuery, onSelect, onDelete }) => {
+const BibleRow: React.FC<BibleRowProps> = ({
+    translation,
+    isSelected,
+    isSecondary,
+    searchQuery,
+    onSelect,
+    onSelectSecondary,
+    onDelete,
+    onContextMenu
+}) => {
     const { t } = useTranslation();
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
     return (
         <div
             onClick={() => !isConfirmingDelete && onSelect()}
+            onContextMenu={(e) => onContextMenu(e, translation)}
             className={cn(
                 "group/row relative w-full h-16 rounded-xl px-4 flex items-center justify-between transition-all duration-300 cursor-pointer border",
                 isSelected
                     ? "bg-accent/10 border-accent/40 shadow-[0_0_20px_var(--accent-glow)] ring-1 ring-accent/20"
-                    : "bg-stone-900/40 border-white/5 hover:border-white/10 hover:bg-stone-800/60"
+                    : isSecondary
+                        ? "bg-blue-500/10 border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.15)] ring-1 ring-blue-500/20"
+                        : "bg-stone-900/40 border-white/5 hover:border-white/10 hover:bg-stone-800/60"
             )}
         >
             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -69,6 +86,11 @@ const BibleRow: React.FC<BibleRowProps> = ({ translation, isSelected, searchQuer
                         {isSelected && (
                             <span className="text-[10px] font-bold text-accent/60 uppercase tracking-widest flex items-center gap-1">
                                 <Plus className="w-2.5 h-2.5 rotate-45" /> {t('active')}
+                            </span>
+                        )}
+                        {isSecondary && (
+                            <span className="text-[10px] font-bold text-blue-400/60 uppercase tracking-widest flex items-center gap-1">
+                                <Plus className="w-2.5 h-2.5 rotate-45" /> {t('secondary', 'Secondary')}
                             </span>
                         )}
                     </div>
@@ -106,14 +128,15 @@ const BibleRow: React.FC<BibleRowProps> = ({ translation, isSelected, searchQuer
 
 const BibleManager: React.FC = () => {
     const { t } = useTranslation();
-    const { currentTranslationId, setTranslation } = useBibleStore();
-    const translations = useLiveQuery(() => db.translations.toArray()) || [];
+    const { currentTranslationId, secondTranslationId, setTranslation, setSecondTranslation } = useBibleStore();
+    const translations = useLiveQuery(() => BibleService.getAllTranslations()) || [];
 
     const [searchQuery, setSearchQuery] = useState('');
     const [openLangs, setOpenLangs] = useState<string[]>([]);
     const [importing, setImporting] = useState(false);
     const [progress, setProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; translation: any } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Grouping & Filtering Logic
@@ -149,23 +172,44 @@ const BibleManager: React.FC = () => {
                 const file = files[i];
                 setProgress({ current: i + 1, total: files.length, filename: file.name });
                 const worker = new ParserWorker();
-                const data = await new Promise<BibleData>((resolve, reject) => {
-                    worker.onmessage = (e) => {
-                        if (e.data.type === 'success') resolve(e.data.data);
-                        else if (e.data.type === 'error') reject(new Error(e.data.error));
-                        worker.terminate();
+
+                await new Promise<void>((resolve, reject) => {
+                    worker.onmessage = async (msg) => {
+                        const { type, data, error, progress: chunkProgress } = msg.data;
+
+                        try {
+                            if (type === 'metadata') {
+                                // Save translation info and books structure first
+                                await BibleService.saveTranslationAndBooks(data.translation, data.books);
+                            } else if (type === 'chunk') {
+                                // Save a block of verses (e.g. 2000 at a time)
+                                await BibleService.saveVerseChunk(data);
+                                // Update internal progress if needed (could show percentage in UI)
+                                if (chunkProgress !== undefined) {
+                                    // Optionally update progress UI with file internal percentage
+                                }
+                            } else if (type === 'success') {
+                                // Fallback for XML path which still returns full data, or just completion signal
+                                if (data) {
+                                     await BibleService.saveBibleData(data);
+                                }
+                                worker.terminate();
+                                resolve();
+                            } else if (type === 'error') {
+                                throw new Error(error);
+                            }
+                        } catch (e) {
+                            worker.terminate();
+                            reject(e);
+                        }
                     };
-                    worker.onerror = (err) => { reject(err); worker.terminate(); };
+                    worker.onerror = (err) => { worker.terminate(); reject(err); };
+
                     if (file.name.toLowerCase().endsWith('.xml')) {
                         file.text().then(text => worker.postMessage({ fileType: 'xml', content: text, fileName: file.name }));
                     } else if (file.name.toLowerCase().match(/\.sqlite3?$/)) {
                         file.arrayBuffer().then(buffer => worker.postMessage({ fileType: 'sqlite', content: buffer, fileName: file.name }));
                     } else reject(new Error(t('unsupported_format', 'Unsupported format')));
-                });
-                await db.transaction('rw', db.translations, db.books, db.verses, async () => {
-                    await db.translations.put(data.translation);
-                    await db.books.bulkPut(data.books);
-                    await db.verses.bulkPut(data.verses);
                 });
                 importedCount++;
             }
@@ -184,15 +228,23 @@ const BibleManager: React.FC = () => {
     };
 
     const handleDelete = async (tId: string) => {
-        await db.transaction('rw', db.translations, db.books, db.verses, async () => {
-            await db.translations.delete(tId);
-            await db.books.where('translationId').equals(tId).delete();
-            await db.verses.where('translationId').equals(tId).delete();
-        });
+        await BibleService.deleteTranslation(tId);
         if (currentTranslationId === tId) {
-            const others = await db.translations.toArray();
+            const others = await BibleService.getAllTranslations();
             if (others.length > 0) setTranslation(others[0].id);
         }
+        if (secondTranslationId === tId) {
+            setSecondTranslation(null);
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, translation: any) => {
+        e.preventDefault();
+        setContextMenu({
+            x: e.clientX,
+            y: e.clientY,
+            translation
+        });
     };
 
     return (
@@ -267,9 +319,12 @@ const BibleManager: React.FC = () => {
                                         key={tr.id}
                                         translation={tr}
                                         isSelected={currentTranslationId === tr.id}
+                                        isSecondary={secondTranslationId === tr.id}
                                         searchQuery={searchQuery}
                                         onSelect={() => setTranslation(tr.id)}
+                                        onSelectSecondary={() => setSecondTranslation(tr.id)}
                                         onDelete={handleDelete}
+                                        onContextMenu={handleContextMenu}
                                     />
                                 ))}
                             </div>
@@ -298,6 +353,53 @@ const BibleManager: React.FC = () => {
                 <div className="text-[10px] font-bold text-accent/40 uppercase tracking-widest text-center">
                     {t('search_results_found', { count: groupedData.totalFound })}
                 </div>
+            )}
+
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                >
+                    <ContextMenuItem
+                        icon={<CheckCircle className="w-3.5 h-3.5" />}
+                        label={t('set_as_primary', 'Set as Primary')}
+                        disabled={currentTranslationId === contextMenu.translation.id}
+                        onClick={() => {
+                            setTranslation(contextMenu.translation.id);
+                            setContextMenu(null);
+                        }}
+                    />
+                    <ContextMenuItem
+                        icon={<Plus className="w-3.5 h-3.5" />}
+                        label={t('set_as_secondary', 'Set as Secondary')}
+                        disabled={secondTranslationId === contextMenu.translation.id}
+                        onClick={() => {
+                            setSecondTranslation(contextMenu.translation.id);
+                            setContextMenu(null);
+                        }}
+                    />
+                    {secondTranslationId === contextMenu.translation.id && (
+                        <ContextMenuItem
+                            icon={<X className="w-3.5 h-3.5 text-red-400" />}
+                            label={t('remove_secondary', 'Remove Secondary')}
+                            onClick={() => {
+                                setSecondTranslation(null);
+                                setContextMenu(null);
+                            }}
+                        />
+                    )}
+                    <div className="h-px bg-white/5 my-1 mx-2" />
+                    <ContextMenuItem
+                        icon={<Trash2 className="w-3.5 h-3.5" />}
+                        label={t('delete')}
+                        danger
+                        onClick={() => {
+                            handleDelete(contextMenu.translation.id);
+                            setContextMenu(null);
+                        }}
+                    />
+                </ContextMenu>
             )}
         </div>
     );

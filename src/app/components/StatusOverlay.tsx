@@ -13,15 +13,6 @@ export const StatusOverlay: React.FC<StatusOverlayProps> = ({ activeOverride }) 
 
     return (
         <div className="absolute top-4 left-[340px] z-50 flex items-center gap-2 pointer-events-none">
-            {/* Live Indicator */}
-            {activeOverride && (
-                <div className="px-3 py-1.5 flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-full animate-pulse backdrop-blur-md">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-widest">
-                        {t('live_override_active', 'Live Override Active')}
-                    </span>
-                </div>
-            )}
 
             {/* Saving Indicator */}
             {isSaving && (

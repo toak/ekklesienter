@@ -120,11 +120,11 @@ const CustomizationPanel: React.FC = () => {
     if (!isOpen) return null;
 
     const tabs: { id: Tab; icon: React.ElementType; label: string }[] = [
-        { id: 'background', icon: ImageIcon, label: t('background') || 'Background' },
-        { id: 'font', icon: Type, label: t('typography') || 'Typography' },
-        { id: 'translation', icon: Languages, label: t('translations') || 'Translations' },
-        { id: 'style', icon: Underline, label: t('reference_style') || 'Style' },
-        { id: 'layout', icon: Layout, label: t('layout') || 'Layout' },
+        { id: 'background', icon: ImageIcon, label: t('background') },
+        { id: 'font', icon: Type, label: t('typography') },
+        { id: 'translation', icon: Languages, label: t('translations') },
+        { id: 'style', icon: Underline, label: t('reference_style') },
+        { id: 'layout', icon: Layout, label: t('layout') },
     ];
 
     const handleDone = () => {
@@ -145,7 +145,7 @@ const CustomizationPanel: React.FC = () => {
                 <div className="absolute inset-0 cursor-zoom-out" onClick={handleCancel} />
 
                 <LogicalCanvas
-                    containerClassName="shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5"
+                    containerClassName="bg-black shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5"
                     style={{
                         borderRadius: (draftSettings || settings).display.cornerRadius ? `${(draftSettings || settings).display.cornerRadius}px` : undefined,
                     }}
@@ -187,7 +187,8 @@ const CustomizationPanel: React.FC = () => {
             <div className="relative w-[460px] h-full flex flex-col animate-in slide-in-from-right duration-500 ease-[cubic-bezier(0.2,0.8,0.2,1)]">
                 {/* Background layers */}
                 <div className="absolute inset-0 bg-stone-950/98 shadow-[-40px_0_80px_rgba(0,0,0,0.6)] border-l border-white/5" />
-                <div className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+                {/* Noise overlay */}
+                <div className="absolute inset-0 opacity-[0.015] pointer-events-none mix-blend-overlay" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")` }} />
 
                 {/* ─── Header ─── */}
                 <div className="relative z-10 px-6 pt-6 pb-0 shrink-0">
@@ -199,7 +200,7 @@ const CustomizationPanel: React.FC = () => {
                             </div>
                             <div>
                                 <h2 className="text-base font-bold text-white tracking-tight leading-none">
-                                    {t('design_studio') || 'Design Studio'}
+                                    {t('design_studio')}
                                 </h2>
                                 <p className="text-[9px] text-stone-600 uppercase tracking-[0.2em] font-bold mt-1">{t('appearance_editor')}</p>
                             </div>
@@ -258,13 +259,13 @@ const CustomizationPanel: React.FC = () => {
                             onClick={handleCancel}
                             className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 text-stone-500 hover:text-stone-200 rounded-2xl transition-all border border-white/5 active:scale-95 text-[11px] font-bold uppercase tracking-wider cursor-pointer"
                         >
-                            {t('discard') || 'Discard'}
+                            {t('discard')}
                         </button>
                         <button
                             onClick={handleDone}
                             className="flex-2 py-3.5 bg-accent text-accent-foreground rounded-2xl transition-all border border-accent/20 shadow-[0_8px_30px_rgba(var(--accent-rgb),0.25)] hover:shadow-[0_8px_40px_rgba(var(--accent-rgb),0.35)] hover:scale-[1.02] active:scale-[0.98] text-[11px] font-black uppercase tracking-widest cursor-pointer"
                         >
-                            {t('save_profile') || 'Save Design Profile'}
+                            {t('save_profile')}
                         </button>
                     </div>
                     <div className="mt-3 flex justify-center">
@@ -274,7 +275,7 @@ const CustomizationPanel: React.FC = () => {
                         >
                             <RotateCcw className="w-3 h-3 text-stone-700 group-hover:text-stone-400 transition-colors" />
                             <span className="text-[10px] font-bold text-stone-700 group-hover:text-stone-400 uppercase tracking-widest transition-colors">
-                                {t('restore_factory_settings') || 'Restore Defaults'}
+                                {t('restore_factory_settings')}
                             </span>
                         </button>
                     </div>

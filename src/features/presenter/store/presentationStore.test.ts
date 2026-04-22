@@ -120,6 +120,44 @@ describe('usePresentationStore', () => {
     expect(usePresentationStore.getState().selectedSlideIds).toEqual(['s2']);
   });
 
+  it('navigateNext with preferLiveAnchor should advance live slide independently', async () => {
+    const slides = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
+    const presentation = { id: 'p1', slides };
+    (db.presentationFiles.get as any).mockResolvedValue(presentation);
+
+    usePresentationStore.setState({
+      activePresentationId: 'p1',
+      activePresentation: presentation as any,
+      liveSlideId: 's1',
+      previewSlideId: 's3', // Detached
+    });
+
+    await usePresentationStore.getState().navigateNext(false, true);
+
+    const state = usePresentationStore.getState();
+    expect(state.liveSlideId).toBe('s2');
+    expect(state.previewSlideId).toBe('s3'); // Should remain on s3
+  });
+
+  it('navigateNext with preferLiveAnchor should advance both if synced', async () => {
+    const slides = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
+    const presentation = { id: 'p1', slides };
+    (db.presentationFiles.get as any).mockResolvedValue(presentation);
+
+    usePresentationStore.setState({
+      activePresentationId: 'p1',
+      activePresentation: presentation as any,
+      liveSlideId: 's1',
+      previewSlideId: 's1', // Synced
+    });
+
+    await usePresentationStore.getState().navigateNext(false, true);
+
+    const state = usePresentationStore.getState();
+    expect(state.liveSlideId).toBe('s2');
+    expect(state.previewSlideId).toBe('s2'); // Should follow to s2
+  });
+
   it('clearSelection should clear selectedSlideIds', () => {
     usePresentationStore.setState({ selectedSlideIds: ['s1', 's2'] });
     usePresentationStore.getState().clearSelection();

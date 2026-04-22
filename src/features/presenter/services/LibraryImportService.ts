@@ -31,19 +31,47 @@ export class LibraryImportService {
     ): Promise<void> {
         if (!filesOrPaths || filesOrPaths.length === 0) return;
 
+        const mediaItems: { file?: File; path?: string; type: MediaType }[] = [];
+        const presentations: { file?: File; path?: string }[] = [];
+
         for (const item of filesOrPaths) {
+            const isFile = item instanceof File;
+            const name = (isFile ? item.name : (item as string).split(/[/\\]/).pop() || '').toLowerCase();
+            const ext = name.split('.').pop();
+
+            if (ext && ['ektp', 'ektmp', 'ektgl', 'pptx'].includes(ext)) {
+                presentations.push(isFile ? { file: item } : { path: item as string });
+            } else {
+                let type: MediaType = 'image';
+                if (ext && ['mp4', 'webm', 'mov'].includes(ext)) type = 'video';
+                if (ext && ['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac'].includes(ext)) type = 'audio';
+                // Also check file.type if it's a File object
+                if (isFile) {
+                    if (item.type.startsWith('video/')) type = 'video';
+                    else if (item.type.startsWith('audio/')) type = 'audio';
+                }
+                mediaItems.push(isFile ? { file: item, path: (item as any).path, type } : { path: item as string, type });
+            }
+        }
+
+        // 1. Process Presentations Sequentially (they have internal logic/side effects)
+        for (const pres of presentations) {
             try {
-                // Case 1: If we got File objects (Native Drop or Web Input)
-                if (item instanceof File) {
-                    await this.importFileObject(item, currentBinId, t);
-                }
-                // Case 2: If we got string paths (Electron selectFile)
-                else if (typeof item === 'string') {
-                    await this.importFilePath(item, currentBinId, t);
-                }
-            } catch (error) {
-                console.error('[LibraryImportService] Import failed:', error);
-                toast.error(t('import_failed', 'Failed to import item'));
+                if (pres.file) await this.importFileObject(pres.file, currentBinId, t);
+                else if (pres.path) await this.importFilePath(pres.path, currentBinId, t);
+            } catch (err) {
+                console.error('[LibraryImportService] Presentation import failed:', err);
+                toast.error(t('import_failed', 'Failed to import presentation'));
+            }
+        }
+
+        // 2. Process Media in Batch (Fast & Parallel)
+        if (mediaItems.length > 0) {
+            const { MediaPersistenceService } = await import('./MediaPersistenceService');
+            const results = await MediaPersistenceService.importMediaBatch(mediaItems, { binId: currentBinId });
+            const successfulIds = results.filter((id): id is string => id !== null);
+            if (successfulIds.length > 0) {
+                toast.success(t('media_imported_batch', 'Imported {{count}} media files', { count: successfulIds.length }));
             }
         }
     }

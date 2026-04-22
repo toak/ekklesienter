@@ -114,12 +114,12 @@ export const LogicalCanvas: React.FC<LogicalCanvasProps> = ({
     return (
         <div
             ref={wrapperRef}
-            className="w-full h-full flex items-center justify-center overflow-hidden"
+            className="w-full h-full flex items-center justify-center overflow-visible"
         >
             <div
                 ref={boundingBoxRef}
                 className={cn(
-                    "relative overflow-hidden shrink-0",
+                    "relative overflow-visible shrink-0",
                     zoom === 1.0 && "transition-all duration-300 ease-in-out", // Only animate in adaptive mode
                     containerClassName
                 )}
@@ -134,7 +134,7 @@ export const LogicalCanvas: React.FC<LogicalCanvasProps> = ({
                 <div
                     ref={innerRef}
                     className={cn(
-                        "absolute top-1/2 left-1/2 origin-center",
+                        "absolute top-1/2 left-1/2 origin-center overflow-visible",
                         zoom === 1.0 && "transition-transform duration-300 ease-in-out", // Only animate in adaptive mode
                         className
                     )}

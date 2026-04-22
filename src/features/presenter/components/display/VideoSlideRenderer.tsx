@@ -16,6 +16,7 @@ interface VideoSlideRendererProps {
   isPreview?: boolean;
   isLive?: boolean;
   isPreloading?: boolean;
+  isRemote?: boolean;
 }
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4];
@@ -46,6 +47,7 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
   isPreview = false,
   isLive = false,
   isPreloading = false,
+  isRemote = false,
 }) => {
   const { t } = useTranslation();
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -75,16 +77,18 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
     isLive,
     isPreloading,
     slideId,
+    isRemote,
   });
 
+
   const mediaMetadata = useLiveQuery(async () => {
-    if (!settings.mediaId) return null;
+    if (isRemote || !settings.mediaId) return null;
     const item = await db.mediaPool.get(settings.mediaId);
     if (item) return { name: item.name };
     const bg = await db.backgrounds.get(settings.mediaId);
     if (bg) return { name: bg.name };
     return null;
-  }, [settings.mediaId]);
+  }, [settings.mediaId, isRemote]);
 
   // Poll the video element directly for reliable state display
   useEffect(() => {
@@ -160,6 +164,13 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
           }
           video.pause();
           break;
+        case 'toggle':
+          if (video.paused) {
+            video.play().catch(() => {});
+          } else {
+            video.pause();
+          }
+          break;
         case 'seek':
           if (typeof data.value === 'number') {
             const clampedValue = Math.max(trimStart, Math.min(data.value, trimEnd > 0 ? trimEnd : video.duration));
@@ -192,36 +203,76 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
 
   // Projector heartbeat: Send actual playback status back to the controller
   // This provides the "ground truth" for the LiveMediaToolbar.
-  useEffect(() => {
-    if (isPreview || !isLive || isPreloading) return;
+    const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
 
-    const sendStatus = () => {
-      const video = videoRef.current;
-      if (!video) return;
-      LiveSyncService.sendVideoStatus(
-        slideId,
-        video.currentTime,
-        !video.paused && !video.ended,
-        video.duration || 0
-      );
-    };
+    const sendStatus = useCallback(() => {
+        const video = videoElement || videoRef.current;
+        if (!video || !isLive) return;
 
-    // Send on key events for immediate feedback
-    const video = videoRef.current;
-    if (video) {
-        video.addEventListener('play', sendStatus);
-        video.addEventListener('pause', sendStatus);
-        video.addEventListener('seeked', sendStatus);
-        // Also send periodic heartbeat for progressive sync
-        const interval = setInterval(sendStatus, 250);
-        return () => {
-            video.removeEventListener('play', sendStatus);
-            video.removeEventListener('pause', sendStatus);
-            video.removeEventListener('seeked', sendStatus);
-            clearInterval(interval);
+        const status = {
+            slideId,
+            currentTime: video.currentTime,
+            isPlaying: !video.paused,
+            duration: (isFinite(video.duration) && video.duration > 0) ? video.duration : 0
         };
-    }
-  }, [isPreview, isLive, isPreloading, slideId, videoRef]);
+
+        if (status.duration > 0 || Math.random() < 0.05) {
+            console.info('📽️ [Projector] Sending status:', status);
+        }
+
+        LiveSyncService.sendVideoStatus(
+            status.slideId,
+            status.currentTime,
+            status.isPlaying,
+            status.duration
+        );
+    }, [slideId, isLive, videoElement, videoRef]);
+
+    // Projector heartbeat: Send actual playback status back to the controller
+    // This provides the "ground truth" for the LiveMediaToolbar.
+    useEffect(() => {
+        if (isPreview || !isLive || isPreloading) return;
+
+        const video = videoElement || videoRef.current;
+        if (video) {
+            video.addEventListener('play', sendStatus);
+            video.addEventListener('pause', sendStatus);
+            video.addEventListener('seeked', sendStatus);
+            video.addEventListener('loadedmetadata', sendStatus);
+            video.addEventListener('durationchange', sendStatus);
+            video.addEventListener('canplay', sendStatus);
+            
+            // Periodic heartbeat - Increased frequency for diagnostics
+            const interval = setInterval(sendStatus, 150);
+            
+            // Listen for manual pull requests from the controller
+            const unsubRequest = LiveSyncService.onVideoStatusRequest(() => {
+                sendStatus();
+            });
+
+            // Immediate report in case metadata is already loaded
+            if (video.readyState >= 1) sendStatus();
+
+            return () => {
+                video.removeEventListener('play', sendStatus);
+                video.removeEventListener('pause', sendStatus);
+                video.removeEventListener('seeked', sendStatus);
+                video.removeEventListener('loadedmetadata', sendStatus);
+                video.removeEventListener('durationchange', sendStatus);
+                video.removeEventListener('canplay', sendStatus);
+                if (interval) clearInterval(interval);
+                unsubRequest();
+                
+                // Final status report to clear playing state on master/remote
+                LiveSyncService.sendVideoStatus(
+                    slideId, 
+                    video.currentTime, 
+                    false, 
+                    video.duration || 0
+                );
+            };
+        }
+    }, [isPreview, isLive, isPreloading, slideId, videoElement, videoRef, sendStatus]);
 
   // Scrubber seek helper
   const seekFromScrubber = useCallback((clientX: number) => {
@@ -294,7 +345,7 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
   if (!hasVideoSource) {
     return (
       <div className={cn(
-        "w-full h-full flex items-center justify-center bg-stone-950",
+        "w-full h-full flex items-center justify-center bg-transparent",
         isPreloading && "opacity-0 pointer-events-none invisible"
       )}>
         <div className="flex flex-col items-center gap-3 text-stone-600">
@@ -315,7 +366,14 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
       onMouseMove={handleActivity}
     >
       <video
-        ref={videoRef}
+        ref={(el) => {
+            // Bridge to the hook's ref
+            if (typeof videoRef === 'object' && videoRef) {
+                (videoRef as any).current = el;
+            }
+            // Trigger local state for heartbeat setup
+            if (el !== videoElement) setVideoElement(el);
+        }}
         src={videoUrl}
         data-preview-slide-id={slideId}
         className={cn(
@@ -324,11 +382,11 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
         )}
         playsInline
         preload="auto"
-        onClick={() => isPreview && actions.togglePlayPause()}
-        style={{ cursor: isPreview ? 'pointer' : 'default' }}
+        onClick={() => isPreview && !isRemote && actions.togglePlayPause()}
+        style={{ cursor: isPreview && !isRemote ? 'pointer' : 'default' }}
       />
 
-      {isPreview && (
+      {isPreview && !isRemote && (
         <>
           {/* Controls Overlay */}
           <div
@@ -521,7 +579,8 @@ const VideoSlideRenderer: React.FC<VideoSlideRendererProps> = ({
       )}
 
       {/* Center play icon when paused and controls hidden */}
-      {isPreview && !isPlaying && !showControls && videoUrl && (
+      {/* Play Icon - Persistently shown on remote or when paused in preview */}
+      {isPreview && (isRemote || (!isPlaying && !showControls)) && videoUrl && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20 animate-in fade-in duration-500">
           <div className="w-40 h-40 rounded-3xl bg-stone-900/40 backdrop-blur-2xl border border-white/10 ring-1 ring-white/5 flex items-center justify-center shadow-2xl">
             <Play className="w-16 h-16 text-accent ml-2" />

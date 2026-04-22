@@ -8,7 +8,7 @@ export const migrateBackgroundToLayers = (bg: BackgroundSettings | undefined): I
 
     const layer: IStyleLayer = {
         id: 'legacy-layer-1',
-        type: bg.type,
+        type: bg.type || 'color',
         visible: true,
         opacity: 1,
         blendMode: 'normal',
@@ -41,8 +41,31 @@ export const migrateBackgroundToLayers = (bg: BackgroundSettings | undefined): I
 /**
  * Ensures that the input is an array of layers, migrating if necessary.
  */
-export const ensureLayers = (layers: IStyleLayer[] | BackgroundSettings | undefined): IStyleLayer[] => {
-    if (Array.isArray(layers)) return layers;
+export const ensureLayers = (layers: IStyleLayer[] | BackgroundSettings | undefined, fallbackColor?: string): IStyleLayer[] => {
+    if (Array.isArray(layers) && layers.length > 0) return layers;
+
+    if (!layers && fallbackColor) {
+        return [{
+            id: 'legacy-fallback-color',
+            type: 'color',
+            visible: true,
+            opacity: 1,
+            blendMode: 'normal',
+            color: fallbackColor,
+            adjustments: {
+                brightness: 100,
+                contrast: 100,
+                exposure: 0,
+                saturation: 100,
+                vibrance: 0,
+                hue: 0,
+                blur: 0,
+                dimmingColor: '#000000',
+                dimmingOpacity: 0
+            }
+        } as IStyleLayer];
+    }
+
     return migrateBackgroundToLayers(layers as BackgroundSettings);
 };
 

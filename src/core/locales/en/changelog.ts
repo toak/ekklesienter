@@ -2,6 +2,45 @@ export default {
     "changelog": "Changelog",
     "changelog_entries": [
         {
+            "version": "v2.2.2",
+            "title": "Stability & Performance",
+            "date": "April 22, 2026",
+            "description": "Critical maintenance update introducing Screen Wake Lock and nested presentation refinements.",
+            "features": [
+                "Implemented Screen Wake Lock to prevent sleep mode during live presentations",
+                "Prevented redundant (Snapshot) duplicates for service presentations",
+                "Added safety check to prevent recursive presentation nesting",
+                "Overall stability improvements and minor bug fixes"
+            ]
+        },
+        {
+            "version": "v2.2.1",
+            "title": "Remote Controlling",
+            "date": "April 12, 2026",
+            "description": "Maintenance update focusing on interface stability and keyboard control refinements.",
+            "features": [
+                "Fixed inconsistent spacebar behavior for media playback",
+                "Added audio toggle support for the spacebar shortcut",
+                "Improved global keyboard event handling stability",
+                "Minor UI refinements and bug fixes"
+            ]
+        },
+        {
+            "version": "v2.2.0",
+            "title": "Remote Controlling",
+            "date": "April 10, 2026",
+            "description": "Control your presentations from anywhere with seamless mobile remote and unified Wi-Fi connectivity.",
+            "features": [
+                "Remote controlling through mobile phone",
+                "Unified Wi-Fi connection for instant pairing",
+                "Real-time slide preview on mobile device",
+                "Touch-optimized navigation controls",
+                "Remote Bible verse selection and projection",
+                "Live media playback controls from phone",
+                "Override controls (Blackout, Whiteout, Logo) on mobile"
+            ]
+        },
+        {
             "version": "v2.1.0",
             "title": "Professional Designer",
             "date": "April 9, 2026",

@@ -105,7 +105,7 @@ export const LibraryHeader: React.FC<LibraryHeaderProps> = ({
                 title={t('import_files_desc', 'Import presentations, templates, or media')}
             >
                 <Download className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-black uppercase tracking-widest">{t('import', 'Import')}</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden @[200px]:block">{t('import', 'Import')}</span>
             </button>
         </div>
     );

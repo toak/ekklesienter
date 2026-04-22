@@ -1,0 +1,17 @@
+{
+  "name": "Ekklesienter Remote",
+  "short_name": "E-Remote",
+  "description": "Remote controller for Ekklesienter Presentation Software",
+  "start_url": "/remote.html",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/isometric/512/remote-control.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

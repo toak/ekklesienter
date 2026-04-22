@@ -12,6 +12,7 @@ import { Music, Plus } from 'lucide-react';
 import AudioScopeBlock from './AudioScopeBlock';
 import TimerAudioClip from './TimerAudioClip';
 import { findOverlappingScopes } from '../../utils/timelineUtils';
+import { MediaPersistenceService } from '../../services/MediaPersistenceService';
 
 /** Width of each slide tile in the timeline (matches SlideTimeline w-32 = 128px) */
 const TILE_WIDTH = 128;
@@ -33,7 +34,9 @@ interface AudioTrackProps {
 const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
     const { t } = useTranslation();
     const { openModal } = useModalStore();
-    const { activePresentationId, addAudioScope } = usePresentationStore();
+    const activePresentationId = usePresentationStore(s => s.activePresentationId);
+    const selectedPresentationId = usePresentationStore(s => s.selectedPresentationId);
+    const addAudioScope = usePresentationStore(s => s.addAudioScope);
     const setLatestArea = useSetAtom(latestInteractionAreaAtom);
     const [hoveredSlotIdx, setHoveredSlotIdx] = React.useState<number | null>(null);
 
@@ -48,10 +51,22 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
         return map;
     }, [visualTimeline]);
 
-    // Live query for all audio scopes in this presentation
+    const activePresentationIds = useMemo(() => {
+        const ids = new Set<string>();
+        if (activePresentationId) ids.add(activePresentationId);
+        if (selectedPresentationId) ids.add(selectedPresentationId);
+        visualTimeline.forEach(item => {
+            if (item.presentationId) ids.add(item.presentationId);
+        });
+        return Array.from(ids);
+    }, [activePresentationId, selectedPresentationId, visualTimeline]);
+
+    // Live query for all audio scopes in these presentations
     const dbScopes = useLiveQuery(
-        () => activePresentationId ? db.audioScopes.where('presentationId').equals(activePresentationId).toArray() : [],
-        [activePresentationId]
+        () => activePresentationIds.length > 0 
+            ? db.audioScopes.where('presentationId').anyOf(activePresentationIds).toArray() 
+            : [],
+        [activePresentationIds]
     ) || [];
 
     // Resolve visual indices for each scope
@@ -111,24 +126,29 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
         e.preventDefault();
         setIsDraggingOver(false);
 
-        // Handle native files
         const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/'));
+        const jsonData = e.dataTransfer.getData('application/json');
+
+        if (files.length === 0 && !jsonData) return;
+        if (visualTimeline.length === 0) return;
 
         // Handle Media Pool items
-        let mediaPoolAudioPath: string | null = null;
+        let mediaPoolItemId: string | null = null;
+        let mediaPoolName: string | null = null;
+
         try {
-            const jsonData = e.dataTransfer.getData('application/json');
             if (jsonData) {
                 const data = JSON.parse(jsonData);
                 if (data.source === 'media-pool' && data.media.type === 'audio') {
-                    mediaPoolAudioPath = data.media.path;
+                    mediaPoolItemId = data.media.id || data.media.path;
+                    mediaPoolName = data.media.name;
                 }
             }
         } catch (err) {
             // Not JSON or wrong format
         }
 
-        if (files.length === 0 && !mediaPoolAudioPath) return;
+        if (files.length === 0 && !mediaPoolItemId) return;
         if (visualTimeline.length === 0) return;
 
         // Determine which slot the drop landed on based on X position
@@ -171,17 +191,15 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
 
         // Process files (Electron provides .path on dropped File objects)
         for (const file of files) {
-            const filePath = (file as unknown as { path: string }).path || file.name;
-            await addAudioScope(targetSlideId, filePath, file.name);
+            const path = (file as any).path || null;
+            const stableId = await MediaPersistenceService.importMediaBlob(file, path, 'audio');
+            if (stableId) {
+                await addAudioScope(targetSlideId, stableId, file.name);
+            }
         }
 
-        if (mediaPoolAudioPath) {
-            const jsonData = e.dataTransfer.getData('application/json');
-            let name = mediaPoolAudioPath.split(/[/\\]/).pop() || 'Audio Track';
-            try {
-                const data = JSON.parse(jsonData);
-                if (data.media?.name) name = data.media.name;
-            } catch (e) { }
+        if (mediaPoolItemId) {
+            const name = mediaPoolName || mediaPoolItemId.split(/[/\\]/).pop() || 'Audio Track';
 
             // Check for overlaps (assume 1 slide span for new drop)
             const overlaps = findOverlappingScopes(targetSlotIdx, targetSlotIdx, visualTimeline, slideToIndexMap);
@@ -189,11 +207,12 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
             if (overlaps.length > 0) {
                 openModal(ModalType.AUDIO_CONFLICT, {
                     targetSlideId,
-                    fileId: mediaPoolAudioPath,
+                    fileId: mediaPoolItemId,
+                    fileName: name,
                     overlappingScopes: overlaps
                 });
             } else {
-                await addAudioScope(targetSlideId, mediaPoolAudioPath, name);
+                await addAudioScope(targetSlideId, mediaPoolItemId, name);
             }
         }
     }, [visualTimeline, addAudioScope, slideToIndexMap, openModal]);
@@ -214,8 +233,8 @@ const AudioTrack: React.FC<AudioTrackProps> = ({ visualTimeline }) => {
             onPointerDown={() => setLatestArea('audio')}
             onDrop={handleDrop}
             className={cn(
-                'relative shrink-0 transition-all rounded-xl border-2',
-                isDraggingOver ? 'border-purple-500/50 bg-purple-500/10' : 'border-transparent'
+                'relative shrink-0 transition-all rounded-xl',
+                isDraggingOver ? 'outline outline-2 outline-purple-500/50 outline-dashed bg-purple-500/10' : ''
             )}
             style={{
                 height: 72,

@@ -7,7 +7,7 @@ import { AppMode } from '@/core/types';
 interface NavigationHeaderProps {
   appMode: AppMode;
   isModePickerOpen: boolean;
-  onToggleModePicker: () => void;
+  onToggleModePicker: (element: HTMLElement | null) => void;
   onCloseModePicker: () => void;
   onSetAppMode: (mode: AppMode) => void;
   onOpenSettings: () => void;
@@ -32,7 +32,7 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
       <div className="flex items-center justify-between">
         <div className="relative">
           <button
-            onClick={onToggleModePicker}
+            onClick={(e) => onToggleModePicker(e.currentTarget)}
             className="group flex items-center gap-2 px-2 py-1.5 -ml-2 rounded-lg hover:bg-white/5 transition-all text-left"
           >
             <div className="p-1.5 bg-accent/20 rounded-lg group-hover:bg-accent/30 transition-colors">
@@ -44,41 +44,13 @@ export const NavigationHeader: React.FC<NavigationHeaderProps> = ({
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
-                <h2 className="font-bold text-stone-200 tracking-tight text-xs uppercase">
+                <h2 className="font-bold text-stone-200 tracking-tight text-xs uppercase hidden @[200px]:block">
                   {appMode === 'scripture' ? t('scripture') : t('presentation', 'Presentation')}
                 </h2>
                 <ChevronDown className={cn("w-3 h-3 text-stone-500 transition-transform", isModePickerOpen && "rotate-180")} />
               </div>
             </div>
           </button>
-
-          {isModePickerOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={onCloseModePicker} />
-              <div className="absolute top-full left-0 mt-1 w-48 bg-stone-900 border border-white/10 rounded-xl shadow-2xl p-1 z-50 animate-in fade-in zoom-in-95 duration-200">
-                <button
-                  onClick={() => { onSetAppMode('scripture'); onCloseModePicker(); }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left",
-                    appMode === 'scripture' ? "bg-accent/10 text-accent font-bold" : "text-stone-400 hover:bg-white/5 hover:text-stone-200"
-                  )}
-                >
-                  <BookOpen className="w-4 h-4" />
-                  {t('scripture')}
-                </button>
-                <button
-                  onClick={() => { onSetAppMode('presentation'); onCloseModePicker(); }}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors text-left",
-                    appMode === 'presentation' ? "bg-accent/10 text-accent font-bold" : "text-stone-400 hover:bg-white/5 hover:text-stone-200"
-                  )}
-                >
-                  <Presentation className="w-4 h-4" />
-                  {t('presentation', 'Presentation')}
-                </button>
-              </div>
-            </>
-          )}
         </div>
         <button
           onClick={onOpenSettings}

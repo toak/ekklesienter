@@ -7,6 +7,8 @@ import './core/styles/globals.css';
 import './core/i18n';
 import './core/styles/fonts';
 import { PerformanceMonitor } from './core/components/PerformanceMonitor';
+import { LoadingScreen } from './core/components/LoadingScreen';
+import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
 if (import.meta.env.DEV) {
   window.addEventListener('unhandledrejection', (event) => {
@@ -14,13 +16,12 @@ if (import.meta.env.DEV) {
   });
 }
 
-import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <PerformanceMonitor />
-      <Suspense fallback={<div className="h-screen w-screen bg-stone-950 flex items-center justify-center text-stone-500 font-serif">Loading...</div>}>
+      <LoadingScreen />
+      <Suspense fallback={null}>
         <App />
       </Suspense>
     </ErrorBoundary>

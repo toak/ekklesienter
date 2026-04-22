@@ -29,7 +29,7 @@ export const TimelineTrackHeaders: React.FC<TimelineTrackHeadersProps> = ({ t, h
 
             {/* Audio Track Label */}
             {showAudio && (
-                <div className="h-[98px] flex flex-col items-center justify-center gap-1 border-t border-white/5 bg-purple-500/10 text-purple-200/60 hover:text-purple-100 hover:bg-purple-500/20 transition-all">
+                <div className="h-[88px] flex flex-col items-center justify-center gap-1 border-t border-white/5 bg-purple-500/10 text-purple-200/60 hover:text-purple-100 hover:bg-purple-500/20 transition-all">
                     <Music className="w-4 h-4 mb-0.5" />
                     <span className="text-[10px] font-bold uppercase tracking-wider">{t('audio', 'Audio')}</span>
                 </div>

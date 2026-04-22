@@ -22,7 +22,6 @@ class FFmpegService {
                     wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
                 });
                 this.isLoaded = true;
-                console.log('[FFmpegService] Loaded FFmpeg.wasm successfully.');
             } catch (error) {
                 console.error('[FFmpegService] Failed to load FFmpeg.wasm:', error);
                 this.isSupported = false;
@@ -42,8 +41,6 @@ class FFmpegService {
 
         const inputName = `input.${extension}`;
         const outputName = `output.${extension}`;
-
-        console.log(`[FFmpegService] Trimming ${start}s to ${end}s...`);
 
         // Write file
         await this.ffmpeg.writeFile(inputName, await fetchFile(blob));

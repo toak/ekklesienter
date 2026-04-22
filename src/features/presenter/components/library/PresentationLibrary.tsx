@@ -35,7 +35,11 @@ const ICON_MAP: Record<string, LucideIcon> = {
     Monitor, Music, Coins, Baby, Mic2, Megaphone, BookOpen, Plus, Presentation, Layers, Layout
 };
 
-const PresentationLibrary: React.FC = () => {
+interface IPresentationLibraryProps {
+    className?: string;
+}
+
+const PresentationLibrary: React.FC<IPresentationLibraryProps> = ({ className }) => {
     const { t, i18n } = useTranslation();
     const lang = i18n.language?.substring(0, 2) || 'en';
     const isRu = lang === 'ru';
@@ -191,7 +195,7 @@ const PresentationLibrary: React.FC = () => {
     const currentNav = templateNavPath[templateNavPath.length - 1];
 
     return (
-        <div className="h-full flex flex-col bg-stone-900/30 border-r border-white/5">
+        <div className={cn("h-full flex flex-col bg-stone-900/80 backdrop-blur-xl border-r border-white/5 @container", className)}>
             <LibraryHeader
                 graceLibSection={graceLibSection}
                 templateNavPath={templateNavPath}
@@ -206,13 +210,18 @@ const PresentationLibrary: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto no-scrollbar p-3">
                 {!graceLibSection ? (
-                    <div className="flex flex-col items-center justify-center h-full text-stone-600 gap-3 px-4 text-center">
-                        <div className="w-12 h-12 rounded-full bg-stone-800/50 flex items-center justify-center">
-                            <Layers className="w-6 h-6 opacity-30" />
+                    <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+                        <div className="w-full max-w-sm p-8 rounded-3xl bg-stone-950/20 border border-white/5 flex flex-col items-center gap-4 group transition-all hover:bg-stone-950/30">
+                            <div className="w-16 h-16 rounded-2xl bg-stone-800/50 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                                <Layers className="w-8 h-8 text-stone-500 opacity-40 group-hover:text-accent group-hover:opacity-100 transition-all" />
+                            </div>
+                            <div className="space-y-1">
+                                <h3 className="text-sm font-bold text-stone-300 uppercase tracking-widest">{t('empty_library', 'Empty Selection')}</h3>
+                                <p className="text-xs font-medium italic text-stone-500 max-w-[220px]">
+                                    {t('select_library_hint', 'Select a section in GraceLib to browse content')}
+                                </p>
+                            </div>
                         </div>
-                        <p className="text-xs font-medium italic opacity-50">
-                            {t('select_library_hint', 'Select a section in GraceLib to browse content')}
-                        </p>
                     </div>
                 ) : (
                     <>

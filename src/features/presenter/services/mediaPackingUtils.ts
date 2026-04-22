@@ -16,9 +16,31 @@ export interface MediaManifest {
 
 /**
  * SHA-256 content-based hashing for blobs.
+ * Optmized for large files: If file > 20MB, hashes a sample (head + mid + tail + size)
+ * for near-instant deduplication without reading the whole file into RAM.
  */
 export async function sha256(blob: Blob): Promise<string> {
-    const arrayBuffer = await blob.arrayBuffer();
+    const SIZE_LIMIT = 20 * 1024 * 1024; // 20MB
+    const SAMPLE_SIZE = 1 * 1024 * 1024; // 1MB
+    
+    let content: Blob;
+    if (blob.size <= SIZE_LIMIT) {
+        content = blob;
+    } else {
+        // Sampled hashing for massive files (Video/Large Audio)
+        const head = blob.slice(0, SAMPLE_SIZE);
+        const mid = blob.slice(Math.floor(blob.size / 2), Math.floor(blob.size / 2) + SAMPLE_SIZE);
+        const tail = blob.slice(blob.size - SAMPLE_SIZE);
+        const meta = new Blob([
+            blob.size.toString(), 
+            blob.type,
+            // Include a middle-of-the-way sample too for safety
+            blob.slice(Math.floor(blob.size / 4), Math.floor(blob.size / 4) + SAMPLE_SIZE / 2)
+        ]);
+        content = new Blob([head, mid, tail, meta]);
+    }
+    
+    const arrayBuffer = await content.arrayBuffer();
     const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -42,11 +64,24 @@ export function extractPathFromLocalResource(url: string): string | null {
 }
 
 /**
- * Safely reads a local file using Electron IPC if available.
+ * Safely reads a local file using Electron IPC or streaming fetch if possible.
  */
 export async function readLocalFileSafe(path: string): Promise<Blob | null> {
     try {
+        // PREFER FETCH: Streaming via protocol is MUCH faster than IPC Buffer transfer
+        // especially for large audio/video files (no struct-clone overhead).
         if (IpcService.isElectron()) {
+            const normalizedPath = path.replace(/\\/g, '/');
+            const url = `local-resource://localhost${normalizedPath.startsWith('/') ? '' : '/'}${normalizedPath}`;
+            
+            try {
+                const response = await fetch(url);
+                if (response.ok) return await response.blob();
+            } catch (fetchError) {
+                console.warn(`Fetch via protocol failed for ${path}, falling back to IPC:`, fetchError);
+            }
+
+            // Fallback for edge cases where protocol might not be ready or fail
             const stats = await IpcService.invoke<{ data: Uint8Array } | null>('read-file-data', path);
             if (stats && stats.data) return new Blob([new Uint8Array(stats.data)]);
         }
@@ -117,7 +152,7 @@ export async function collectMediaRefs(
 ): Promise<Map<string, { role: string; originalName: string; fontFamily?: string; fontWeight?: string | number }>> {
     const mediaMap = new Map<string, { role: string; originalName: string; fontFamily?: string; fontWeight?: string | number }>();
 
-    const addRef = (id: string | undefined, role: string, originalName: string = id || '', extra: any = {}) => {
+    const addRef = (id: string | undefined, role: string, originalName: string = id || '', extra: Record<string, any> = {}) => {
         if (id && !mediaMap.has(id)) {
             mediaMap.set(id, { role, originalName, ...extra });
         }
@@ -129,7 +164,7 @@ export async function collectMediaRefs(
             // This ensures backgrounds and canvas element images are packed regardless
             // of whether the flag was set by the original code path.
             if (layer.image?.id) {
-                const name = (layer.image as any).name || layer.image.id;
+                const name = (layer.image as { name?: string }).name || layer.image.id;
                 addRef(layer.image.id, `${layerRole}_image`, name);
             } else if (layer.image?.url) {
                 const path = extractPathFromLocalResource(layer.image.url);
@@ -137,7 +172,7 @@ export async function collectMediaRefs(
             }
 
             if (layer.video?.id) {
-                const name = (layer.video as any).name || layer.video.id;
+                const name = (layer.video as { name?: string }).name || layer.video.id;
                 addRef(layer.video.id, `${layerRole}_video`, name);
             } else if (layer.video?.url) {
                 const path = extractPathFromLocalResource(layer.video.url);
@@ -172,11 +207,11 @@ export async function collectMediaRefs(
                     if (item.fills) collectFromLayers(item.fills, 'item_fill');
                     if (item.strokes) collectFromLayers(item.strokes, 'item_stroke');
 
-                    if (item.type === 'image' && (item as any).image?.id) {
-                        const img = (item as any).image;
+                    if (item.type === 'image' && item.image?.id) {
+                        const img = item.image;
                         addRef(img.id, 'item_image', img.name || img.id);
-                    } else if (item.type === 'video' && (item as any).video?.id) {
-                        const vid = (item as any).video;
+                    } else if (item.type === 'video' && item.video?.id) {
+                        const vid = item.video;
                         addRef(vid.id, 'item_video', vid.name || vid.id);
                     }
 
@@ -210,10 +245,10 @@ export async function collectMediaRefs(
                 }
             }
         } else if (type === 'verse') {
-            const s = slide as any;
+            const s = slide as unknown as ICanvasSlide; // Verses use canvas layout
             if (s.backgroundOverride) collectFromLayers(s.backgroundOverride, 'background');
         } else if (type === 'video') {
-            const s = slide as any;
+            const s = slide as any; // Legacy video slides are loosely typed
             if (s.backgroundOverride) collectFromLayers(s.backgroundOverride, 'background');
             if (s.videoSettings?.mediaId) {
                 const id = extractPathFromLocalResource(s.videoSettings.mediaId) || s.videoSettings.mediaId;
@@ -291,7 +326,7 @@ export async function getMediaBlob(localId: string): Promise<{ blob: Blob; name:
 /**
  * Recursively replaces IDs in an object using a provided map.
  */
-export function patchMediaIds(target: any, map: Map<string, string>) {
+export function patchMediaIds(target: unknown, map: Map<string, string>) {
     if (!target || typeof target !== 'object') return;
 
     if (Array.isArray(target)) {
