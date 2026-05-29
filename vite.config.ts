@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
           main: path.resolve(__dirname, 'index.html'),
           projector: path.resolve(__dirname, 'projector.html'),
           remote: path.resolve(__dirname, 'remote.html'),
+          stage: path.resolve(__dirname, 'stage.html'),
         },
       },
     },

@@ -37,6 +37,7 @@ process.env.VITE_PUBLIC = app.isPackaged ? process.env.DIST : path.join(__dirnam
 
 let mainWindow: BrowserWindow | null;
 let projectorWindow: BrowserWindow | null;
+let stageWindow: BrowserWindow | null;
 let wakeLockId: number | null = null;
 
 const gotTheLock = app.requestSingleInstanceLock();
@@ -206,12 +207,15 @@ function createMainWindow() {
         mainWindow.loadURL(VITE_DEV_SERVER_URL);
     } else {
         // win.loadFile('dist/index.html')
-        mainWindow.loadFile(path.join(process.env.DIST, 'index.html'));
+        mainWindow.loadFile(path.join(process.env.DIST || '', 'index.html'));
     }
 
     mainWindow.on('close', () => {
         if (projectorWindow && !projectorWindow.isDestroyed()) {
             projectorWindow.close();
+        }
+        if (stageWindow && !stageWindow.isDestroyed()) {
+            stageWindow.close();
         }
     });
 
@@ -280,7 +284,7 @@ function createProjectorWindow(displaySettings?: any) {
         const baseUrl = VITE_DEV_SERVER_URL.replace(/\/+$/, '');
         projectorWindow.loadURL(`${baseUrl}/projector.html`);
     } else {
-        projectorWindow.loadFile(path.join(process.env.DIST, 'projector.html'));
+        projectorWindow.loadFile(path.join(process.env.DIST || '', 'projector.html'));
     }
 
     // Reliably notify main window when projector page is loaded (Electron-level event)
@@ -298,12 +302,72 @@ function createProjectorWindow(displaySettings?: any) {
     });
 }
 
+// Create Stage Window
+function createStageWindow(displaySettings?: any) {
+    if (stageWindow) {
+        if (!stageWindow.isDestroyed()) {
+            stageWindow.focus();
+        } else {
+            stageWindow = null;
+        }
+        return;
+    }
+
+    const displays = screen.getAllDisplays();
+    let display = displays[0];
+
+    if (displaySettings && displaySettings.stageDisplayId !== undefined) {
+        const targetDisplay = displays.find(d => d.id === displaySettings.stageDisplayId);
+        if (targetDisplay) {
+            display = targetDisplay;
+        }
+    } else {
+        const externalDisplay = displays.find((d) => d.bounds.x !== 0 || d.bounds.y !== 0);
+        display = externalDisplay || displays[0];
+    }
+
+    stageWindow = new BrowserWindow({
+        x: display.bounds.x,
+        y: display.bounds.y,
+        width: display.bounds.width,
+        height: display.bounds.height,
+        fullscreen: true,
+        autoHideMenuBar: true,
+        frame: false,
+        alwaysOnTop: true,
+        webPreferences: {
+            preload: path.join(__dirname, 'preload.cjs'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: false,
+            autoplayPolicy: 'no-user-gesture-required'
+        },
+    });
+
+    console.log('Main Process: Stage Window Created');
+
+    if (VITE_DEV_SERVER_URL) {
+        const baseUrl = VITE_DEV_SERVER_URL.replace(/\/+$/, '');
+        stageWindow.loadURL(`${baseUrl}/stage.html`);
+    } else {
+        stageWindow.loadFile(path.join(process.env.DIST || '', 'stage.html'));
+    }
+
+    stageWindow.on('closed', () => {
+        stageWindow = null;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('stage-closed');
+        }
+    });
+}
+
 // Quit when all windows are closed, except on macOS.
 app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
         mainWindow = null;
         projectorWindow = null;
+        stageWindow = null;
     }
 });
 
@@ -396,13 +460,19 @@ app.whenReady().then(() => {
 
     ipcMain.handle('remote:get-info', () => {
         return {
+            ip: remoteServerInfo.currentPin !== '0000' ? (remoteServerInfo as any).currentIp : '127.0.0.1',
+            port: remoteServerInfo.currentPin !== '0000' ? (remoteServerInfo as any).port : 3211,
             pin: remoteServerInfo.currentPin
-            // Add ip/port if needed, but 'remote:start' already returns them
         };
     });
 
     ipcMain.handle('open-projector', (event, displaySettings) => {
         createProjectorWindow(displaySettings);
+        return true;
+    });
+
+    ipcMain.handle('open-stage', (event, displaySettings) => {
+        createStageWindow(displaySettings);
         return true;
     });
 
@@ -472,6 +542,14 @@ app.whenReady().then(() => {
         if (projectorWindow && !projectorWindow.isDestroyed()) {
             projectorWindow.close();
             projectorWindow = null;
+        }
+        return true;
+    });
+
+    ipcMain.handle('close-stage', () => {
+        if (stageWindow && !stageWindow.isDestroyed()) {
+            stageWindow.close();
+            stageWindow = null;
         }
         return true;
     });
