@@ -5,6 +5,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/core/utils/cn';
 import { Monitor, Square, Columns, LayoutGrid, Eye, EyeOff } from 'lucide-react';
 import { StageCardConfig, StageCardId } from '@/core/types';
+import { CustomSlider } from '@/components/CustomSlider';
 
 const StageSettings: React.FC = () => {
     const { t } = useTranslation();
@@ -50,38 +51,26 @@ const StageSettings: React.FC = () => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {/* Gap Slider */}
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label className="text-sm font-semibold text-stone-300">{t('grid_gap', 'Card Spacing')}</label>
-                            <span className="text-xs text-stone-500 font-mono bg-stone-950 px-2 py-1 rounded-md">{stage.gap}px</span>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="64"
-                            step="4"
-                            value={stage.gap}
-                            onChange={(e) => updateStageSettings({ gap: Number(e.target.value) })}
-                            className="w-full accent-accent bg-stone-800 rounded-full h-1.5 appearance-none"
-                        />
-                    </div>
+                    <CustomSlider
+                        label={t('grid_gap', 'Card Spacing')}
+                        value={stage.gap}
+                        min={0}
+                        max={64}
+                        step={4}
+                        unit="px"
+                        onChange={(val) => updateStageSettings({ gap: val })}
+                    />
 
                     {/* Corner Radius Slider */}
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <label className="text-sm font-semibold text-stone-300">{t('corner_radius', 'Corner Radius')}</label>
-                            <span className="text-xs text-stone-500 font-mono bg-stone-950 px-2 py-1 rounded-md">{stage.cornerRadius}px</span>
-                        </div>
-                        <input
-                            type="range"
-                            min="0"
-                            max="48"
-                            step="4"
-                            value={stage.cornerRadius}
-                            onChange={(e) => updateStageSettings({ cornerRadius: Number(e.target.value) })}
-                            className="w-full accent-accent bg-stone-800 rounded-full h-1.5 appearance-none"
-                        />
-                    </div>
+                    <CustomSlider
+                        label={t('corner_radius', 'Corner Radius')}
+                        value={stage.cornerRadius}
+                        min={0}
+                        max={48}
+                        step={4}
+                        unit="px"
+                        onChange={(val) => updateStageSettings({ cornerRadius: val })}
+                    />
                 </div>
             </div>
 
