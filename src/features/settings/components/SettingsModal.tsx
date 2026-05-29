@@ -9,7 +9,8 @@ import LogoSettings from './LogoSettings';
 import OverrideSettings from './OverrideSettings';
 import ShortcutsSettings from './ShortcutsSettings';
 import RemoteSettings from './RemoteSettings';
-import { X, Globe, Database, Monitor, Info, ImageIcon, Layers, Command, Smartphone } from 'lucide-react';
+import StageSettings from './StageSettings';
+import { X, Globe, Database, Monitor, Info, ImageIcon, Layers, Command, Smartphone, Airplay } from 'lucide-react';
 
 interface SettingsModalProps {
     isOpen: boolean;
@@ -31,6 +32,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             case 'overrides': return <OverrideSettings />;
             case 'shortcuts': return <ShortcutsSettings />;
             case 'remote': return <RemoteSettings />;
+            case 'stage': return <StageSettings />;
             case 'about': return <AboutSettings />;
             default: return <GeneralSettings />;
         }
@@ -69,6 +71,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'overrides' && <Layers className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'shortcuts' && <Command className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'remote' && <Smartphone className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
+                                    {activeTab === 'stage' && <Monitor className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                     {activeTab === 'about' && <Info className="w-6 h-6 text-accent animate-in zoom-in duration-500" />}
                                 </div>
                             </div>
@@ -81,6 +84,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     <span className="w-1 h-1 rounded-full bg-stone-800" />
                                     <span className="text-[10px] font-bold text-accent uppercase tracking-[0.3em]">
                                         {activeTab === 'remote' && t('remote_control_title')}
+                                        {activeTab === 'stage' && t('stage_screen_title', 'Stage Screen')}
                                         {activeTab === 'general' && t('general')}
                                         {activeTab === 'displays' && t('displays')}
                                         {activeTab === 'data' && t('data')}
@@ -96,6 +100,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
                                     {activeTab === 'overrides' && t('overrides', 'Overrides')}
                                     {activeTab === 'shortcuts' && t('shortcuts', 'Shortcuts')}
                                     {activeTab === 'remote' && t('remote_control_title', 'Remote Control')}
+                                    {activeTab === 'stage' && t('stage_screen_title', 'Stage Screen')}
                                     {activeTab === 'about' && t('about_app')}
                                 </h2>
                             </div>
@@ -123,7 +128,12 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose }) => {
             </div>
 
             {/* Click outside to close (backdrop) */}
-            <div className="absolute inset-0 -z-10" onClick={onClose} />
+            <button
+                type="button"
+                aria-label={t('close', 'Close')}
+                className="absolute inset-0 -z-10 w-full h-full cursor-default bg-transparent"
+                onClick={onClose}
+            />
         </div>
     );
 };

@@ -17,6 +17,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, setActiveT
         { id: 'overrides', label: t('overrides', 'Overrides'), icon: Layers, description: t('overrides_description', 'Black, white & logo screens') },
         { id: 'shortcuts', label: t('shortcuts', 'Shortcuts'), icon: Command, description: t('hotkeys_overview', 'App keyboard shortcuts') },
         { id: 'remote', label: t('remote_control_title', 'Remote Control'), icon: Smartphone, description: t('remote_control_desc', 'Connect your mobile device to control presentation') },
+        { id: 'stage', label: t('stage_screen_title', 'Stage Screen'), icon: Monitor, description: t('stage_screen_desc', 'Layout for the stage monitor') },
         { id: 'about', label: t('about_app'), icon: Info, description: t('about_description') },
     ];
 
@@ -53,7 +54,7 @@ const SettingsSidebar: React.FC<SettingsSidebarProps> = ({ activeTab, setActiveT
                             >
                                 <div className="flex items-center gap-3">
                                     <div className={cn(
-                                        "p-2 rounded-lg transition-all duration-300",
+                                        "p-2 rounded-xl transition-all duration-300",
                                         isActive ? "bg-accent shadow-[0_0_15px_var(--accent-glow)]" : "bg-stone-900 group-hover:bg-stone-800"
                                     )}>
                                         <Icon className={cn("w-4 h-4", isActive ? "text-accent-foreground" : "text-stone-400")} />

@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Monitor, Cpu, ScreenShare } from 'lucide-react';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/core/utils/cn';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 interface IDisplayInfo {
     id: number;
@@ -15,7 +16,10 @@ interface IDisplayInfo {
 
 const DisplaySettings: React.FC = () => {
     const { t } = useTranslation();
-    const { settings, updateDisplay } = usePresenterStore();
+    const { settings, updateDisplay } = usePresenterStore(useShallow(state => ({
+        settings: state.settings,
+        updateDisplay: state.updateDisplay
+    })));
     const [displays, setDisplays] = useState<IDisplayInfo[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -28,7 +32,7 @@ const DisplaySettings: React.FC = () => {
 
                     // If auto-defining, calculate current aspect ratio
                     if (settings.display.autoDefine && data.length > 0) {
-                        const externalDisplay = data.find((d: any) => d.bounds.x !== 0 || d.bounds.y !== 0);
+                        const externalDisplay = data.find((d: IDisplayInfo) => d.bounds.x !== 0 || d.bounds.y !== 0);
                         const display = externalDisplay || data[0];
                         const ratio = display.size.width / display.size.height;
                         if (settings.display.aspectRatio !== ratio) {
@@ -66,6 +70,12 @@ const DisplaySettings: React.FC = () => {
         if (settings.display.autoDefine) return;
         const currentId = settings.display.previewDisplayId;
         updateDisplay({ previewDisplayId: currentId === id ? undefined : id });
+    };
+
+    const setStageDisplay = (id: number) => {
+        if (settings.display.autoDefine) return;
+        const currentId = settings.display.stageDisplayId;
+        updateDisplay({ stageDisplayId: currentId === id ? undefined : id });
     };
 
     return (
@@ -113,6 +123,7 @@ const DisplaySettings: React.FC = () => {
                     displays.map((display) => {
                         const isPresenter = settings.display.presenterDisplayId === display.id;
                         const isPreview = settings.display.previewDisplayId === display.id;
+                        const isStage = settings.display.stageDisplayId === display.id;
                         const isMain = display.bounds.x === 0 && display.bounds.y === 0;
 
                         return (
@@ -120,7 +131,7 @@ const DisplaySettings: React.FC = () => {
                                 key={display.id}
                                 className={cn(
                                     "bg-stone-900/40 border transition-all duration-300 rounded-3xl p-6 relative overflow-hidden group",
-                                    (isPresenter || isPreview) ? "border-accent/30 bg-accent/5" : "border-white/5"
+                                    (isPresenter || isPreview || isStage) ? "border-accent/30 bg-accent/5" : "border-white/5"
                                 )}
                             >
                                 <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-accent/5 blur-2xl rounded-full group-hover:bg-accent/10 transition-colors" />
@@ -139,7 +150,7 @@ const DisplaySettings: React.FC = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    <span className="text-[10px] font-mono text-stone-600 bg-stone-950/50 px-2 py-1 rounded-md">
+                                    <span className="text-[10px] font-mono text-stone-600 bg-stone-950/50 px-2 py-1 rounded-xl">
                                         {display.size.width}x{display.size.height}
                                     </span>
                                 </div>
@@ -171,6 +182,20 @@ const DisplaySettings: React.FC = () => {
                                     >
                                         <Monitor className="w-3 h-3" />
                                         {t('preview_display')}
+                                    </button>
+
+                                    <button
+                                        disabled={settings.display.autoDefine}
+                                        onClick={() => setStageDisplay(display.id)}
+                                        className={cn(
+                                            "flex items-center justify-center gap-2 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border",
+                                            isStage
+                                                ? "bg-stone-200 text-stone-950 border-white shadow-xl"
+                                                : "bg-stone-950/50 border-white/5 text-stone-500 hover:text-stone-300 hover:bg-stone-800/40 disabled:opacity-30 disabled:cursor-not-allowed"
+                                        )}
+                                    >
+                                        <Monitor className="w-3 h-3" />
+                                        {t('stage_display', 'Stage Display')}
                                     </button>
                                 </div>
                             </div>
