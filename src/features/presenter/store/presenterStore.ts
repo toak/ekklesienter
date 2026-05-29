@@ -19,6 +19,8 @@ interface PresenterStore {
     updateDisplay: (display: Partial<PresenterSettings['display']>) => void;
     updateLogo: (logo: Partial<PresenterSettings['logo']>) => void;
     updateAudioSettings: (audio: Partial<PresenterSettings['audio']>) => void;
+    updateStageSettings: (stage: Partial<PresenterSettings['stage']>) => void;
+    toggleStageQr: (show: boolean) => void;
     updateOverrideBackground: (type: 'blackout' | 'whiteout' | 'logo', layers: IStyleLayer[]) => void;
     addCustomLogo: (logo: ILogo) => void;
     removeCustomLogo: (logoId: string) => void;
@@ -110,6 +112,17 @@ export const DEFAULT_SETTINGS: PresenterSettings = {
         customLogos: [],
         customGroups: [],
         logoGroups: []
+    },
+    stage: {
+        layout: [
+            { id: 'current', visible: true, x: 0, y: 0, w: 8, h: 8 },
+            { id: 'next', visible: true, x: 8, y: 0, w: 4, h: 4 },
+            { id: 'prev', visible: true, x: 8, y: 4, w: 4, h: 4 },
+            { id: 'sound', visible: true, x: 0, y: 8, w: 12, h: 2 }
+        ],
+        gap: 24,
+        cornerRadius: 24,
+        showRemoteQr: false
     },
     audio: {
         defaultFadeDuration: 1.0
@@ -262,6 +275,26 @@ export const usePresenterStore = create<PresenterStore>()(
                     settings: {
                         ...state.settings,
                         audio: { ...state.settings.audio, ...audio }
+                    }
+                }));
+                get().syncSettings();
+            },
+
+            updateStageSettings: (stage) => {
+                set((state) => ({
+                    settings: {
+                        ...state.settings,
+                        stage: { ...state.settings.stage, ...stage }
+                    }
+                }));
+                get().syncSettings();
+            },
+
+            toggleStageQr: (show) => {
+                set((state) => ({
+                    settings: {
+                        ...state.settings,
+                        stage: { ...state.settings.stage, showRemoteQr: show }
                     }
                 }));
                 get().syncSettings();
@@ -444,6 +477,11 @@ export const usePresenterStore = create<PresenterStore>()(
                 // Add default audio settings if missing
                 if (state.settings && !state.settings.audio) {
                     state.settings.audio = DEFAULT_SETTINGS.audio;
+                }
+                
+                // Add default stage settings if missing
+                if (state.settings && !state.settings.stage) {
+                    state.settings.stage = DEFAULT_SETTINGS.stage;
                 }
 
                 if (version === 0 && state.settings) {

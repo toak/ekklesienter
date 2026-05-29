@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { Play, Pause, Volume2, VolumeX, Gauge, Monitor, Music, SkipBack, SkipForward, Circle } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Gauge, Monitor, Music, SkipBack, SkipForward, Circle, QrCode } from 'lucide-react';
 import { usePresentationStore } from '../../store/presentationStore';
+import { usePresenterStore } from '../../store/presenterStore';
 import { IVideoSlide, ISlide } from '@/core/types/presentation';
 import { LiveSyncService } from '@/core/services/liveSyncService';
 import { cn } from '@/core/utils/cn';
 import { db } from '@/core/db';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { audioService } from '../../services/AudioService';
 
 /**
  * Formats seconds into MM:SS or HH:MM:SS display.
@@ -37,6 +39,8 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
 }) => {
   const { t } = useTranslation();
   const liveSlideId = usePresentationStore(s => s.liveSlideId);
+  const toggleStageQr = usePresenterStore(s => s.toggleStageQr);
+  const showStageQr = usePresenterStore(s => s.settings.stage?.showRemoteQr ?? false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const speedButtonRef = useRef<HTMLButtonElement>(null);
   const [menuPosition, setMenuPosition] = useState({ bottom: 0, right: 0 });
@@ -117,19 +121,30 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
     }
   }, [liveSlideId]);
 
-  // Audio Status Listener
+  // Audio Status Listener (Local Polling)
   useEffect(() => {
-    const unsub = LiveSyncService.onAudioStatus((data) => {
+    const interval = setInterval(() => {
         // Optimistic UI: Ignore status if we've interacted recently
         if (performance.now() - lastInteractionRef.current < 1000) return;
 
-        if (!data.scopeId) {
-            setAudioStatus(null);
+        const activeId = audioService.targetScopeId;
+        if (activeId) {
+            const progress = audioService.getTrackProgress(activeId);
+            const track = audioService.activeTracks.get(activeId);
+            if (progress && track) {
+                setAudioStatus({
+                    scopeId: activeId,
+                    currentTime: progress.currentTime,
+                    duration: progress.duration,
+                    isPlaying: progress.isPlaying,
+                    fileId: track.scope.fileId
+                });
+            }
         } else {
-            setAudioStatus(data);
+            setAudioStatus(null);
         }
-    });
-    return () => unsub();
+    }, 200);
+    return () => clearInterval(interval);
   }, []);
 
   const isAudioMode = !settings && !!audioStatus;
@@ -155,7 +170,10 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
     if (isAudioMode && audioStatus) {
         lastInteractionRef.current = performance.now();
         setAudioStatus(prev => prev ? { ...prev, isPlaying: !prev.isPlaying } : null);
-        LiveSyncService.sendAudioCommand(audioStatus.scopeId, 'toggle');
+        
+        const progress = audioService.getTrackProgress(audioStatus.scopeId);
+        if (progress?.isPlaying) audioService.pauseTrack(audioStatus.scopeId);
+        else audioService.playTrack(audioStatus.scopeId);
         return;
     }
 
@@ -183,7 +201,7 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
         return { ...prev, isPlaying: true, currentTime: startTime };
       }
     });
-  }, [liveSlideId, isAudioMode, audioStatus]);
+  }, [liveSlideId, isAudioMode, audioStatus, liveSlideInfo?.type]);
 
   // ── Sync playState with Projector Heartbeat (ground truth) ──
   // The LiveMediaToolbar is fully independent from the preview viewport.
@@ -225,7 +243,6 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
 
     // Request initial status immediately on mount
     LiveSyncService.requestVideoStatus();
-    LiveSyncService.sendAudioCommand('', 'request-status' as any);
 
     return () => {
         unsubStatus?.();
@@ -266,7 +283,7 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
     
     if (isAudioMode && audioStatus) {
         setAudioStatus(prev => prev ? { ...prev, currentTime: time } : null);
-        LiveSyncService.sendAudioCommand(audioStatus.scopeId, 'seek', time);
+        audioService.seekTrack(audioStatus.scopeId, time);
         return;
     }
 
@@ -382,10 +399,10 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
   };
 
   return (
-    <div className="w-full flex h-12 bg-[#171717] border-t border-[#262626] relative z-20 shrink-0 select-none">
+    <div className="w-full flex h-12 bg-stone-900 border-t border-white/5 relative z-20 shrink-0 select-none">
       {/* Track Header (Aligned with main timeline tracks) */}
       <div className={cn(
-        "w-20 shrink-0 flex flex-col items-center justify-center gap-0.5 border-r border-[#262626] bg-[#1a1a1a] transition-colors",
+        "w-20 shrink-0 flex flex-col items-center justify-center gap-0.5 border-r border-white/5 bg-stone-950 transition-colors",
         isAudioMode ? "text-amber-500/80" : "text-accent/80"
       )}>
         {isAudioMode ? <Music className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
@@ -502,7 +519,7 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
                 </button>
                 {showSpeedMenu && createPortal(
                 <div 
-                    className="fixed bg-[#171717] border border-[#262626] rounded-lg shadow-xl py-1 min-w-[100px] z-100 animate-in fade-in zoom-in-95"
+                    className="fixed bg-stone-900 border border-white/5 rounded-lg shadow-xl py-1 min-w-[100px] z-100 animate-in fade-in zoom-in-95"
                     style={{ 
                     bottom: menuPosition.bottom,
                     right: menuPosition.right
@@ -528,6 +545,18 @@ export const LiveMediaToolbar: React.FC<LiveMediaToolbarProps> = ({
         )}
 
         <div className="flex items-center gap-2 px-1">
+          <button
+            onClick={() => toggleStageQr(!showStageQr)}
+            className={cn(
+              "h-8 px-2 flex items-center gap-1.5 rounded-md transition-colors cursor-pointer text-[11px] font-medium mr-2",
+              showStageQr ? "bg-accent/20 text-accent hover:bg-accent/30" : "hover:bg-white/10 text-stone-300"
+            )}
+            title={t('toggle_stage_qr', 'Toggle Stage QR')}
+          >
+            <QrCode className="w-3.5 h-3.5" />
+            {t('stage_qr', 'Stage QR')}
+          </button>
+
           <button
             onClick={handleMuteToggle}
             className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-white/10 transition-colors cursor-pointer"
