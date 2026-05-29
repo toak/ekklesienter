@@ -284,7 +284,7 @@ export const usePresenterStore = create<PresenterStore>()(
                 set((state) => ({
                     settings: {
                         ...state.settings,
-                        stage: { ...state.settings.stage, ...stage }
+                        stage: { ...(state.settings.stage ?? DEFAULT_SETTINGS.stage), ...stage }
                     }
                 }));
                 get().syncSettings();
@@ -294,7 +294,7 @@ export const usePresenterStore = create<PresenterStore>()(
                 set((state) => ({
                     settings: {
                         ...state.settings,
-                        stage: { ...state.settings.stage, showRemoteQr: show }
+                        stage: { ...(state.settings.stage ?? DEFAULT_SETTINGS.stage), showRemoteQr: show }
                     }
                 }));
                 get().syncSettings();
