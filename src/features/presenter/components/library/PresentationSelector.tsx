@@ -31,6 +31,7 @@ import { toast } from '@/core/utils/toast';
 import { truncateMiddle } from '@/core/utils/markdownUtils';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 import { getUniquePresentationName } from '@/core/utils/nameUtils';
+import { DropdownSelector } from '@/shared/ui/DropdownSelector';
 
 interface PresentationSelectorProps {
     className?: string;
@@ -118,6 +119,11 @@ const PresentationSelector: React.FC<PresentationSelectorProps> = ({ className }
 
         // 5. Sorting
         list.sort((a, b) => {
+            if (sortBy === 'lastOpened') {
+                if (a.isStarred && !b.isStarred) return -1;
+                if (!a.isStarred && b.isStarred) return 1;
+            }
+
             if (sortBy === 'alphabetical') {
                 return a.name.localeCompare(b.name);
             }
@@ -126,7 +132,7 @@ const PresentationSelector: React.FC<PresentationSelectorProps> = ({ className }
                 const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
                 return dateB - dateA;
             }
-            // Default: lastOpened / updatedAt
+            // Default: lastOpened / updatedAt (fallback when both are starred or both are unstarred)
             const dateA = a.lastOpened ? new Date(a.lastOpened).getTime() : (a.updatedAt ? new Date(a.updatedAt).getTime() : 0);
             const dateB = b.lastOpened ? new Date(b.lastOpened).getTime() : (b.updatedAt ? new Date(b.updatedAt).getTime() : 0);
             return dateB - dateA;
@@ -313,6 +319,23 @@ const PresentationSelector: React.FC<PresentationSelectorProps> = ({ className }
         }
     };
 
+    const typeOptions = [
+        { value: 'all', label: t('type_all', 'All Types') },
+        { value: 'master', label: t('type_master', 'Master') },
+        { value: 'usual', label: t('type_usual', 'Usual') }
+    ];
+
+    const tagOptions = [
+        { value: '', label: t('filter_tags', 'Tags') },
+        ...allExistingTags.map(tag => ({ value: tag, label: tag }))
+    ];
+
+    const sortOptions = [
+        { value: 'lastOpened', label: t('last_opened', 'Recent') },
+        { value: 'alphabetical', label: t('alphabetical', 'A-Z') },
+        { value: 'createdAt', label: t('date_created', 'Created') }
+    ];
+
     return (
         <div className={cn("relative", className)}>
             <button
@@ -403,41 +426,30 @@ const PresentationSelector: React.FC<PresentationSelectorProps> = ({ className }
                                 </button>
 
                                 {/* Type Dropdown */}
-                                <select
+                                <DropdownSelector
                                     value={filterType}
-                                    onChange={(e: any) => setFilterType(e.target.value)}
-                                    className="bg-white/5 border border-white/5 rounded-lg px-1.5 py-1 text-[10px] text-stone-300 focus:outline-none focus:border-accent/40 transition-all cursor-pointer min-w-0 flex-1"
-                                >
-                                    <option value="all" className="bg-stone-900">{t('type_all', 'All Types')}</option>
-                                    <option value="master" className="bg-stone-900">{t('type_master', 'Master')}</option>
-                                    <option value="usual" className="bg-stone-900">{t('type_usual', 'Usual')}</option>
-                                </select>
+                                    options={typeOptions}
+                                    onChange={(val) => setFilterType(val as any)}
+                                    className="h-7 px-1.5 py-1 text-[10px] bg-white/5 border-white/5 rounded-lg flex-1 min-w-0 font-bold leading-none select-none hover:bg-white/10 hover:border-white/10"
+                                />
 
                                 {/* Tag Dropdown */}
-                                <select
+                                <DropdownSelector
                                     value={selectedTag}
-                                    onChange={(e) => setSelectedTag(e.target.value)}
-                                    className="bg-white/5 border border-white/5 rounded-lg px-1.5 py-1 text-[10px] text-stone-300 focus:outline-none focus:border-accent/40 transition-all cursor-pointer min-w-0 flex-1"
-                                >
-                                    <option value="" className="bg-stone-900">{t('filter_tags', 'Tags')}</option>
-                                    {allExistingTags.map(tag => (
-                                        <option key={tag} value={tag} className="bg-stone-900">{tag}</option>
-                                    ))}
-                                </select>
+                                    options={tagOptions}
+                                    onChange={(val) => setSelectedTag(val)}
+                                    placeholder={t('filter_tags', 'Tags')}
+                                    className="h-7 px-1.5 py-1 text-[10px] bg-white/5 border-white/5 rounded-lg flex-1 min-w-0 font-bold leading-none select-none hover:bg-white/10 hover:border-white/10"
+                                />
 
                                 {/* Sort Dropdown */}
-                                <div className="relative flex items-center shrink-0">
-                                    <select
-                                        value={sortBy}
-                                        onChange={(e: any) => setSortBy(e.target.value)}
-                                        className="bg-white/5 border border-white/5 rounded-lg pl-5 pr-1.5 py-1 text-[10px] text-stone-300 focus:outline-none focus:border-accent/40 transition-all cursor-pointer min-w-[75px]"
-                                    >
-                                        <option value="lastOpened" className="bg-stone-900">{t('last_opened', 'Recent')}</option>
-                                        <option value="alphabetical" className="bg-stone-900">{t('alphabetical', 'A-Z')}</option>
-                                        <option value="createdAt" className="bg-stone-900">{t('date_created', 'Created')}</option>
-                                    </select>
-                                    <ArrowUpDown className="absolute left-1.5 top-1/2 -translate-y-1/2 w-2.5 h-2.5 text-stone-500 pointer-events-none" />
-                                </div>
+                                <DropdownSelector
+                                    value={sortBy}
+                                    options={sortOptions}
+                                    onChange={(val) => setSortBy(val as any)}
+                                    icon={<ArrowUpDown className="w-2.5 h-2.5 text-stone-500" />}
+                                    className="h-7 pl-1.5 pr-1 py-1 text-[10px] bg-white/5 border-white/5 rounded-lg shrink-0 min-w-[85px] font-bold leading-none select-none hover:bg-white/10 hover:border-white/10"
+                                />
                             </div>
                         </div>
 
