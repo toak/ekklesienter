@@ -55,7 +55,7 @@ export interface IVerseSlide extends IBaseSlide {
   textStyle?: Record<string, any>;
 }
 
-export interface ITimerSlide extends IBaseSlide {
+export interface ITimerSlide extends IBaseSlide, Partial<ITimerSettings> {
   type: 'timer';
   durationSec: number;
   countDirection: 'up' | 'down';
@@ -161,6 +161,8 @@ export interface IPresentationFile {
   fileHandle?: any; // Persistent handle for incremental saves
   thumbnailUrl?: string; // Local blob URL or base64 for the first slide preview
   hasPreview?: boolean; // Flag to indicate if a preview.png exists in the ZIP
+  isStarred?: boolean;
+  tags?: string[];
 
   slideStorageMode?: 'inline' | 'split';
   slideIndex?: Array<{ id: string; order: number; type?: SlideType }>;
