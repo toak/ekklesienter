@@ -4,11 +4,17 @@ import { useHistoryStore } from '@/core/store/historyStore';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { Clock, History as HistoryIcon, Trash2, ChevronRight } from 'lucide-react';
 import { getBookName } from '@/core/data/bookData';
+import { useShallow } from 'zustand/react/shallow';
 
-const HistoryPanel: React.FC = () => {
+const HistoryPanel: React.FC = React.memo(() => {
     const { t, i18n } = useTranslation();
-    const { history, clearHistory } = useHistoryStore();
-    const { setActiveVerse } = useBibleStore();
+    const { history, clearHistory } = useHistoryStore(useShallow(s => ({
+        history: s.history,
+        clearHistory: s.clearHistory
+    })));
+    const { setActiveVerse } = useBibleStore(useShallow(s => ({
+        setActiveVerse: s.setActiveVerse
+    })));
     const lang = i18n.language?.substring(0, 2) || 'en';
 
     if (history.length === 0) {
@@ -31,8 +37,9 @@ const HistoryPanel: React.FC = () => {
                 </div>
                 <button
                     onClick={clearHistory}
-                    className="p-1.5 hover:bg-red-500/10 hover:text-red-400 text-stone-500 rounded-lg transition-all"
+                    className="p-1.5 hover:bg-red-500/10 hover:text-red-400 text-stone-500 rounded-xl transition-all"
                     title={t('clear_history', 'Clear History')}
+                    aria-label={t('clear_history', 'Clear History')}
                 >
                     <Trash2 className="w-4 h-4" />
                 </button>
@@ -61,6 +68,8 @@ const HistoryPanel: React.FC = () => {
             </div>
         </div>
     );
-};
+});
+
+HistoryPanel.displayName = 'HistoryPanel';
 
 export default HistoryPanel;

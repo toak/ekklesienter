@@ -7,6 +7,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { cn } from '@/core/utils/cn';
 import SlideDisplay from './SlideDisplay';
 import { usePresentationStore } from '../../store/presentationStore';
+import { PresenterService } from '../../services/presenterService';
+import { QRCodeSVG } from 'qrcode.react';
 
 const StageView: React.FC = () => {
     const { t } = useTranslation();

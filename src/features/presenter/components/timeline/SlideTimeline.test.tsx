@@ -35,6 +35,9 @@ const { mockPresentationStore } = vi.hoisted(() => ({
     removeSlide: vi.fn(),
     moveSlide: vi.fn(),
     toggleSlideExpansion: vi.fn(),
+    syncNestedPresentation: vi.fn(),
+    setCachedNestedPresentation: vi.fn(),
+    nestedPresentationsCache: {},
   }
 }));
 
@@ -58,9 +61,13 @@ vi.mock('@/core/store/modalStore', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, defaultValue: string) => defaultValue,
+    t: (key: string, options: any) => typeof options === 'string' ? options : (options?.defaultValue || key),
     i18n: { language: 'en' },
   }),
+  initReactI18next: {
+    type: '3rdParty',
+    init: vi.fn(),
+  },
 }));
 
 vi.mock('jotai', () => ({
@@ -77,6 +84,7 @@ vi.mock('@/core/store/uiAtoms', () => ({
   slideDesignTabAtom: { initialValue: 'design' },
   selectedTransitionSlideIdAtom: { initialValue: null },
   selectedCanvasItemIdsAtom: { initialValue: [] },
+  latestInteractionAreaAtom: { initialValue: 'timeline' },
 }));
 
 vi.mock('dexie-react-hooks', () => ({

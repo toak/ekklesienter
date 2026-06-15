@@ -234,38 +234,15 @@ export class MyBibleParser {
             // Cache for dynamic ID mapping (fuzzy match results)
             const dynamicBookMap: Record<number, string> = {};
 
-            // Convert booksMap to Book array, sorted by canonical order
-            const books: Book[] = [];
-            for (const [bookId, data] of booksMap) {
-                books.push({
-                    bookId: bookId,
-                    translationId,
-                    name: data.name,
-                    chapters: [...data.chapters].sort((a, b) => a - b)
-                });
-            }
-            books.sort((a, b) => getBookOrder(a.bookId) - getBookOrder(b.bookId));
-
-            // Emit metadata early if streaming is supported
-            if (onProgress) {
-                onProgress('metadata', { translation, books });
-            }
-
-            const CHUNK_SIZE = 2000;
-            let currentChunk: Verse[] = [];
-
+            // STEP 1: Preliminary pass to build booksMap and resolve dynamicBookMap
             for (let i = 0; i < rawVerses.length; i++) {
                 const row = rawVerses[i];
                 const bookNumber = Number(row[0]);
                 const chapter = Number(row[1]);
-                const verseNumber = Number(row[2]);
-                const text = cleanText(String(row[3]));
 
-                // CHECK 1: Standard Static Mapping or Dynamic Cache
                 let bookId = bookMap[bookNumber] || dynamicBookMap[bookNumber];
-
-                // Get book name
                 let bookName = '';
+
                 if (customBookNames[bookNumber]) {
                     bookName = customBookNames[bookNumber];
                 } else if (bookId) {
@@ -316,6 +293,37 @@ export class MyBibleParser {
                     booksMap.set(bookId, { chapters: new Set(), name: bookName });
                 }
                 booksMap.get(bookId)!.chapters.add(chapter);
+            }
+
+            // Convert booksMap to Book array, sorted by canonical order
+            const books: Book[] = [];
+            for (const [bookId, data] of booksMap) {
+                books.push({
+                    bookId: bookId,
+                    translationId,
+                    name: data.name,
+                    chapters: [...data.chapters].sort((a, b) => a - b)
+                });
+            }
+            books.sort((a, b) => getBookOrder(a.bookId) - getBookOrder(b.bookId));
+
+            // Emit metadata early if streaming is supported
+            if (onProgress) {
+                onProgress('metadata', { translation, books });
+            }
+
+            const CHUNK_SIZE = 2000;
+            let currentChunk: Verse[] = [];
+
+            for (let i = 0; i < rawVerses.length; i++) {
+                const row = rawVerses[i];
+                const bookNumber = Number(row[0]);
+                const chapter = Number(row[1]);
+                const verseNumber = Number(row[2]);
+                const text = cleanText(String(row[3]));
+
+                let bookId = bookMap[bookNumber] || dynamicBookMap[bookNumber];
+                if (!bookId) continue;
 
                 const verse: Verse = {
                     translationId,

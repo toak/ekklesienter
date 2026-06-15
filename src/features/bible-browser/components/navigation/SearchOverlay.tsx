@@ -11,7 +11,7 @@ interface SearchOverlayProps {
   lang: string;
 }
 
-export const SearchOverlay: React.FC<SearchOverlayProps> = ({
+export const SearchOverlay: React.FC<SearchOverlayProps> = React.memo(({
   isSearching,
   searchResults,
   onResultClick,
@@ -23,7 +23,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     <div className="absolute inset-0 z-20 bg-stone-900 overflow-y-auto no-scrollbar animate-in fade-in duration-200">
       <div className="p-3 border-b border-white/5 sticky top-0 bg-stone-900/95 backdrop-blur-sm flex items-center justify-between">
         <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest">
-          {isSearching ? t('searching', 'Searching...') : t('found_verses', 'Found Verses')}
+          {isSearching ? t('search.searching', 'Searching...') : t('search.found_verses', 'Found Verses')}
         </span>
         {!isSearching && (
           <span className="text-[10px] text-accent font-medium">{searchResults.length}</span>
@@ -53,10 +53,12 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
         {!isSearching && searchResults.length === 0 && (
           <div className="py-20 text-center space-y-3">
             <Search className="w-10 h-10 text-stone-800 mx-auto" strokeWidth={1} />
-            <p className="text-sm text-stone-600 italic">{t('no_results_found', 'No verses found')}</p>
+            <p className="text-sm text-stone-600 italic">{t('search.no_results_found', 'No verses found')}</p>
           </div>
         )}
       </div>
     </div>
   );
-};
+});
+
+SearchOverlay.displayName = 'SearchOverlay';

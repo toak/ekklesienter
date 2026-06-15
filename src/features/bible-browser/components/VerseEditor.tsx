@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Verse } from '@/core/types';
 import { Save, X, Edit3, Keyboard } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
@@ -23,17 +23,25 @@ const VerseEditor: React.FC<VerseEditorProps> = ({ verse, onSave, onCancel }) =>
         }
     }, [text]);
 
-    const handleKeyDown = (e: React.KeyboardEvent) => {
+    const handleSave = useCallback(() => {
+        onSave(text);
+    }, [onSave, text]);
+
+    const handleCancel = useCallback(() => {
+        onCancel();
+    }, [onCancel]);
+
+    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
         // Stop event from bubbling to global listeners
         e.nativeEvent.stopImmediatePropagation();
         e.stopPropagation();
 
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-            onSave(text);
+            handleSave();
         } else if (e.key === 'Escape') {
-            onCancel();
+            handleCancel();
         }
-    };
+    }, [handleSave, handleCancel]);
 
     return (
         <div className="w-full p-6 bg-stone-900/60 backdrop-blur-xl border-b border-white/5 animate-in slide-in-from-left-2 fade-in duration-300">
@@ -79,8 +87,9 @@ const VerseEditor: React.FC<VerseEditorProps> = ({ verse, onSave, onCancel }) =>
 
                     <div className="flex gap-2 mt-2">
                         <button
-                            onClick={() => onSave(text)}
+                            onClick={handleSave}
                             title={t('save_changes')}
+                            aria-label={t('save_changes')}
                             className={cn(
                                 "flex-1 flex items-center justify-center h-10 rounded-xl transition-all active:scale-95 shadow-lg shadow-accent/10 whitespace-nowrap",
                                 "bg-accent text-accent-foreground hover:bg-accent/90"
@@ -89,8 +98,9 @@ const VerseEditor: React.FC<VerseEditorProps> = ({ verse, onSave, onCancel }) =>
                             <Save className="w-5 h-5" />
                         </button>
                         <button
-                            onClick={onCancel}
+                            onClick={handleCancel}
                             title={t('cancel')}
+                            aria-label={t('cancel')}
                             className="flex-1 flex items-center justify-center h-10 rounded-xl text-stone-500 hover:text-stone-200 hover:bg-white/5 transition-all active:scale-95 group whitespace-nowrap"
                         >
                             <X className="w-5 h-5 transition-transform group-hover:rotate-90" />

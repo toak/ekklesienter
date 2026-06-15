@@ -24,7 +24,7 @@ export const BibleSelectionVerseList: React.FC<BibleSelectionVerseListProps> = (
         </label>
         {selectedVerseNumbers.length > 0 && (
           <span className="text-[10px] font-bold text-amber-500/70">
-            {selectedVerseNumbers.length} {t('selected', 'selected')}
+            {t('selected_count', { count: selectedVerseNumbers.length, defaultValue: '{{count}} selected' })}
           </span>
         )}
       </div>

@@ -1,12 +1,15 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Create the local cached directory matching your target framework version
 
-# Run and deploy your AI Studio app
+mkdir -p ~/Library/Caches/electron/
 
-This contains everything you need to run your app locally.
+# Force download the exact framework zip file into your cache directory
 
-View your app in AI Studio: <https://ai.studio/apps/drive/1ZNt7jvcme7sRHAbuCnuF3yNEKLdbGsD->
+curl -L -o ~/Library/Caches/electron/electron-v40.9.3-darwin-x64.zip <https://npmmirror.com/mirrors/electron/40.9.3/electron-v40.9.3-darwin-x64.zip>
+curl -L -o ~/Library/Caches/electron/electron-v40.9.3-darwin-arm64.zip <https://npmmirror.com/mirrors/electron/40.9.3/electron-v40.9.3-darwin-arm64.zip>
+
+# Run with no mirrors declared; it picks up the pre-cached zips and pulls utilities from GitHub natively
+
+npm run build:all
 
 ## Run Locally
 

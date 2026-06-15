@@ -1,5 +1,6 @@
 import { BibleData, Book, Verse, Translation } from '@/core/types';
 import { SEQUENTIAL_TO_STANDARD, getBookName, getBookOrder } from '@/core/data/bookData';
+import { extractWords } from '@/features/search/utils/bibleSearchUtils';
 
 /**
  * Parsers for Zefania XML Bible Format
@@ -85,7 +86,8 @@ export class ZefaniaParser {
                         bookId,
                         chapter: cnumber,
                         verseNumber: vnumber,
-                        text
+                        text,
+                        words: extractWords(text)
                     });
                 });
             });

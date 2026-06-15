@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useShallow } from 'zustand/react/shallow';
 import { Search, CornerDownLeft, BookOpen, Clock, ChevronDown, ChevronRight, Hash, Sparkles, Wand2, ArrowRight } from 'lucide-react';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { useHistoryStore } from '@/core/store/historyStore';
@@ -31,8 +32,16 @@ const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose }) 
         setSelectedVerses,
         commitToProjector,
         currentTranslationId 
-    } = useBibleStore();
-    const { history } = useHistoryStore();
+    } = useBibleStore(useShallow(state => ({
+        currentBookId: state.currentBookId,
+        setBook: state.setBook,
+        setChapter: state.setChapter,
+        setActiveVerse: state.setActiveVerse,
+        setSelectedVerses: state.setSelectedVerses,
+        commitToProjector: state.commitToProjector,
+        currentTranslationId: state.currentTranslationId
+    })));
+    const history = useHistoryStore(state => state.history);
     
     const [query, setQuery] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -44,13 +53,13 @@ const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose }) 
         return saved ? JSON.parse(saved) : { references: true, topics: true, keywords: true };
     });
 
-    const toggleSection = (id: string) => {
+    const toggleSection = useCallback((id: string) => {
         setExpandedSections(prev => {
             const next = { ...prev, [id]: !prev[id] };
             localStorage.setItem('search_expanded_sections', JSON.stringify(next));
             return next;
         });
-    };
+    }, []);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const lang = i18n.language?.substring(0, 2) || 'en';
@@ -158,6 +167,10 @@ const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose }) 
         onClose();
     };
 
+    const handleUndoCorrection = useCallback(() => {
+        setQuery(q => q + ' ');
+    }, []);
+
     if (!isOpen) return null;
 
     const hasAnyResults = results.references.length > 0 || results.topics.length > 0 || results.keywords.length > 0;
@@ -204,7 +217,7 @@ const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose }) 
                             </span>
                         </div>
                         <button 
-                            onClick={() => setQuery(query + ' ')} // Trick to force re-parse without correcting
+                            onClick={handleUndoCorrection}
                             className="text-[10px] text-stone-500 hover:text-white uppercase tracking-wider font-bold"
                         >
                             {t('search.undo', 'Original query')}
@@ -231,7 +244,7 @@ const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose }) 
                                             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all text-left group"
                                         >
                                             <div className="flex items-center gap-3 min-w-0">
-                                                <div className="p-2 bg-stone-800 rounded-lg group-hover:bg-accent/20 transition-colors shrink-0">
+                                                <div className="p-2 bg-stone-800 rounded-xl group-hover:bg-accent/20 transition-colors shrink-0">
                                                     <BookOpen className="w-4 h-4 text-accent" />
                                                 </div>
                                                 <div className="min-w-0">
@@ -267,13 +280,13 @@ const QuickSearchModal: React.FC<QuickSearchModalProps> = ({ isOpen, onClose }) 
                                             className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all text-left group"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <div className="p-2 bg-stone-800 rounded-lg group-hover:bg-purple-500/20 transition-colors">
+                                                <div className="p-2 bg-stone-800 rounded-xl group-hover:bg-purple-500/20 transition-colors">
                                                     <Sparkles className="w-4 h-4 text-purple-400" />
                                                 </div>
                                                 <div>
                                                     <h4 className="text-sm font-bold text-white capitalize">{topic.query}</h4>
                                                     <p className="text-[10px] text-stone-500">
-                                                        {topic.refs?.length} {t('search.passages', 'scripture passages')}
+                                                        {t('search.passages_count', { count: topic.refs?.length || 0, defaultValue: '{{count}} scripture passages' })}
                                                     </p>
                                                 </div>
                                             </div>

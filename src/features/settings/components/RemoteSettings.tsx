@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useTranslation } from 'react-i18next';
-import { Smartphone, ServerCrash, Check, Copy, Wifi, ShieldCheck, QrCode } from 'lucide-react';
+import { Smartphone, ServerCrash, Check, Copy, Wifi, ShieldCheck, QrCode, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 const RemoteSettings: React.FC = () => {
@@ -11,13 +11,45 @@ const RemoteSettings: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
+    const [refreshing, setRefreshing] = useState(false);
+
+    const cleanupRemoteState = () => {
+        setServerInfo(null);
+        setError(null);
+        setLoading(true);
+    };
+
+    /**
+     * Refreshes the server network info.
+     * Tries getInfo() first — if the server is already running and Wi-Fi hasn't
+     * changed, the PIN and URL remain stable (no reconnect needed).
+     * Falls back to a full start() only when the server is unreachable.
+     */
+    const handleRefresh = async () => {
+        if (refreshing) return;
+        setRefreshing(true);
+        try {
+            if (window.electron?.ipcRenderer?.remote) {
+                const info = await window.electron.ipcRenderer.remote.getInfo();
+                if (info?.success) {
+                    setServerInfo({ ip: info.ip, port: info.port, pin: info.pin });
+                    setError(null);
+                } else {
+                    // Server not running — do a full restart
+                    await startServer();
+                }
+            }
+        } catch {
+            await startServer();
+        } finally {
+            setRefreshing(false);
+        }
+    };
 
     useEffect(() => {
         startServer();
         return () => {
-            setServerInfo(null);
-            setError(null);
-            setLoading(true);
+            cleanupRemoteState();
         };
     }, []);
 
@@ -25,9 +57,7 @@ const RemoteSettings: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            // @ts-ignore
             if (window.electron?.ipcRenderer?.remote) {
-                // @ts-ignore
                 const info = await window.electron.ipcRenderer.remote.start();
                 if (info.success) {
                     setServerInfo({ ip: info.ip, port: info.port, pin: info.pin });
@@ -37,8 +67,8 @@ const RemoteSettings: React.FC = () => {
             } else {
                 setError('IPC Bridge not available.');
             }
-        } catch (err: any) {
-            setError(err.message || 'Server start failed.');
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : 'Server start failed.');
         } finally {
             setLoading(false);
         }
@@ -140,7 +170,7 @@ const RemoteSettings: React.FC = () => {
                                 
                                 <div className="relative z-10 flex flex-col gap-3">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-lg bg-stone-800 border border-white/5 flex items-center justify-center">
+                                        <div className="w-6 h-6 rounded-xl bg-stone-800 border border-white/5 flex items-center justify-center">
                                             <QrCode size={12} className="text-stone-400" />
                                         </div>
                                         <h3 className="text-xs font-bold text-stone-500 uppercase tracking-widest">{t('remote_auth_pin')}</h3>
@@ -176,6 +206,15 @@ const RemoteSettings: React.FC = () => {
                     <div className="mt-2 group">
                         <div className="flex items-center justify-between mb-2 px-1">
                             <label className="text-[10px] text-stone-500 font-bold uppercase tracking-widest">{t('remote_enter_url_manually')}</label>
+                            <button
+                                onClick={handleRefresh}
+                                disabled={refreshing}
+                                className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-stone-500 hover:text-accent transition-colors disabled:opacity-40 cursor-pointer"
+                                title={t('remote_refresh_network')}
+                            >
+                                <RefreshCw size={11} className={refreshing ? 'animate-spin' : ''} />
+                                <span>{t('remote_refresh_network')}</span>
+                            </button>
                         </div>
                         <div className="flex items-center pl-4 pr-1.5 py-1.5 bg-stone-900/40 border border-white/5 hover:border-white/10 hover:bg-stone-900/60 rounded-2xl transition-all duration-300 focus-within:border-white/10 focus-within:bg-stone-900/60">
                             <div className="flex-1 text-[13px] font-mono text-stone-400 select-all overflow-hidden text-ellipsis whitespace-nowrap md:min-w-0 min-w-0 pr-4 my-2">

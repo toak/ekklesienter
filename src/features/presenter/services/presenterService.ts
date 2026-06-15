@@ -1,5 +1,5 @@
 import { IProjectorCommand, IProjectorState } from '@/core/types';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 /**
  * Service for handling presenter-specific logic and IPC communication.

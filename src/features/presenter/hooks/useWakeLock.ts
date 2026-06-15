@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { usePresentationStore } from '../store/presentationStore';
-import { WakeLockService } from '@/core/services/WakeLockService';
+import { WakeLockService } from '@/core/services/wakeLockService';
 
 /**
  * Hook to manage screen wake lock based on the live presentation state.
@@ -11,8 +11,6 @@ export const useWakeLock = () => {
 
     useEffect(() => {
         const isLive = !!liveSlideId;
-        
-        console.log(`[useWakeLock] Live status changed: ${isLive}`);
         
         WakeLockService.setWakeLock(isLive).catch(err => {
             console.error('[useWakeLock] Error toggling wake lock:', err);

@@ -27,7 +27,7 @@ export interface ILayerRowProps {
     onRemove: (id: string) => void;
 }
 
-export const LayerRow: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect, onUpdate, onRemove }) => {
+const LayerRowComponent: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect, onUpdate, onRemove }) => {
     const { t } = useTranslation();
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
     const style = { transform: CSS.Transform.toString(transform), transition };
@@ -126,3 +126,5 @@ export const LayerRow: React.FC<ILayerRowProps> = ({ item, isSelected, onSelect,
         </div>
     );
 };
+
+export const LayerRow = React.memo(LayerRowComponent);

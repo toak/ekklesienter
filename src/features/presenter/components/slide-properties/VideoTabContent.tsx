@@ -10,11 +10,12 @@ import { CustomSlider } from '@/components/CustomSlider';
 import { ScrubbableInput } from './ScrubbableInput';
 import { IVideoSettings, VIDEO_MAX_FILE_SIZE } from '@/core/types';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useShallow } from 'zustand/react/shallow';
 import { db } from '@/core/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { toast } from '@/core/utils/toast';
-import { IpcService } from '@/core/services/IpcService';
-import { ffmpegService } from '@/core/services/FFmpegService';
+import { IpcService } from '@/core/services/ipcService';
+import { ffmpegService } from '@/core/services/ffmpegService';
 
 const SPEED_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 4];
 
@@ -74,7 +75,7 @@ const extractPosterFrame = (videoUrl: string): Promise<string | undefined> => {
 
 export const VideoTabContent: React.FC<IVideoTabContentProps> = ({ settings, onUpdate }) => {
   const { t } = useTranslation();
-  const { openModal } = useModalStore();
+  const { openModal } = useModalStore(useShallow(s => ({ openModal: s.openModal })));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isTrimming, setIsTrimming] = useState(false);
 

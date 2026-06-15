@@ -161,8 +161,8 @@ const SlideCanvas: React.FC<SlideCanvasProps> = ({ slideId, canvasItems }) => {
         }
     };
 
-    // During drag, use localItems (optimistic). Otherwise, use store items directly (no useEffect delay).
-    const renderItems = dragActive ? localItems : resolvedItems;
+    // During drag and pending update, use localItems (optimistic). Otherwise, use store items directly (no useEffect delay).
+    const renderItems = (dragActive || pendingUpdate) ? localItems : resolvedItems;
     const sortedItems = [...renderItems].sort((a, b) => a.zIndex - b.zIndex);
 
     return (

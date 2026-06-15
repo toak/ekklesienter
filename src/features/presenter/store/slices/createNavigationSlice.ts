@@ -237,7 +237,10 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
 
     setLiveSlide: (id, presentationId, rootPresentationId, navigationParentSlideId) => set((state) => ({ 
         liveSlideId: id,
-        activePresentationId: presentationId || state.activePresentationId,
+        // NOTE: Never overwrite activePresentationId here — that would cause the master timeline to
+        // switch to the nested presentation's slide list. activePresentationId must always remain 
+        // the master presentation the user has open. Track which presentation is currently live
+        // separately via rootPresentationId and navigationParentSlideId.
         rootPresentationId: rootPresentationId !== undefined ? rootPresentationId : state.rootPresentationId,
         navigationParentSlideId: navigationParentSlideId !== undefined ? navigationParentSlideId : state.navigationParentSlideId
     })),
@@ -316,28 +319,23 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
                         const nextIdx = Math.min(parentPres.slides.length - 1, parentIdx + 1);
                         const nextId = parentPres.slides[nextIdx].id;
 
+                        const nextParentSlideId = stack.length > 0 ? stack[stack.length - 1].parentNestedSlideId : null;
+                        
                         if (preferLiveAnchor) {
-                            setLiveSlide(nextId);
-                            if (!detached && previewSlideId === liveSlideId) {
-                                set({ 
-                                    previewSlideId: nextId,
-                                    selectedSlideIds: [nextId],
-                                    selectedPresentationId: parentPres.id,
-                                    selectedPresentation: parentPres,
-                                    navigationDirection: 'forward',
-                                    navigationParentSlideId: null
-                                });
+                            const isSynced = !detached && liveSlideId === previewSlideId;
+                            if (isSynced) {
+                                await setPreviewSlide(nextId, parentPres.id, undefined, nextParentSlideId);
+                                const { previewSlideId, selectedPresentationId, navigationParentSlideId: newlyResolvedParentSlideId } = get();
+                                setLiveSlide(previewSlideId!, selectedPresentationId || undefined, undefined, newlyResolvedParentSlideId);
+                            } else {
+                                setLiveSlide(nextId, parentPres.id, undefined, nextParentSlideId);
                             }
                         } else {
-                            set({ 
-                                previewSlideId: nextId,
-                                selectedSlideIds: [nextId],
-                                selectedPresentationId: parentPres.id,
-                                selectedPresentation: parentPres,
-                                navigationDirection: 'forward',
-                                navigationParentSlideId: null
-                            });
-                            if (!detached && liveSlideId) setLiveSlide(nextId); 
+                            await setPreviewSlide(nextId, parentPres.id, undefined, nextParentSlideId);
+                            if (!detached && liveSlideId) {
+                                const { previewSlideId, selectedPresentationId, navigationParentSlideId: newlyResolvedParentSlideId } = get();
+                                setLiveSlide(previewSlideId!, selectedPresentationId || undefined, undefined, newlyResolvedParentSlideId);
+                            }
                         }
                         return;
                     }
@@ -350,15 +348,21 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
 
         if (preferLiveAnchor) {
             set({ navigationDirection: 'forward' });
-            // Must await setPreviewSlide to handle potential nested auto-entry
-            await setPreviewSlide(nextId, currentPresId);
-            const resolvedId = get().previewSlideId;
-            setLiveSlide(resolvedId!);
+            const isSynced = !detached && liveSlideId === previewSlideId;
+            if (isSynced) {
+                // Must await setPreviewSlide to handle potential nested auto-entry
+                await setPreviewSlide(nextId, currentPresId);
+                const { previewSlideId: resolvedId, selectedPresentationId, navigationParentSlideId } = get();
+                setLiveSlide(resolvedId!, selectedPresentationId || undefined, undefined, navigationParentSlideId);
+            } else {
+                setLiveSlide(nextId, currentPresId, undefined, get().navigationParentSlideId);
+            }
         } else {
             set({ navigationDirection: 'forward' });
             await setPreviewSlide(nextId, currentPresId);
             if (!detached && liveSlideId) {
-                setLiveSlide(get().previewSlideId);
+                const { previewSlideId, selectedPresentationId, navigationParentSlideId } = get();
+                setLiveSlide(previewSlideId!, selectedPresentationId || undefined, undefined, navigationParentSlideId);
             }
         }
     },
@@ -401,28 +405,23 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
                         const prevIdx = Math.max(0, parentIdx - 1);
                         const prevId = parentPres.slides[prevIdx].id;
 
+                        const prevParentSlideId = stack.length > 0 ? stack[stack.length - 1].parentNestedSlideId : null;
+
                         if (preferLiveAnchor) {
-                            setLiveSlide(prevId);
-                            if (!detached && previewSlideId === liveSlideId) {
-                                set({ 
-                                    previewSlideId: prevId,
-                                    selectedSlideIds: [prevId],
-                                    selectedPresentationId: parentPres.id,
-                                    selectedPresentation: parentPres,
-                                    navigationDirection: 'backward',
-                                    navigationParentSlideId: null
-                                });
+                            const isSynced = !detached && liveSlideId === previewSlideId;
+                            if (isSynced) {
+                                await setPreviewSlide(prevId, parentPres.id, undefined, prevParentSlideId);
+                                const { previewSlideId: resolvedId, selectedPresentationId, navigationParentSlideId } = get();
+                                setLiveSlide(resolvedId!, selectedPresentationId || undefined, undefined, navigationParentSlideId);
+                            } else {
+                                setLiveSlide(prevId, parentPres.id, undefined, prevParentSlideId);
                             }
                         } else {
-                            set({ 
-                                previewSlideId: prevId,
-                                selectedSlideIds: [prevId],
-                                selectedPresentationId: parentPres.id,
-                                selectedPresentation: parentPres,
-                                navigationDirection: 'backward',
-                                navigationParentSlideId: null
-                            });
-                            if (!detached && liveSlideId) setLiveSlide(prevId);
+                            await setPreviewSlide(prevId, parentPres.id, undefined, prevParentSlideId);
+                            if (!detached && liveSlideId) {
+                                const { previewSlideId: resolvedId, selectedPresentationId, navigationParentSlideId } = get();
+                                setLiveSlide(resolvedId!, selectedPresentationId || undefined, undefined, navigationParentSlideId);
+                            }
                         }
                         return;
                     }
@@ -435,14 +434,20 @@ export const createNavigationSlice: PresentationSliceCreator = (set, get) => ({
 
         if (preferLiveAnchor) {
             set({ navigationDirection: 'backward' });
-            await setPreviewSlide(prevId, currentPresId);
-            const resolvedId = get().previewSlideId;
-            setLiveSlide(resolvedId!);
+            const isSynced = !detached && liveSlideId === previewSlideId;
+            if (isSynced) {
+                await setPreviewSlide(prevId, currentPresId);
+                const { previewSlideId: resolvedId, selectedPresentationId, navigationParentSlideId } = get();
+                setLiveSlide(resolvedId!, selectedPresentationId || undefined, undefined, navigationParentSlideId);
+            } else {
+                setLiveSlide(prevId, currentPresId, undefined, get().navigationParentSlideId);
+            }
         } else {
             set({ navigationDirection: 'backward' });
             await setPreviewSlide(prevId, currentPresId);
             if (!detached && liveSlideId) {
-                setLiveSlide(get().previewSlideId);
+                const { previewSlideId, selectedPresentationId, navigationParentSlideId } = get();
+                setLiveSlide(previewSlideId!, selectedPresentationId || undefined, undefined, navigationParentSlideId);
             }
         }
     },

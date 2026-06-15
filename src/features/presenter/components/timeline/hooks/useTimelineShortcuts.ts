@@ -80,6 +80,7 @@ export const useTimelineShortcuts = ({
                     pasteSlides(state.activePresentationId);
                 }
             } else if (isMod && e.key === 'd') {
+                if (!isTimelineHoveredRef.current) return;
                 // Command+D for duplication
                 e.preventDefault();
                 if (state.selectedAudioScopeId) {

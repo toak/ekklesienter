@@ -179,6 +179,24 @@ export const createPresentationSlice: PresentationSliceCreator = (set, get) => (
             order: i
         }));
 
+        const updateNestedServiceId = async (slidesToCheck: any[]) => {
+            for (const s of slidesToCheck) {
+                const nestedId = s.type === 'nested' ? s.presentationId : s.masterPresentationId || s.linkedPresentationId || s.localNestedPresentationId;
+                if (nestedId) {
+                    const nestedPres = await db.presentationFiles.get(nestedId);
+                    if (nestedPres && nestedPres.serviceId !== activeServiceId) {
+                        await db.presentationFiles.update(nestedId, {
+                            serviceId: activeServiceId
+                        });
+                        if (nestedPres.slides) {
+                            await updateNestedServiceId(nestedPres.slides);
+                        }
+                    }
+                }
+            }
+        };
+        await updateNestedServiceId(processedSlides);
+
         await get().updatePresentationSlides(newPresId, processedSlides);
         toast.success(i18n.t('slides_imported_to_service', 'Slides imported successfully'));
     },

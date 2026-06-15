@@ -1,41 +1,42 @@
-import { IpcService } from './IpcService';
+import { ipcService } from './ipcService';
+
+let wakeLock: WakeLockSentinel | null = null;
+let isEnabled = false;
+let boundVisibilityChange: (() => Promise<void>) | null = null;
 
 /**
  * Service to manage screen wake lock (preventing sleep).
  * Supports both standard Web Screen Wake Lock API and Electron powerSaveBlocker.
  */
-export class WakeLockService {
-    private static wakeLock: WakeLockSentinel | null = null;
-    private static isEnabled = false;
-
+export const wakeLockService = {
     /**
      * Set the wake lock state.
      */
-    static async setWakeLock(enabled: boolean): Promise<void> {
-        this.isEnabled = enabled;
+    async setWakeLock(enabled: boolean): Promise<void> {
+        isEnabled = enabled;
 
-        if (IpcService.isElectron()) {
-            await this.setElectronWakeLock(enabled);
+        if (ipcService.isElectron()) {
+            await wakeLockService.setElectronWakeLock(enabled);
         } else {
-            await this.setWebWakeLock(enabled);
+            await wakeLockService.setWebWakeLock(enabled);
         }
-    }
+    },
 
     /**
      * Electron-specific wake lock via powerSaveBlocker.
      */
-    private static async setElectronWakeLock(enabled: boolean): Promise<void> {
+    async setElectronWakeLock(enabled: boolean): Promise<void> {
         try {
-            await IpcService.power.setWakeLock(enabled);
+            await ipcService.power.setWakeLock(enabled);
         } catch (error) {
             console.error('[WakeLockService] Failed to set Electron wake lock:', error);
         }
-    }
+    },
 
     /**
      * Web-specific wake lock via Screen Wake Lock API.
      */
-    private static async setWebWakeLock(enabled: boolean): Promise<void> {
+    async setWebWakeLock(enabled: boolean): Promise<void> {
         if (!('wakeLock' in navigator)) {
             console.warn('[WakeLockService] Screen Wake Lock API not supported in this browser.');
             return;
@@ -43,40 +44,48 @@ export class WakeLockService {
 
         try {
             if (enabled) {
-                if (!this.wakeLock) {
-                    this.wakeLock = await navigator.wakeLock.request('screen');
+                if (!wakeLock) {
+                    wakeLock = await navigator.wakeLock.request('screen');
                     console.log('[WakeLockService] Web wake lock acquired');
                     
                     // Re-acquire if visibility changes
-                    this.wakeLock.addEventListener('release', () => {
+                    wakeLock.addEventListener('release', () => {
                         console.log('[WakeLockService] Web wake lock released');
-                        this.wakeLock = null;
+                        wakeLock = null;
                     });
                 }
+
+                // Add visibilitychange event listener dynamically when lock is acquired
+                if (typeof document !== 'undefined' && !boundVisibilityChange) {
+                    boundVisibilityChange = () => wakeLockService.handleVisibilityChange();
+                    document.addEventListener('visibilitychange', boundVisibilityChange);
+                }
             } else {
-                if (this.wakeLock) {
-                    await this.wakeLock.release();
-                    this.wakeLock = null;
+                if (wakeLock) {
+                    await wakeLock.release();
+                    wakeLock = null;
+                }
+
+                // Remove visibilitychange listener when lock is fully released
+                if (typeof document !== 'undefined' && boundVisibilityChange) {
+                    document.removeEventListener('visibilitychange', boundVisibilityChange);
+                    boundVisibilityChange = null;
                 }
             }
         } catch (error) {
             console.error('[WakeLockService] Failed to set Web wake lock:', error);
         }
-    }
+    },
 
     /**
      * Re-acquires the wake lock if it was enabled and lost (e.g., due to tab switching).
      */
-    static async handleVisibilityChange(): Promise<void> {
-        if (this.isEnabled && !IpcService.isElectron() && !this.wakeLock && document.visibilityState === 'visible') {
-            await this.setWebWakeLock(true);
+    async handleVisibilityChange(): Promise<void> {
+        if (isEnabled && !ipcService.isElectron() && !wakeLock && document.visibilityState === 'visible') {
+            await wakeLockService.setWebWakeLock(true);
         }
     }
-}
+};
 
-// Global listener for web visibility change
-if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-        WakeLockService.handleVisibilityChange();
-    });
-}
+/** @deprecated Use wakeLockService instead. */
+export const WakeLockService = wakeLockService;

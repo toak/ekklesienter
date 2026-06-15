@@ -20,9 +20,9 @@ interface UseTimelineDragAndDropProps {
     selectedSlideIds: string[];
     trackRef: React.RefObject<TrackContainerHandle>;
     dragActiveRef: React.MutableRefObject<boolean>;
-    pendingUpdateRef: React.MutableRefObject<boolean>;
     updatePresentationSlides: (id: string, slides: ISlide[]) => Promise<void>;
     addPresentationToTimeline: (pid: string, idx?: number) => Promise<void>;
+    takeSnapshot: (presentationId: string) => Promise<void>;
 }
 
 /**
@@ -37,9 +37,9 @@ export const useTimelineDragAndDrop = ({
     selectedSlideIds,
     trackRef,
     dragActiveRef,
-    pendingUpdateRef,
     updatePresentationSlides,
-    addPresentationToTimeline
+    addPresentationToTimeline,
+    takeSnapshot
 }: UseTimelineDragAndDropProps) => {
     const [activeId, setActiveId] = useState<string | null>(null);
     
@@ -91,6 +91,7 @@ export const useTimelineDragAndDrop = ({
 
         // Start continuous auto-scroll loop
         if (autoScrollRafRef.current === null) {
+            let lastTickTime = performance.now();
             const tick = () => {
                 if (!dragActiveRef.current) {
                     autoScrollRafRef.current = null;
@@ -111,17 +112,27 @@ export const useTimelineDragAndDrop = ({
                     let scrollSpeed = 0;
 
                     if (pointerX < leftEdge && scrollEl.scrollLeft > 0) {
-                        const depth = Math.min((leftEdge - pointerX) / EDGE_ZONE, 1);
-                        scrollSpeed = -Math.round(MAX_SPEED * depth);
+                        const rawDepth = Math.min((leftEdge - pointerX) / EDGE_ZONE, 1);
+                        const depth = Math.pow(rawDepth, 2); // Quadratic curve for smooth start
+                        scrollSpeed = -MAX_SPEED * depth;
                     } else if (pointerX > rightEdge && scrollEl.scrollLeft < scrollEl.scrollWidth - scrollEl.clientWidth) {
-                        const depth = Math.min((pointerX - rightEdge) / EDGE_ZONE, 1);
-                        scrollSpeed = Math.round(MAX_SPEED * depth);
+                        const rawDepth = Math.min((pointerX - rightEdge) / EDGE_ZONE, 1);
+                        const depth = Math.pow(rawDepth, 2); // Quadratic curve for smooth start
+                        scrollSpeed = MAX_SPEED * depth;
                     }
 
                     if (scrollSpeed !== 0) {
+                        const now = performance.now();
+                        const delta = (now - lastTickTime) / 16.67; // Scale by frame time relative to 60fps
+                        lastTickTime = now;
+
                         const maxScroll = scrollEl.scrollWidth - scrollEl.clientWidth;
-                        scrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, scrollEl.scrollLeft + scrollSpeed));
+                        scrollEl.scrollLeft = Math.max(0, Math.min(maxScroll, scrollEl.scrollLeft + Math.round(scrollSpeed * delta)));
+                    } else {
+                        lastTickTime = performance.now(); // Reset baseline when not scrolling
                     }
+                } else {
+                    lastTickTime = performance.now();
                 }
                 
                 // Keep ticking until drag ends
@@ -208,15 +219,13 @@ export const useTimelineDragAndDrop = ({
             // Sync visual state immediately
             setLocalSlides(finalSlidesOrdered);
 
-            // Persist to store / DB
+            // Persist to store / DB (snapshot before so drag reorder is undoable)
             if (activePresentationId && finalSlidesOrdered.length > 0) {
-                pendingUpdateRef.current = true;
-                updatePresentationSlides(activePresentationId, finalSlidesOrdered).finally(() => {
-                    pendingUpdateRef.current = false;
-                });
+                await takeSnapshot(activePresentationId);
+                await updatePresentationSlides(activePresentationId, finalSlidesOrdered);
             }
         }
-    }, [activePresentationId, addPresentationToTimeline, dragActiveRef, pendingUpdateRef, setLocalSlides, stopAutoScroll, updatePresentationSlides]);
+    }, [activePresentationId, addPresentationToTimeline, dragActiveRef, setLocalSlides, stopAutoScroll, updatePresentationSlides]);
 
     const handleDragCancel = useCallback(() => {
         stopAutoScroll();

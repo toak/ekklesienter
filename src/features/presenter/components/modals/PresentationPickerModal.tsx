@@ -5,12 +5,15 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
-import { ISlide, ICanvasSlide } from '@/core/types';
-import { X, Layers, Monitor, Music, Plus, Search, Folder } from 'lucide-react';
+import { ISlide, ICanvasSlide, IPresentationFile } from '@/core/types';
+import { X, Layers, Monitor, Music, Plus, Search, Folder, Edit2, Copy, Download, Trash2 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import SlideContentRenderer from '../slide-editor/SlideContentRenderer';
 import { useContainFit } from '@/core/hooks/useContainFit';
 import TrackContainer from '../timeline/TrackContainer';
+import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
+import { getUniquePresentationName } from '@/core/utils/nameUtils';
+import { GraceLibExportService } from '@/features/presenter/services/GraceLibExportService';
 
 const ModalAudioScope: React.FC<{
     scope: any;
@@ -48,6 +51,13 @@ const PresentationPickerModal: React.FC = () => {
     const [selectedPresentationId, setSelectedPresentationId] = useState<string | null>(null);
     const [previewSlideId, setPreviewSlideId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        presentation: IPresentationFile;
+    } | null>(null);
+
+    const { openModal } = useModalStore();
 
     const allPresentations = useLiveQuery(() => db.presentationFiles.toArray()) || [];
     const allTemplates = useLiveQuery(() => db.templates.toArray()) || [];
@@ -169,7 +179,7 @@ const PresentationPickerModal: React.FC = () => {
 
     const currentPreviewSlide = slides.find(s => s.id === previewSlideId) || slides[0];
 
-    return createPortal(
+    const mainPortal = createPortal(
         <div className="fixed inset-0 z-10001 flex items-center justify-center bg-black/85 backdrop-blur-2xl animate-in fade-in duration-300 p-6">
             <div className="bg-stone-900 border border-white/10 rounded-[40px] w-full max-w-7xl h-[90vh] flex overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)] animate-in zoom-in-95 duration-500">
                 
@@ -205,8 +215,13 @@ const PresentationPickerModal: React.FC = () => {
                             <button
                                 key={p.id}
                                 onClick={() => setSelectedPresentationId(p.id)}
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setContextMenu({ x: e.clientX, y: e.clientY, presentation: p });
+                                }}
                                 className={cn(
-                                    "flex flex-col text-left p-4 rounded-2xl border transition-all duration-200 group relative overflow-hidden",
+                                    "flex flex-col text-left p-4 rounded-2xl border transition-all duration-200 group relative overflow-hidden shrink-0",
                                     selectedPresentationId === p.id 
                                         ? "bg-accent/10 border-accent/30 shadow-[0_0_20px_rgba(147,51,234,0.15)]" 
                                         : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10"
@@ -214,10 +229,14 @@ const PresentationPickerModal: React.FC = () => {
                             >
                                 <div className="flex items-center gap-3 mb-2">
                                     <div className={cn(
-                                        "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors",
-                                        selectedPresentationId === p.id ? "bg-accent text-white" : "bg-black/30 text-stone-400 group-hover:text-stone-300"
+                                        "w-12 h-8 rounded-md flex items-center justify-center shrink-0 overflow-hidden bg-black/50 border border-white/10 transition-colors",
+                                        selectedPresentationId === p.id ? "border-accent/50 text-accent" : "text-stone-400 group-hover:text-stone-300"
                                     )}>
-                                        <Layers className="w-4 h-4" />
+                                        {p.thumbnailUrl ? (
+                                            <img src={p.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Layers className="w-4 h-4" />
+                                        )}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className={cn(
@@ -230,7 +249,7 @@ const PresentationPickerModal: React.FC = () => {
                                 </div>
                                 <div className="flex items-center justify-between mt-1">
                                     <span className="text-[9px] font-black uppercase tracking-widest text-stone-500">
-                                        {p.slides.length} {t('slides')}
+                                        {t('slides_count', { count: p.slides.length, defaultValue: '{{count}} slides' })}
                                     </span>
                                     {p.binId && (
                                         <div className="flex items-center gap-1 text-stone-600">
@@ -322,7 +341,7 @@ const PresentationPickerModal: React.FC = () => {
                                 </span>
                                 <div className="w-px h-3 bg-white/10" />
                                 <span className="text-[9px] font-bold text-stone-600 uppercase tracking-widest">
-                                    {slides.length} {t('slides')}
+                                    {t('slides_count', { count: slides.length, defaultValue: '{{count}} slides' })}
                                 </span>
                             </div>
                         </div>
@@ -443,6 +462,88 @@ const PresentationPickerModal: React.FC = () => {
         </div>,
         document.body
     );
+
+    // ContextMenu portals itself internally — render it in the component tree (not in another createPortal)
+    const contextMenuEl = contextMenu ? (
+        <ContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onClose={() => setContextMenu(null)}
+        >
+            <ContextMenuItem
+                icon={<Edit2 className="w-3 h-3" />}
+                label={t('rename', 'Rename')}
+                onClick={() => {
+                    openModal(ModalType.PROMPT, {
+                        title: t('rename_presentation', 'New name:'),
+                        defaultValue: contextMenu.presentation.name,
+                        onSelection: (newName: string | null) => {
+                            if (newName) {
+                                db.presentationFiles.update(contextMenu.presentation.id, { name: newName });
+                            }
+                        }
+                    });
+                    setContextMenu(null);
+                }}
+            />
+            <ContextMenuItem
+                icon={<Copy className="w-3 h-3" />}
+                label={t('duplicate', 'Duplicate')}
+                onClick={async () => {
+                    const original = await db.presentationFiles.get(contextMenu.presentation.id);
+                    if (original) {
+                        const newName = await getUniquePresentationName(original.name);
+                        const clone = structuredClone(original);
+                        clone.id = crypto.randomUUID();
+                        clone.name = newName;
+                        const now = new Date();
+                        clone.createdAt = now;
+                        clone.updatedAt = now;
+                        clone.lastOpened = now;
+                        await db.presentationFiles.add(clone);
+                    }
+                    setContextMenu(null);
+                }}
+            />
+            <ContextMenuItem
+                icon={<Download className="w-3 h-3" />}
+                label={t('export', 'Export')}
+                onClick={() => {
+                    GraceLibExportService.exportItem(
+                        contextMenu.presentation.id,
+                        'presentation',
+                        contextMenu.presentation.name
+                    );
+                    setContextMenu(null);
+                }}
+            />
+            <div className="h-px bg-white/5 my-1 mx-2" />
+            <ContextMenuItem
+                icon={<Trash2 className="w-3 h-3" />}
+                label={t('delete', 'Delete')}
+                danger
+                onClick={() => {
+                    openModal(ModalType.CONFIRM, {
+                        title: t('confirm_delete', 'Confirm Delete'),
+                        message: t('confirm_remove_presentation', 'Remove this presentation from library?'),
+                        variant: 'danger',
+                        onSelection: (confirmed: boolean) => {
+                            if (confirmed) {
+                                db.presentationFiles.delete(contextMenu.presentation.id);
+                                if (selectedPresentationId === contextMenu.presentation.id) {
+                                    setSelectedPresentationId(null);
+                                }
+                            }
+                        }
+                    });
+                    setContextMenu(null);
+                }}
+            />
+        </ContextMenu>
+    ) : null;
+
+    return <>{mainPortal}{contextMenuEl}</>;
+
 };
 
 export default PresentationPickerModal;

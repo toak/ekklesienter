@@ -8,6 +8,7 @@ import {
     slideEditorPendingUpdateAtom,
 } from '@/core/store/uiAtoms';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
+import { useShallow } from 'zustand/react/shallow';
 import { ICanvasItem } from '@/core/types';
 import {
     calculateMove,
@@ -24,7 +25,11 @@ export function useCanvasInteraction(
     setLocalItems: React.Dispatch<React.SetStateAction<ICanvasItem[]>>,
     getContainerRect: () => DOMRect | { left: number; top: number; width: number; height: number; }
 ) {
-    const { updateCanvasItem, takeSnapshot } = usePresentationStore();
+    const { updateCanvasItem, updateCanvasItemsOrder, takeSnapshot } = usePresentationStore(useShallow(s => ({
+        updateCanvasItem: s.updateCanvasItem,
+        updateCanvasItemsOrder: s.updateCanvasItemsOrder,
+        takeSnapshot: s.takeSnapshot
+    })));
     const [selectedIds, setSelectedIds] = useAtom(selectedCanvasItemIdsAtom);
     const [editingId, setEditingId] = useAtom(editingCanvasItemIdAtom) as [string | null, (v: string | null) => void];
     const [tool, setTool] = useAtom(canvasToolAtom) as [string, (v: string) => void];
@@ -44,34 +49,80 @@ export function useCanvasInteraction(
             return;
         }
 
+        let targetIds = selectedIds;
         const isMulti = e.ctrlKey || e.metaKey;
         if (isMulti && type === 'move') {
-            setSelectedIds(prev =>
-                prev.includes(item.id)
-                    ? prev.filter(id => id !== item.id)
-                    : [...prev, item.id]
-            );
+            targetIds = selectedIds.includes(item.id)
+                ? selectedIds.filter(id => id !== item.id)
+                : [...selectedIds, item.id];
+            setSelectedIds(targetIds);
         } else if (!selectedIds.includes(item.id)) {
-            setSelectedIds([item.id]);
+            targetIds = [item.id];
+            setSelectedIds(targetIds);
             if (item.type === 'text' && type === 'move') return;
         }
 
-        takeSnapshot(slideId).catch(console.error);
+        let updatedLocalItems = [...localItems];
+        let draggedItemIds = targetIds;
+        let dragItem = item;
+
+        if (e.altKey && type === 'move') {
+            await takeSnapshot(slideId).catch(console.error);
+            const clones = targetIds.map(id => {
+                const orig = localItems.find(i => i.id === id);
+                if (!orig) return null;
+                const clone = structuredClone(orig);
+                clone.id = crypto.randomUUID();
+                clone.zIndex = updatedLocalItems.length;
+                return clone;
+            }).filter((c): c is ICanvasItem => c !== null);
+
+            if (clones.length > 0) {
+                updatedLocalItems = [...updatedLocalItems, ...clones];
+                const clonedIds = clones.map(c => c.id);
+                draggedItemIds = clonedIds;
+                setSelectedIds(clonedIds);
+                setLocalItems(updatedLocalItems);
+
+                const clickedIdx = targetIds.indexOf(item.id);
+                if (clickedIdx !== -1 && clones[clickedIdx]) {
+                    dragItem = clones[clickedIdx];
+                } else {
+                    dragItem = clones[0];
+                }
+            }
+        } else {
+            await takeSnapshot(slideId).catch(console.error);
+        }
+
         setDragActive(true);
         dragState.current = {
             type,
-            itemId: item.id,
+            itemId: dragItem.id,
             startX: e.clientX,
             startY: e.clientY,
-            startItemX: item.x,
-            startItemY: item.y,
-            startItemW: item.width,
-            startItemH: item.height,
-            startRotation: item.rotation || 0,
-            startPivotX: item.pivotX ?? 50,
-            startPivotY: item.pivotY ?? 50,
+            startItemX: dragItem.x,
+            startItemY: dragItem.y,
+            startItemW: dragItem.width,
+            startItemH: dragItem.height,
+            startRotation: dragItem.rotation || 0,
+            startPivotX: dragItem.pivotX ?? 50,
+            startPivotY: dragItem.pivotY ?? 50,
             corner,
-        };
+            draggedItems: draggedItemIds.map(id => {
+                const activeItem = updatedLocalItems.find(i => i.id === id) || dragItem;
+                return {
+                    id: activeItem.id,
+                    startItemX: activeItem.x,
+                    startItemY: activeItem.y,
+                    startItemW: activeItem.width,
+                    startItemH: activeItem.height,
+                    startRotation: activeItem.rotation || 0,
+                    startPivotX: activeItem.pivotX ?? 50,
+                    startPivotY: activeItem.pivotY ?? 50,
+                };
+            }),
+        } as any;
 
         let cursor = 'default';
         if (type === 'move') {
@@ -81,13 +132,13 @@ export function useCanvasInteraction(
         } else if (type === 'pivot') {
             cursor = 'crosshair';
         } else if (type === 'resize' && corner) {
-            cursor = getCursorForCorner(corner, item.rotation || 0);
+            cursor = getCursorForCorner(corner, dragItem.rotation || 0);
         }
         document.body.style.cursor = cursor;
         document.body.style.userSelect = 'none';
 
         if (type === 'resize' || type === 'rotate') e.preventDefault();
-    }, [editingId, setSelectedIds, setEditingId, tool, selectedIds, slideId, takeSnapshot, setDragActive]);
+    }, [editingId, setSelectedIds, setEditingId, tool, selectedIds, slideId, takeSnapshot, setDragActive, localItems, setLocalItems]);
 
     const handleMouseMove = useCallback((e: MouseEvent) => {
         const state = dragState.current;
@@ -112,8 +163,26 @@ export function useCanvasInteraction(
                 if (dist < 3) return;
                 state.hasMoved = true;
             }
-            const updates = calculateMove(state, deltaXPct, deltaYPct);
-            updateLocalItem(state.itemId, updates);
+            const dragged = (state as any).draggedItems || [];
+            if (dragged.length > 0) {
+                const updates = dragged.map((di: any) => {
+                    const updatesForItem = calculateMove({
+                        startItemX: di.startItemX,
+                        startItemY: di.startItemY,
+                    } as any, deltaXPct, deltaYPct);
+                    return {
+                        id: di.id,
+                        updates: updatesForItem,
+                    };
+                });
+                setLocalItems(prev => prev.map(item => {
+                    const update = updates.find((u: any) => u.id === item.id);
+                    return update ? { ...item, ...update.updates } : item;
+                }));
+            } else {
+                const updates = calculateMove(state, deltaXPct, deltaYPct);
+                updateLocalItem(state.itemId, updates);
+            }
         } else if (state.type === 'resize' && state.corner) {
             const updates = calculateResize(state, deltaXPx, deltaYPx, rect.width, rect.height, item);
             if (updates) updateLocalItem(state.itemId, updates);
@@ -135,23 +204,8 @@ export function useCanvasInteraction(
     const handleMouseUp = useCallback(() => {
         const state = dragState.current;
         if (state) {
-            const finalItem = localItems.find(i => i.id === state.itemId);
-            if (finalItem && state.hasMoved !== false) {
-                const updates: Partial<ICanvasItem> = {
-                    x: finalItem.x,
-                    y: finalItem.y,
-                    width: finalItem.width,
-                    height: finalItem.height,
-                    rotation: finalItem.rotation,
-                    pivotX: finalItem.pivotX,
-                    pivotY: finalItem.pivotY,
-                };
-
-                if (finalItem.type === 'text' && finalItem.text) {
-                    updates.text = { ...finalItem.text, resizingMode: finalItem.text.resizingMode };
-                }
-
-                updateCanvasItem(slideId, state.itemId, updates);
+            if (state.hasMoved !== false) {
+                updateCanvasItemsOrder(slideId, localItems).catch(console.error);
             }
         }
 
@@ -161,7 +215,7 @@ export function useCanvasInteraction(
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
         setRotateCursorAngle(null);
-    }, [slideId, localItems, updateCanvasItem, setPendingUpdate, setDragActive]);
+    }, [slideId, localItems, updateCanvasItemsOrder, setPendingUpdate, setDragActive]);
 
     useEffect(() => {
         window.addEventListener('mousemove', handleMouseMove);

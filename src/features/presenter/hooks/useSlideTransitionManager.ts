@@ -1,12 +1,18 @@
 import { useState, useRef, useEffect } from 'react';
-import { ICanvasSlide } from '@/core/types';
+import { ICanvasSlide, ISlide } from '@/core/types';
 import { normalizeTransitionType } from '../components/display/transitions/SlideTransitions';
+
+export interface UseSlideTransitionManagerReturn {
+  prevSlideState: { key: string; content: React.ReactNode } | null;
+  isTransitioning: boolean;
+  prevContentRef: React.MutableRefObject<React.ReactNode>;
+}
 
 /**
  * Hook to manage slide transition lifecycle, caching previous slide state,
  * and handling transition timing.
  */
-export function useSlideTransitionManager(currentKey: string, selectedSlide: any, lastTransitionTrigger: number) {
+export function useSlideTransitionManager(currentKey: string, selectedSlide: ISlide | null | undefined, lastTransitionTrigger: number): UseSlideTransitionManagerReturn {
   const currentKeyRef = useRef(currentKey);
   const prevContentRef = useRef<React.ReactNode>(null);
   const [prevSlideState, setPrevSlideState] = useState<{ key: string, content: React.ReactNode } | null>(null);

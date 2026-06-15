@@ -1,6 +1,6 @@
 import { db } from '@/core/db';
-import { PresentationSliceCreator } from '../types';
-import { ISlide, ICanvasSlide } from '@/core/types';
+import { PresentationSliceCreator, PresentationState } from '../types';
+import { ISlide, ICanvasSlide, IPresentationFile, ICanvasItem } from '@/core/types';
 import { toast } from '@/core/utils/toast';
 import i18n from '@/core/i18n';
 
@@ -8,15 +8,15 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
     updatePresentationSlides: async (presentationId, slides) => {
         const now = new Date();
         const { activePresentationId, activePresentation, selectedPresentationId, selectedPresentation } = get();
-        const updates: any = {};
+        const updates: Partial<PresentationState> = {};
 
         if (activePresentationId === presentationId) {
-            const basePres = activePresentation || { id: presentationId, name: '', slides: [], updatedAt: now } as any;
+            const basePres = activePresentation || { id: presentationId, name: '', slides: [], updatedAt: now, createdAt: now, type: 'presentation' } as IPresentationFile;
             updates.activePresentation = { ...basePres, slides, updatedAt: now };
         }
 
         if (selectedPresentationId === presentationId) {
-            const basePres = selectedPresentation || { id: presentationId, name: '', slides: [], updatedAt: now } as any;
+            const basePres = selectedPresentation || { id: presentationId, name: '', slides: [], updatedAt: now, createdAt: now, type: 'presentation' } as IPresentationFile;
             updates.selectedPresentation = { ...basePres, slides, updatedAt: now };
         }
 
@@ -37,7 +37,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const slideIdx = pres.slides.findIndex(s => s.id === slideId);
         if (slideIdx === -1) return;
 
-        await Promise.all(pres.slides.map(s => get().takeSnapshot(s.id)));
+        await get().takeSnapshot(presentationId);
 
         const original = pres.slides[slideIdx];
         const newId = crypto.randomUUID();
@@ -90,7 +90,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const pres = await db.presentationFiles.get(presentationId);
         if (!pres) return;
 
-        await Promise.all(pres.slides.map(s => get().takeSnapshot(s.id)));
+        await get().takeSnapshot(presentationId);
 
         const newSlides = [...pres.slides];
         const createdSlideIds: string[] = [];
@@ -114,7 +114,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
             newSlide.isExpanded = false;
 
             if (newSlide.type === 'normal' && newSlide.content && newSlide.content.canvasItems) {
-                newSlide.content.canvasItems = newSlide.content.canvasItems.map((item: any) => ({
+                newSlide.content.canvasItems = newSlide.content.canvasItems.map((item: ICanvasItem) => ({
                     ...item,
                     id: crypto.randomUUID()
                 }));
@@ -170,7 +170,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const idx = pres.slides.findIndex(s => s.id === slideId);
         if (idx === -1) return;
 
-        await Promise.all(pres.slides.map(s => get().takeSnapshot(s.id)));
+        await get().takeSnapshot(presentationId);
 
         const newSlides = [...pres.slides];
         const [moved] = newSlides.splice(idx, 1);
@@ -191,11 +191,54 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         await get().updatePresentationSlides(presentationId, ordered);
     },
 
+    moveSlides: async (presentationId, slideIds, direction) => {
+        const pres = await db.presentationFiles.get(presentationId);
+        if (!pres || slideIds.length === 0) return;
+
+        const sortedSelected = pres.slides.filter(s => slideIds.includes(s.id));
+        if (sortedSelected.length === 0) return;
+
+        const indices = sortedSelected.map(s => pres.slides.findIndex(slide => slide.id === s.id));
+
+        await get().takeSnapshot(presentationId);
+        const newSlides = [...pres.slides];
+
+        if (direction === 'start') {
+            const remaining = newSlides.filter(s => !slideIds.includes(s.id));
+            const ordered = [...sortedSelected, ...remaining].map((s, i) => ({ ...s, order: i }));
+            await get().updatePresentationSlides(presentationId, ordered);
+        } else if (direction === 'end') {
+            const remaining = newSlides.filter(s => !slideIds.includes(s.id));
+            const ordered = [...remaining, ...sortedSelected].map((s, i) => ({ ...s, order: i }));
+            await get().updatePresentationSlides(presentationId, ordered);
+        } else if (direction === 'back') {
+            if (indices[0] === 0) return; // boundary guard
+            for (let i = 0; i < indices.length; i++) {
+                const idx = indices[i];
+                const temp = newSlides[idx];
+                newSlides[idx] = newSlides[idx - 1];
+                newSlides[idx - 1] = temp;
+            }
+            const ordered = newSlides.map((s, i) => ({ ...s, order: i }));
+            await get().updatePresentationSlides(presentationId, ordered);
+        } else if (direction === 'forth') {
+            if (indices[indices.length - 1] === pres.slides.length - 1) return; // boundary guard
+            for (let i = indices.length - 1; i >= 0; i--) {
+                const idx = indices[i];
+                const temp = newSlides[idx];
+                newSlides[idx] = newSlides[idx + 1];
+                newSlides[idx + 1] = temp;
+            }
+            const ordered = newSlides.map((s, i) => ({ ...s, order: i }));
+            await get().updatePresentationSlides(presentationId, ordered);
+        }
+    },
+
     removeSlide: async (presentationId, slideId) => {
         const pres = await db.presentationFiles.get(presentationId);
         if (!pres) return;
 
-        await get().takeSnapshot(slideId);
+        await get().takeSnapshot(presentationId);
 
         const newSlides = pres.slides.filter(s => s.id !== slideId).map((s, i) => ({ ...s, order: i }));
         await get().updatePresentationSlides(presentationId, newSlides);
@@ -212,7 +255,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const pres = await db.presentationFiles.get(presentationId);
         if (!pres) return;
 
-        await Promise.all(slideIds.map(id => get().takeSnapshot(id)));
+        await get().takeSnapshot(presentationId);
 
         const removeSet = new Set(slideIds);
         const newSlides = pres.slides
@@ -245,6 +288,8 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
         const targetPres = await db.presentationFiles.get(presentationId);
         if (!sourcePres || !targetPres) return;
 
+        await get().takeSnapshot(presentationId);
+
         const slidesToPaste = sourcePres.slides.filter(s => clipboard.slideIds.includes(s.id));
         if (slidesToPaste.length === 0) return;
 
@@ -259,7 +304,7 @@ export const createSlideOperationsSlice: PresentationSliceCreator = (set, get) =
             slideIdMap.set(s.id, newId);
             cloned.id = newId;
             if (cloned.type === 'normal' && cloned.content && cloned.content.canvasItems) {
-                cloned.content.canvasItems = cloned.content.canvasItems.map((item: any) => ({
+                cloned.content.canvasItems = cloned.content.canvasItems.map((item: ICanvasItem) => ({
                     ...item,
                     id: crypto.randomUUID()
                 }));

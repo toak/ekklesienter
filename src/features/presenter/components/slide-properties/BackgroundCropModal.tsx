@@ -6,6 +6,8 @@ import { cn } from '@/core/utils/cn';
 import { CustomSlider } from '@/components/CustomSlider';
 import { CanvasService } from '@/features/presenter/services/CanvasService';
 
+import { useModalStore, ModalType } from '@/core/store/modalStore';
+
 interface CropData {
   x: number;
   y: number;
@@ -13,22 +15,18 @@ interface CropData {
   height: number;
 }
 
-interface BackgroundCropModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  imageUrl: string;
-  initialCrop?: CropData;
-  onApply: (crop: CropData) => void;
-}
-
-export const BackgroundCropModal: React.FC<BackgroundCropModalProps> = ({
-  isOpen,
-  onClose,
-  imageUrl,
-  initialCrop,
-  onApply
-}) => {
+export const BackgroundCropModal: React.FC = () => {
   const { t } = useTranslation();
+  const { closeModal, stack } = useModalStore();
+
+  const modalData = [...stack].reverse().find(m => m.id === ModalType.IMAGE_CROP);
+  const isOpen = !!modalData;
+  const imageUrl = modalData?.props?.imageUrl as string || '';
+  const initialCrop = modalData?.props?.initialCrop as CropData | undefined;
+  const onApply = modalData?.props?.onApply as ((crop: CropData) => void) | undefined;
+
+  const onClose = () => closeModal(ModalType.IMAGE_CROP);
+
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -154,7 +152,9 @@ export const BackgroundCropModal: React.FC<BackgroundCropModalProps> = ({
         zoom
     );
 
-    onApply(crop);
+    if (onApply) {
+      onApply(crop);
+    }
     onClose();
   };
 

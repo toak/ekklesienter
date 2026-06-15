@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
-import { IMediaItem, MediaType } from '@/core/types';
+import { IMediaItem, MediaType, IMediaBin } from '@/core/types';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
+
+export interface UseMediaPoolDataReturn {
+  bins: IMediaBin[];
+  mediaItems: IMediaItem[];
+  visibleItems: IMediaItem[];
+  activeBin: IMediaBin | null;
+  mediaTimes: Record<string, { current: number; duration: number }>;
+  setMediaTimes: React.Dispatch<React.SetStateAction<Record<string, { current: number; duration: number }>>>;
+}
 
 /**
  * Hook to manage media pool data: bins, media items, and duration preloading.
  */
-export function useMediaPoolData(filter: MediaType | 'all', activeBinId: string | null) {
+export function useMediaPoolData(filter: MediaType | 'all', activeBinId: string | null): UseMediaPoolDataReturn {
   const [mediaTimes, setMediaTimes] = useState<Record<string, { current: number; duration: number }>>({});
 
   const bins = useLiveQuery(() => db.mediaBins.orderBy('createdAt').toArray(), []) || [];

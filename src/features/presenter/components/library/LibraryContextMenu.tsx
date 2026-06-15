@@ -1,6 +1,7 @@
 import React from 'react';
-import { Edit2, Download, Trash2, RefreshCw } from 'lucide-react';
+import { Edit2, Download, Trash2, RefreshCw, Copy } from 'lucide-react';
 import { TFunction } from 'i18next';
+import { getUniquePresentationName } from '@/core/utils/nameUtils';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 import { ModalType } from '@/core/store/modalStore';
 import { GraceLibExportService } from '@/features/presenter/services/GraceLibExportService';
@@ -145,6 +146,25 @@ export const LibraryContextMenu: React.FC<LibraryContextMenuProps> = ({
                                     }
                                 }
                             });
+                            onClose();
+                        }}
+                    />
+                    <ContextMenuItem
+                        icon={<Copy className="w-3 h-3" />}
+                        label={t('duplicate', 'Duplicate')}
+                        onClick={async () => {
+                            const original = await db.presentationFiles.get(contextMenu.item.id);
+                            if (original) {
+                                const newName = await getUniquePresentationName(original.name);
+                                const clone = structuredClone(original);
+                                clone.id = crypto.randomUUID();
+                                clone.name = newName;
+                                const now = new Date();
+                                clone.createdAt = now;
+                                clone.updatedAt = now;
+                                clone.lastOpened = now;
+                                await db.presentationFiles.add(clone);
+                            }
                             onClose();
                         }}
                     />

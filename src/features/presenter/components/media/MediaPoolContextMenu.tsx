@@ -4,6 +4,7 @@ import { Edit2, Trash2 } from 'lucide-react';
 import { db } from '@/core/db';
 import { IMediaItem, IMediaBin } from '@/core/types';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useShallow } from 'zustand/react/shallow';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 
 export interface IMediaContextMenu {
@@ -40,7 +41,7 @@ export const MediaPoolContextMenu: React.FC<MediaPoolContextMenuProps> = ({
   setActiveBinId
 }) => {
   const { t } = useTranslation();
-  const { openModal } = useModalStore();
+  const { openModal } = useModalStore(useShallow(s => ({ openModal: s.openModal })));
 
   if (!contextMenu) return null;
 

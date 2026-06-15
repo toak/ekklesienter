@@ -1,11 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
-import { parseSearchQuery } from '@/features/search/utils/searchParser';
+import { parseSearchQuery, ParseResult } from '@/features/search/utils/searchParser';
 import { searchVerses, SearchResult } from '@/features/search/services/globalSearchService';
+import { ErrorLoggingService } from '@/core/services/errorLoggingService';
 
 /**
  * Hook to handle navigation search logic (parsing and verse results)
  */
-export function useNavigationSearch(lang: string, currentTranslationId: string) {
+export function useNavigationSearch(lang: string, currentTranslationId: string): {
+  searchQuery: string;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  searchResults: SearchResult[];
+  isSearching: boolean;
+  parseResult: ParseResult;
+} {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -20,7 +27,12 @@ export function useNavigationSearch(lang: string, currentTranslationId: string) 
           const results = await searchVerses(parseResult.originalQuery, currentTranslationId);
           setSearchResults(results);
         } catch (error) {
-          console.error('Search error:', error);
+          const err = error instanceof Error ? error : new Error(String(error));
+          await ErrorLoggingService.logError(err, 'error', {
+            component: 'useNavigationSearch',
+            query: parseResult.originalQuery,
+            translationId: currentTranslationId
+          });
           setSearchResults([]);
         } finally {
           setIsSearching(false);

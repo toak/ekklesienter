@@ -15,7 +15,7 @@ import { useAtomValue } from 'jotai';
 
 // Hooks and Services
 import { LiveSyncService } from '@/core/services/liveSyncService';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { useSlideDisplayData } from '../../hooks/useSlideDisplayData';
 import { useSlideTransitionManager } from '../../hooks/useSlideTransitionManager';
 

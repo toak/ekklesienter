@@ -41,6 +41,7 @@ interface TimelineSlideTrackProps {
     dragActiveId: string | null;
     audioTrack?: React.ReactNode;
     children?: React.ReactNode;
+    onUserScroll?: () => void;
 }
 
 /**
@@ -77,7 +78,8 @@ export const TimelineSlideTrack: React.FC<TimelineSlideTrackProps> = ({
     isSubItemSelected,
     dragActiveId,
     audioTrack,
-    children
+    children,
+    onUserScroll
 }) => {
     const handleSelect = React.useCallback((id: string, e?: React.MouseEvent) => {
         toggleSlideSelection(id, !!(e?.metaKey || e?.ctrlKey), e?.shiftKey);
@@ -102,7 +104,7 @@ export const TimelineSlideTrack: React.FC<TimelineSlideTrackProps> = ({
 
     return (
         <div className="flex-1 overflow-hidden relative">
-            <TrackContainer ref={trackRef}>
+            <TrackContainer ref={trackRef} onUserScroll={onUserScroll}>
                 <div className="flex flex-col min-h-full min-w-full">
                     {/* Lane 1: Slides */}
                     <div className="flex-1 flex items-center px-8 py-4 min-w-full relative">
@@ -141,6 +143,7 @@ export const TimelineSlideTrack: React.FC<TimelineSlideTrackProps> = ({
                                         isMultiSelect={selectedSlideIds.length > 1}
                                         isSubItemSelected={isSubItemSelected}
                                         isMultiDragHidden={!!dragActiveId && selectedSlideIds.length > 1 && selectedSlideIds.includes(slide.id) && slide.id !== dragActiveId}
+                                        dragActiveId={dragActiveId}
                                         setContextMenu={setContextMenu}
                                     />
                                 ))}

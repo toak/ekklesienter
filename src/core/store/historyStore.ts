@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { ICanvasItem, IStyleLayer, Verse } from '../types';
+import { ISlide, IStyleLayer, Verse } from '../types';
 
 export interface IHistorySnapshot {
     id: string;
     timestamp: number;
-    slideId: string;
-    canvasItems: ICanvasItem[];
-    background?: IStyleLayer[];
+    /** ID of the presentation whose slides array is captured */
+    presentationId: string;
+    /** Full deep-cloned slides array — the "before" state for this action */
+    slides: ISlide[];
+    /** Human-readable label for devtools (optional) */
+    actionLabel?: string;
 }
 
 interface HistoryState {
@@ -19,8 +22,20 @@ interface HistoryState {
     history: Verse[];
 
     setLimit: (limit: number) => void;
+    /**
+     * Push a "before" snapshot onto the past stack.
+     * Call this BEFORE performing any mutating action.
+     * Clears the redo (future) stack.
+     */
     pushSnapshot: (snapshot: Omit<IHistorySnapshot, 'id' | 'timestamp'>) => void;
+    /**
+     * Pop the most recent snapshot from past and return it so the caller
+     * can restore that state. The popped snapshot is moved to future.
+     */
     undo: () => IHistorySnapshot | null;
+    /**
+     * Pop from future and return it for restore. Moves it back to past.
+     */
     redo: () => IHistorySnapshot | null;
     clear: () => void;
     // Background history
@@ -79,15 +94,17 @@ export const useHistoryStore = create<HistoryState>()(
                 const { past, future } = get();
                 if (past.length === 0) return null;
 
+                // Pop the most recent "before" snapshot — this IS the state to restore
                 const newPast = [...past];
-                const current = newPast.pop()!;
+                const snapshotToRestore = newPast.pop()!;
 
                 set({
                     past: newPast,
-                    future: [current, ...future],
+                    future: [snapshotToRestore, ...future],
                 });
 
-                return newPast.length > 0 ? newPast[newPast.length - 1] : null;
+                // Return the snapshot so the caller can restore it
+                return snapshotToRestore;
             },
 
             redo: () => {
@@ -95,14 +112,15 @@ export const useHistoryStore = create<HistoryState>()(
                 if (future.length === 0) return null;
 
                 const newFuture = [...future];
-                const next = newFuture.shift()!;
+                const snapshotToRestore = newFuture.shift()!;
 
                 set({
-                    past: [...past, next],
+                    past: [...past, snapshotToRestore],
                     future: newFuture,
                 });
 
-                return next;
+                // Return the snapshot so the caller can restore it
+                return snapshotToRestore;
             },
 
             clear: () => set({ past: [], future: [] }),

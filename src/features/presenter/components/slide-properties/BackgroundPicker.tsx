@@ -3,11 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { IStyleLayer, BackgroundSettings } from '@/core/types';
 import { ensureLayers } from '@/core/utils/styleMigration';
 import { Layers, Hash } from 'lucide-react';
-import { BackgroundCropModal } from './BackgroundCropModal';
 import { cn } from '@/core/utils/cn';
 import { CompactColorPicker } from '@/components/CompactColorPicker';
 import { GradientPicker } from '@/components/GradientPicker';
 import { useHistoryStore } from '@/core/store/historyStore';
+import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useShallow } from 'zustand/react/shallow';
 import { useThrottle } from '@/core/hooks/useThrottle';
 import { useMediaUrl } from '@/core/hooks/useMediaUrl';
 
@@ -40,8 +41,11 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showAdvancedLayers, setShowAdvancedLayers] = useState(false);
-    const [isCropModalOpen, setIsCropModalOpen] = useState(false);
-    const { recentBackgrounds, addRecentBackground } = useHistoryStore();
+    const { openModal } = useModalStore();
+    const { recentBackgrounds, addRecentBackground } = useHistoryStore(useShallow(s => ({
+        recentBackgrounds: s.recentBackgrounds,
+        addRecentBackground: s.addRecentBackground
+    })));
 
     const [localLayers, setLocalLayers] = useState<IStyleLayer[]>(layers);
     const throttledOnChange = useThrottle(onChange, 16);
@@ -158,7 +162,7 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
     };
 
     return (
-        <div className={cn("flex flex-col h-full overflow-hidden", !hideLayerStack ? "bg-[#171717] rounded-3xl border border-white/5 shadow-2xl text-white" : "")}>
+        <div className={cn("flex flex-col h-full overflow-hidden", !hideLayerStack ? "bg-stone-900 rounded-3xl border border-white/5 shadow-2xl text-white" : "")}>
             {!hideLayerStack && showAdvancedLayers && (
                 <LayerStack 
                     layers={layers} 
@@ -268,21 +272,19 @@ export const BackgroundPicker: React.FC<BackgroundPickerProps> = ({
                         <AdjustmentPanel 
                             activeLayer={activeLayer}
                             onUpdateLayer={(updates, immediate) => updateLayer(activeLayer.id, updates, immediate)}
-                            onOpenCropModal={() => setIsCropModalOpen(true)}
+                            onOpenCropModal={() => {
+                                if (activeLayer.type === 'image' && activeImageUrl) {
+                                    openModal(ModalType.IMAGE_CROP, {
+                                        imageUrl: activeImageUrl,
+                                        initialCrop: activeLayer.image?.crop,
+                                        onApply: (crop: any) => updateLayer(activeLayer.id, { image: { ...activeLayer.image!, crop } }, true)
+                                    });
+                                }
+                            }}
                         />
                     </>
                 )}
             </div>
-
-            {activeLayer?.type === 'image' && activeImageUrl && (
-                <BackgroundCropModal
-                    isOpen={isCropModalOpen}
-                    onClose={() => setIsCropModalOpen(false)}
-                    imageUrl={activeImageUrl}
-                    initialCrop={activeLayer.image?.crop}
-                    onApply={(crop) => updateLayer(activeLayer.id, { image: { ...activeLayer.image!, crop } }, true)}
-                />
-            )}
         </div>
     );
 };

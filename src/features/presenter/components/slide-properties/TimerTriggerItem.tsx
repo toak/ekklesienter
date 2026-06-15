@@ -23,7 +23,7 @@ import { TimerActionStep } from './TimerActionStep';
 interface ITimerTriggerItemProps {
     trigger: ITimerTrigger;
     idx: number;
-    ts: ITimerSettings | undefined;
+    ts: Partial<ITimerSettings> | undefined;
     selectedSlideId: string;
     updateTimerSettings: (id: string, settings: Partial<ITimerSettings>) => void;
     sensors: ReturnType<typeof useSensors>;
@@ -32,7 +32,7 @@ interface ITimerTriggerItemProps {
     slides: ISlide[];
 }
 
-export const TimerTriggerItem: React.FC<ITimerTriggerItemProps> = ({ 
+const TimerTriggerItemComponent: React.FC<ITimerTriggerItemProps> = ({ 
     trigger, idx, ts, selectedSlideId, updateTimerSettings, sensors, openModal, t, slides
 }) => {
     const [localValue, setLocalValue] = React.useState<string | null>(null);
@@ -247,3 +247,5 @@ export const TimerTriggerItem: React.FC<ITimerTriggerItemProps> = ({
         </div>
     );
 };
+
+export const TimerTriggerItem = React.memo(TimerTriggerItemComponent);

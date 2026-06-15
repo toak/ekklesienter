@@ -2,6 +2,7 @@ import './core/utils/blobDebugger';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import ProjectorView from '@/features/presenter/components/display/ProjectorView';
+import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
 import './core/styles/globals.css';
 import './core/i18n';
@@ -14,6 +15,8 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
     <React.StrictMode>
-        <ProjectorView />
+        <ErrorBoundary fallback={<div className="w-full h-full min-h-screen bg-black" />}>
+            <ProjectorView />
+        </ErrorBoundary>
     </React.StrictMode>
 );

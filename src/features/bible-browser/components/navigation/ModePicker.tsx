@@ -12,7 +12,7 @@ interface ModePickerProps {
     triggerRect: DOMRect | null;
 }
 
-const ModePicker: React.FC<ModePickerProps> = ({
+const ModePicker: React.FC<ModePickerProps> = React.memo(({
     appMode,
     onSetAppMode,
     onClose,
@@ -60,7 +60,7 @@ const ModePicker: React.FC<ModePickerProps> = ({
                 <button
                     onClick={() => { onSetAppMode('scripture'); onClose(); }}
                     className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors text-left",
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-colors text-left",
                         appMode === 'scripture' ? "bg-accent/10 text-accent font-bold" : "text-stone-400 hover:bg-white/5 hover:text-stone-200"
                     )}
                 >
@@ -70,7 +70,7 @@ const ModePicker: React.FC<ModePickerProps> = ({
                 <button
                     onClick={() => { onSetAppMode('presentation'); onClose(); }}
                     className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs transition-colors text-left",
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs transition-colors text-left",
                         appMode === 'presentation' ? "bg-accent/10 text-accent font-bold" : "text-stone-400 hover:bg-white/5 hover:text-stone-200"
                     )}
                 >
@@ -81,6 +81,8 @@ const ModePicker: React.FC<ModePickerProps> = ({
         </div>,
         document.body
     );
-};
+});
+
+ModePicker.displayName = 'ModePicker';
 
 export default ModePicker;

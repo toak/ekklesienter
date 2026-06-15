@@ -7,7 +7,7 @@ import { audioService } from '@/features/presenter/services/AudioService';
 
 import { useTimerAudio } from './useTimerAudio';
 import { LiveSyncService } from '@/core/services/liveSyncService';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 export const useTimerCore = (id: string, settings: ITimerSettings, isLive: boolean, isProjector: boolean = false, isPreloading: boolean = false) => {
     const [timeLeft, setTimeLeft] = useState(settings.duration);

@@ -44,8 +44,7 @@ vi.mock('jszip', () => {
       generateAsync: vi.fn().mockResolvedValue(new Blob(['test-zip'], { type: 'application/zip' })),
     };
   });
-  // @ts-ignore
-  mockJSZip.loadAsync = vi.fn();
+  (mockJSZip as any).loadAsync = vi.fn();
   return {
     default: mockJSZip,
   };

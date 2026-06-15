@@ -8,10 +8,25 @@ export type NavLevel =
   | { type: 'template'; template: ITemplate }
   | { type: 'block'; template: ITemplate; blockId: string };
 
+export interface UseTemplatePickerDataReturn {
+  allTemplates: ITemplate[];
+  allBlocks: IBlock[];
+  blocksMap: Map<string, IBlock>;
+  templates: ITemplate[];
+  searchQuery: string;
+  setSearchQuery: React.Dispatch<React.SetStateAction<string>>;
+  navStack: NavLevel[];
+  setNavStack: React.Dispatch<React.SetStateAction<NavLevel[]>>;
+  currentView: NavLevel;
+  pushNav: (level: NavLevel) => void;
+  popNav: () => void;
+  refreshNavTemplate: (updatedTemplate: ITemplate) => void;
+}
+
 /**
  * Hook for template picker data fetching, filtering, and navigation.
  */
-export function useTemplatePickerData(blockId?: string) {
+export function useTemplatePickerData(blockId?: string): UseTemplatePickerDataReturn {
   // ─── Data Queries ───
   const allTemplates = useLiveQuery(() => PresentationDataService.getTemplates()) || [];
   const allBlocks = useLiveQuery(() => PresentationDataService.getBlocks()) || [];

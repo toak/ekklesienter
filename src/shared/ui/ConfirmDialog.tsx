@@ -31,8 +31,20 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     useEffect(() => {
         if (!isOpen) return;
         const handler = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onCancel();
-            if (e.key === 'Enter') onConfirm();
+            if (e.key === 'Escape') {
+                onCancel();
+                return;
+            }
+            if (e.key === 'Enter') {
+                const target = e.target as HTMLElement;
+                const isInput = target && (
+                    target.tagName === 'INPUT' || 
+                    target.tagName === 'TEXTAREA' || 
+                    target.isContentEditable
+                );
+                if (isInput) return;
+                onConfirm();
+            }
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);

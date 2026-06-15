@@ -1,6 +1,7 @@
 import React from 'react';
 import { Music, Volume2, VolumeX, Repeat, Trash2 } from 'lucide-react';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useShallow } from 'zustand/react/shallow';
 import { cn } from '@/core/utils/cn';
 import { CustomSlider } from '@/components/CustomSlider';
 import { IAudioScope } from '@/core/types';
@@ -8,7 +9,7 @@ import type { TFunction } from 'i18next';
 import { ScrubbableInput } from '../slide-properties/ScrubbableInput';
 import { db } from '@/core/db';
 import { toast } from '@/core/utils/toast';
-import { ffmpegService } from '@/core/services/FFmpegService';
+import { ffmpegService } from '@/core/services/ffmpegService';
 import { useState, useCallback } from 'react';
 import { Play, Clock } from 'lucide-react';
 
@@ -31,7 +32,7 @@ interface IAudioTabContentProps {
 export const AudioTabContent: React.FC<IAudioTabContentProps> = ({
     scope, mediaItem, selectedAudioScopeId, updateAudioScope, removeAudioScope, selectAudioScope, t,
 }) => {
-    const { openModal } = useModalStore();
+    const { openModal } = useModalStore(useShallow(s => ({ openModal: s.openModal })));
     const [isTrimming, setIsTrimming] = useState(false);
 
     const handleApplyTrim = useCallback(async () => {

@@ -1,18 +1,18 @@
 import { db } from '@/core/db';
-import { IpcService } from '@/core/services/IpcService';
+import { ipcService } from '@/core/services/ipcService';
 import { getBookName } from '@/core/data/bookData';
+
+let lastUpdateId = 0;
 
 /**
  * Service for synchronizing application state with the remote controller.
  * Handles complex payload construction, recursive slide resolution, and async media status.
  */
-export class RemoteSyncService {
-  private static lastUpdateId = 0;
-
+export const remoteSyncService = {
   /**
    * Constructs and sends the application state to the remote controller.
    */
-  static async updateRemoteState(params: {
+  async updateRemoteState(params: {
     appMode: string;
     activeVerse: any;
     activePresentation: any;
@@ -29,9 +29,9 @@ export class RemoteSyncService {
     activeLogoUrl: string | null;
     settings: any;
   }) {
-    if (!IpcService.isElectron()) return;
+    if (!ipcService.isElectron()) return;
     
-    const currentUpdateId = ++this.lastUpdateId;
+    const currentUpdateId = ++lastUpdateId;
     const { 
       appMode, activeVerse, activePresentation, selectedPresentation, 
       presentationStack, projectorIsLive, liveSlideId, previewSlideId, 
@@ -46,6 +46,7 @@ export class RemoteSyncService {
     let slideBlock: any = null;
     let prevSlideData: any = null;
     let nextSlideData: any = null;
+    let timelineSlides: any[] = [];
 
     // 1. Resolve Audio Scopes for the current presentation context
     let timelineScopes: any[] = [];
@@ -55,7 +56,7 @@ export class RemoteSyncService {
         if (targetPres?.id) {
             timelineAudioPresId = targetPres.id;
             timelineScopes = await db.audioScopes.where('presentationId').equals(targetPres.id).toArray();
-            if (currentUpdateId !== this.lastUpdateId) return;
+            if (currentUpdateId !== lastUpdateId) return;
         }
     } catch (err) { }
 
@@ -82,13 +83,25 @@ export class RemoteSyncService {
         slidePreviewText = activeVerse.text;
         isLive = projectorIsLive;
     } else if (appMode === 'presentation' && activePresentation) {
-        const targetId = liveSlideId || previewSlideId;
+        let targetId = liveSlideId || previewSlideId;
         let currentPres = activePresentation;
-        if (selectedPresentation && selectedPresentation.slides.some((s: any) => s.id === targetId)) {
-            currentPres = selectedPresentation;
+        if (selectedPresentation) {
+            if (!targetId || !activePresentation || selectedPresentation.slides.some((s: any) => s.id === targetId)) {
+                currentPres = selectedPresentation;
+            }
         }
 
-        const slide = currentPres.slides.find((s: any) => s.id === targetId);
+        let slide = null;
+        if (currentPres?.slides?.length > 0) {
+            if (targetId) {
+                slide = currentPres.slides.find((s: any) => s.id === targetId);
+            }
+            if (!slide) {
+                slide = currentPres.slides[0];
+                targetId = slide.id;
+            }
+        }
+        
         if (slide) {
             slideData = slide;
             slideTitle = (slide as any).name || (slide as any).label || 'Presentation Slide';
@@ -96,7 +109,7 @@ export class RemoteSyncService {
             try {
                 if (slide.templateId) slideTemplate = await db.templates.get(slide.templateId);
                 if (slide.blockId) slideBlock = await db.blocks.get(slide.blockId);
-                if (currentUpdateId !== this.lastUpdateId) return;
+                if (currentUpdateId !== lastUpdateId) return;
 
                 // Attempt to resolve more specific name for video/media slides
                 if (slideTitle === 'Presentation Slide') {
@@ -108,7 +121,7 @@ export class RemoteSyncService {
                         const mediaId = (slide as any).videoSettings?.mediaId || items?.find((i: any) => i.type === 'video')?.mediaId || canvasItems?.find((i: any) => i.type === 'video')?.mediaId;
                         if (mediaId) {
                             const mediaDoc = await db.mediaPool.get(mediaId);
-                            if (currentUpdateId !== this.lastUpdateId) return;
+                            if (currentUpdateId !== lastUpdateId) return;
                             if (mediaDoc?.name) slideTitle = mediaDoc.name;
                         }
                     }
@@ -136,7 +149,7 @@ export class RemoteSyncService {
                 const mId = sRef.type === 'normal' ? sRef.masterPresentationId : (sRef.type === 'nested' ? sRef.presentationId : undefined);
                 if (!mId) return sRef;
                 const p = await db.presentationFiles.get(mId);
-                if (currentUpdateId !== this.lastUpdateId) throw new Error('stale');
+                if (currentUpdateId !== lastUpdateId) throw new Error('stale');
                 if (p && p.slides.length > 0) return resolveNeighbor(dir === 'first' ? p.slides[0] : p.slides[p.slides.length-1], dir);
                 return sRef;
             };
@@ -150,7 +163,7 @@ export class RemoteSyncService {
                 } else if (presentationStack.length > 0) {
                     const last = presentationStack[presentationStack.length - 1];
                     const pPres = await db.presentationFiles.get(last.presentationId);
-                    if (currentUpdateId === this.lastUpdateId && pPres) {
+                    if (currentUpdateId === lastUpdateId && pPres) {
                         const pIdx = pPres.slides.findIndex((s: any) => s.id === last.parentNestedSlideId);
                         if (pIdx > 0) prevSlideData = await resolveNeighbor(pPres.slides[pIdx - 1], 'last');
                     }
@@ -162,7 +175,7 @@ export class RemoteSyncService {
                 } else if (presentationStack.length > 0) {
                     const last = presentationStack[presentationStack.length - 1];
                     const pPres = await db.presentationFiles.get(last.presentationId);
-                    if (currentUpdateId === this.lastUpdateId && pPres) {
+                    if (currentUpdateId === lastUpdateId && pPres) {
                         const pIdx = pPres.slides.findIndex((s: any) => s.id === last.parentNestedSlideId);
                         if (pIdx !== -1 && pIdx < pPres.slides.length - 1) nextSlideData = await resolveNeighbor(pPres.slides[pIdx + 1], 'first');
                     }
@@ -171,17 +184,34 @@ export class RemoteSyncService {
                 if (err.message === 'stale') return;
                 console.error('[RemoteSync] Slide resolution error:', err);
             }
+            
+            // Populate timeline slides
+            timelineSlides = currentPres.slides || [];
         }
     }
 
     // 3. Prepare Remote Assets (Logo)
     let remoteLogoUrl = activeLogoUrl;
     if (activeLogoUrl?.startsWith('blob:') || activeLogoUrl?.startsWith('file:')) {
-        remoteLogoUrl = `${window.location.protocol}//${window.location.hostname}:3211/media/${activeLogo.id}`;
+        let host = 'localhost';
+        let port = 3211;
+        if (ipcService.isElectron()) {
+            try {
+                const info = await ipcService.invoke<{ ip: string; port: number } | null>('remote:get-info');
+                if (info && info.ip && info.ip !== '127.0.0.1') {
+                    host = info.ip;
+                    port = info.port || 3211;
+                }
+            } catch (err) {
+                console.error('[RemoteSync] Failed to resolve remote server info:', err);
+            }
+        }
+        const protocol = window.location.protocol === 'file:' ? 'http:' : window.location.protocol;
+        remoteLogoUrl = `${protocol}//${host}:${port}/media/${activeLogo.id}`;
     }
 
     // 4. Dispatch construction to IPC
-    IpcService.send('remote:update-state', {
+    ipcService.send('remote:update-state', {
         active: isLive,
         slideTitle,
         slidePreviewText: slidePreviewText || (previewSlideId ? 'Selected' : 'No slide selected'),
@@ -190,6 +220,7 @@ export class RemoteSyncService {
         slideBlock, 
         prevSlideData, 
         nextSlideData,
+        timelineSlides,
         playing: isPlaying,
         activeOverride,
         activeLogoUrl: remoteLogoUrl,
@@ -199,4 +230,7 @@ export class RemoteSyncService {
         settings
     });
   }
-}
+};
+
+/** @deprecated Use remoteSyncService instead. */
+export const RemoteSyncService = remoteSyncService;

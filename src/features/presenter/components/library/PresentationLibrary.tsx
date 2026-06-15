@@ -20,7 +20,7 @@ import { GraceLibExportService } from '@/features/presenter/services/GraceLibExp
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
 import { Edit2, RefreshCw, ChevronRight, FolderPlus, MoreVertical, Folder, Download } from 'lucide-react';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { TemplatePreviewItem } from './TemplatePreviewItem';
 import { LibraryImportService } from '../../services/LibraryImportService';
 import { LibraryTemplatesSection } from './LibraryTemplatesSection';

@@ -27,7 +27,7 @@ const SearchHighlight: React.FC<{ text: string; query: string }> = ({ text, quer
   );
 };
 
-export const BookList: React.FC<BookListProps> = ({
+export const BookList: React.FC<BookListProps> = React.memo(({
   books,
   currentBookId,
   onBookSelect,
@@ -80,4 +80,6 @@ export const BookList: React.FC<BookListProps> = ({
       })}
     </div>
   );
-};
+});
+
+BookList.displayName = 'BookList';

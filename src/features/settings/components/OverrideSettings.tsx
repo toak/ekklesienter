@@ -11,13 +11,13 @@ import { useLogoSettings } from './logo/useLogoSettings';
 import { LogoGrid } from './logo/LogoGrid';
 import { CreateGroupDialog } from './logo/CreateGroupDialog';
 import { LogoCard } from './logo/LogoCard';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 type OverrideTab = 'blackout' | 'whiteout' | 'logo';
 
 const OverrideSettings: React.FC = () => {
     const { t } = useTranslation();
-    const { updateOverrideBackground } = usePresenterStore();
+    const updateOverrideBackground = usePresenterStore(state => state.updateOverrideBackground);
     const [activeTab, setActiveTab] = useState<OverrideTab>('logo');
     const [logoSubTab, setLogoSubTab] = useState<'library' | 'background'>('library');
 
@@ -44,25 +44,28 @@ const OverrideSettings: React.FC = () => {
 
     // Find active logo object
     const activeLogo = React.useMemo(() => {
-        if (!activeLogoId) return null;
+        let resultLogo = null;
+        if (activeLogoId) {
+            // 1. Search preloaded
+            for (const group of PRELOADED_LOGOS) {
+                const found = group.logos.find(l => l.id === activeLogoId);
+                if (found) { resultLogo = found; break; }
+            }
 
-        // 1. Search preloaded
-        for (const group of PRELOADED_LOGOS) {
-            const found = group.logos.find(l => l.id === activeLogoId);
-            if (found) return found;
+            if (!resultLogo) {
+                // 2. Search custom
+                resultLogo = settings.logo.customLogos.find(l => l.id === activeLogoId) || null;
+            }
+
+            if (!resultLogo) {
+                // 3. Search groups
+                for (const group of settings.logo.customGroups || []) {
+                    const found = group.logos.find(l => l.id === activeLogoId);
+                    if (found) { resultLogo = found; break; }
+                }
+            }
         }
-
-        // 2. Search custom
-        const customFound = settings.logo.customLogos.find(l => l.id === activeLogoId);
-        if (customFound) return customFound;
-
-        // 3. Search groups
-        for (const group of settings.logo.customGroups || []) {
-            const found = group.logos.find(l => l.id === activeLogoId);
-            if (found) return found;
-        }
-
-        return null;
+        return resultLogo;
     }, [activeLogoId, settings.logo]);
 
     const logoUrl = useLogoUrl(activeLogo);
@@ -145,7 +148,7 @@ const OverrideSettings: React.FC = () => {
                                     <button
                                         onClick={() => setLogoSubTab('library')}
                                         className={cn(
-                                            "flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                            "flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all",
                                             logoSubTab === 'library' ? "bg-stone-800 text-white shadow-lg" : "text-stone-500 hover:text-stone-300"
                                         )}
                                     >
@@ -155,7 +158,7 @@ const OverrideSettings: React.FC = () => {
                                     <button
                                         onClick={() => setLogoSubTab('background')}
                                         className={cn(
-                                            "flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                                            "flex items-center gap-2 px-4 py-1.5 rounded-xl text-xs font-bold transition-all",
                                             logoSubTab === 'background' ? "bg-stone-800 text-white shadow-lg" : "text-stone-500 hover:text-stone-300"
                                         )}
                                     >
@@ -168,14 +171,14 @@ const OverrideSettings: React.FC = () => {
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => handleSelectFile()}
-                                            className="p-2 bg-stone-800 hover:bg-stone-700 rounded-lg border border-white/5 transition-colors text-stone-300 hover:text-white"
+                                            className="p-2 bg-stone-800 hover:bg-stone-700 rounded-xl border border-white/5 transition-colors text-stone-300 hover:text-white"
                                             title={t('add_logo', 'Add Logo')}
                                         >
                                             <Plus className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={() => handleImportFolder()}
-                                            className="p-2 bg-stone-800 hover:bg-stone-700 rounded-lg border border-white/5 transition-colors text-stone-300 hover:text-white"
+                                            className="p-2 bg-stone-800 hover:bg-stone-700 rounded-xl border border-white/5 transition-colors text-stone-300 hover:text-white"
                                             title={t('import_folder', 'Import Folder')}
                                         >
                                             <FolderOpen className="w-4 h-4" />

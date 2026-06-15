@@ -7,9 +7,10 @@ interface ToastProps {
     title: string;
     description?: string;
     type: 'success' | 'error' | 'info' | 'warning';
+    toastId?: string | number;
 }
 
-const PremiumToast = ({ title, description, type }: ToastProps) => {
+const PremiumToast = ({ title, description, type, toastId }: ToastProps) => {
     const icons = {
         success: <Check className="w-5 h-5 text-accent" />,
         error: <AlertCircle className="w-5 h-5 text-red-400" />,
@@ -58,7 +59,13 @@ const PremiumToast = ({ title, description, type }: ToastProps) => {
 
             {/* Close Button - subtle */}
             <button
-                onClick={() => sonnerToast.dismiss()}
+                onClick={() => {
+                    if (toastId !== undefined) {
+                        sonnerToast.dismiss(toastId);
+                    } else {
+                        sonnerToast.dismiss();
+                    }
+                }}
                 className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-white/5 rounded-lg text-stone-600 hover:text-stone-300 absolute top-3 right-3"
             >
                 <X className="w-3.5 h-3.5" />
@@ -70,22 +77,22 @@ const PremiumToast = ({ title, description, type }: ToastProps) => {
 export const toast = {
     success: (title: string, description?: string) => {
         sonnerToast.custom((t) => (
-            <PremiumToast title={title} description={description} type="success" />
+            <PremiumToast title={title} description={description} type="success" toastId={t} />
         ));
     },
     error: (title: string, description?: string) => {
         sonnerToast.custom((t) => (
-            <PremiumToast title={title} description={description} type="error" />
+            <PremiumToast title={title} description={description} type="error" toastId={t} />
         ));
     },
     info: (title: string, description?: string) => {
         sonnerToast.custom((t) => (
-            <PremiumToast title={title} description={description} type="info" />
+            <PremiumToast title={title} description={description} type="info" toastId={t} />
         ));
     },
     warning: (title: string, description?: string) => {
         sonnerToast.custom((t) => (
-            <PremiumToast title={title} description={description} type="warning" />
+            <PremiumToast title={title} description={description} type="warning" toastId={t} />
         ));
     },
     promise: <T,>(

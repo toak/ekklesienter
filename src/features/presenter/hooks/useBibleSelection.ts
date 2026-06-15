@@ -2,12 +2,40 @@ import { useState, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { BOOK_ORDER } from '@/core/data/bookData';
-import { Verse, ICanvasSlide, ISlide } from '@/core/types';
+import { Verse, ICanvasSlide, ISlide, IPresentationFile, Translation, Book } from '@/core/types';
+
+export interface UseBibleSelectionReturn {
+  selectedTranslationId: string;
+  setSelectedTranslationId: React.Dispatch<React.SetStateAction<string>>;
+  secondTranslationId: string | null;
+  setSecondTranslationId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedBookId: string;
+  setSelectedBookId: React.Dispatch<React.SetStateAction<string>>;
+  selectedChapter: number;
+  setSelectedChapter: React.Dispatch<React.SetStateAction<number>>;
+  selectedVerseNumbers: number[];
+  setSelectedVerseNumbers: React.Dispatch<React.SetStateAction<number[]>>;
+  lastClickedVerseNumber: number | null;
+  setLastClickedVerseNumber: React.Dispatch<React.SetStateAction<number | null>>;
+  insertMode: 'single' | 'multiple';
+  setInsertMode: React.Dispatch<React.SetStateAction<'single' | 'multiple'>>;
+  showSecondTranslation: boolean;
+  setShowSecondTranslation: React.Dispatch<React.SetStateAction<boolean>>;
+  carouselIndex: number;
+  setCarouselIndex: React.Dispatch<React.SetStateAction<number>>;
+  translations: Translation[];
+  sortedBooks: Book[];
+  versesInChapter: Verse[];
+  chaptersCount: number;
+  selectedVerses: Verse[];
+  secondTranslationVerse: Verse | null;
+  secondTranslationVerses: Verse[];
+}
 
 /**
  * Hook to manage the state and data for Bible selection in modals.
  */
-export function useBibleSelection(presentation: any, slideId?: string) {
+export function useBibleSelection(presentation: IPresentationFile | null | undefined, slideId?: string): UseBibleSelectionReturn {
   // 1. Selection State
   const [selectedTranslationId, setSelectedTranslationId] = useState<string>('');
   const [secondTranslationId, setSecondTranslationId] = useState<string | null>(null);

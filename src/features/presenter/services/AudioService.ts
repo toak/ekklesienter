@@ -1,9 +1,9 @@
 import { IAudioScope, ISlide, ICanvasSlide } from '@/core/types';
-import { generateWaveformPoints } from '@/core/utils/audioUtils';
-import { db } from '@/core/db';
-import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
-import { extractPathFromLocalResource } from './mediaPackingUtils';
-import { IpcService } from '@/core/services/IpcService';
+import { AudioBufferLoader } from '../utils/audio/AudioBufferLoader';
+
+interface WindowWithWebkit extends Window {
+    webkitAudioContext?: typeof AudioContext;
+}
 
 class AudioService {
     private static instance: AudioService;
@@ -25,23 +25,7 @@ class AudioService {
     
     // Timer management for delayed tracks
     private pendingDelays: Map<string, NodeJS.Timeout> = new Map();
-
     private syncingScopeId: string | null = null;
-
-    // File cache with LRU limits to prevent memory bloat
-    private bufferCache: Map<string, AudioBuffer> = new Map();
-    private waveformCache: Map<string, number[]> = new Map();
-    private blobUrlCache: Map<string, string> = new Map();
-    
-    // Limits
-    private readonly MAX_BUFFER_CACHE = 10;
-    private readonly MAX_WAVEFORM_CACHE = 50;
-    private readonly MAX_BLOB_CACHE = 20;
-
-    private loadingPromises: Map<string, Promise<AudioBuffer | null>> = new Map();
-    private durationPromises: Map<string, Promise<number>> = new Map();
-    private durationCache: Map<string, number> = new Map();
-    private resolvePromises: Map<string, Promise<string>> = new Map();
 
     private constructor() { }
 
@@ -52,9 +36,16 @@ class AudioService {
         return AudioService.instance;
     }
 
+    private get loader() {
+        return AudioBufferLoader.getInstance();
+    }
+
     private async ensureContext() {
         if (!this.audioContext) {
-            const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+            const AudioContextClass = window.AudioContext || (window as WindowWithWebkit).webkitAudioContext;
+            if (!AudioContextClass) {
+                throw new Error('AudioContext is not supported in this environment');
+            }
             this.audioContext = new AudioContextClass();
         }
         if (this.audioContext.state === 'suspended') {
@@ -72,227 +63,9 @@ class AudioService {
         }
     }
 
-    private resolveUrl(fileId: string): string {
-        return getLocalResourceUrl(fileId);
-    }
-
-    private async resolveEffectiveUrl(fileId: string): Promise<string> {
-        if (!fileId) return '';
-
-        // Reuse cached blob URL if we already created one for this fileId
-        const cached = this.blobUrlCache.get(fileId);
-        if (cached) return cached;
-
-        // Concurrency Guard: If we are already resolving this file, wait for it
-        const ongoing = this.resolvePromises.get(fileId);
-        if (ongoing) return ongoing;
-
-        const resolutionPromise = (async () => {
-            // Check if we already have this in DB (e.g. imported media)
-            let dbItem = (await db.mediaPool.get(fileId) || await db.backgrounds.get(fileId)) as { data?: Blob, path?: string } | undefined;
-            
-            if (!dbItem) {
-                // Fallback 1: check by exact path match
-                const path = extractPathFromLocalResource(fileId) || fileId;
-                dbItem = await db.mediaPool.where('path').equals(path).first();
-                
-                if (!dbItem) {
-                    // Fallback 1.5: check backgrounds table by path
-                    dbItem = await db.backgrounds.where('path').equals(path).first();
-                }
-
-                if (!dbItem) {
-                    // Fallback 2: check by filename only (useful for presentations from other machines)
-                    const filename = path.split(/[/\\]/).pop();
-                    if (filename && filename.includes('.')) {
-                        dbItem = await db.mediaPool.where('name').equals(filename).first();
-                        
-                        // Final sanity check: try normalized name fallback
-                        if (!dbItem) {
-                            const normalized = filename.normalize('NFC');
-                            dbItem = await db.mediaPool.where('name').equals(normalized).first();
-                        }
-                    }
-                }
-            }
-
-            if (dbItem?.data) {
-                const blobUrl = URL.createObjectURL(dbItem.data);
-                
-                // LRU for Blob URLs to prevent memory leaks
-                if (this.blobUrlCache.size >= this.MAX_BLOB_CACHE) {
-                    const oldestKey = this.blobUrlCache.keys().next().value;
-                    if (oldestKey) {
-                        const oldUrl = this.blobUrlCache.get(oldestKey);
-                        if (oldUrl) URL.revokeObjectURL(oldUrl);
-                        this.blobUrlCache.delete(oldestKey);
-                    }
-                }
-                
-                this.blobUrlCache.set(fileId, blobUrl);
-                return blobUrl;
-            }
-
-            const dbPath = dbItem && 'path' in dbItem ? dbItem.path as string : undefined;
-            const pathToCheck = dbPath || extractPathFromLocalResource(fileId) || fileId;
-            return this.resolveUrl(pathToCheck);
-        })().finally(() => {
-            this.resolvePromises.delete(fileId);
-        });
-
-        this.resolvePromises.set(fileId, resolutionPromise);
-        return resolutionPromise;
-    }
-
     public async getWaveform(fileId: string, samples: number = 100): Promise<number[] | null> {
-        if (!fileId) return null;
-        const cacheKey = `${fileId}:${samples}`;
-        const cached = this.waveformCache.get(cacheKey);
-        if (cached) return cached;
-
-        // AI Fix: If duration or size is already known to be long, don't even try
-        // Size check first as it is the safest/fastest
-        const stats = await this.getFileStats(fileId);
-        if (stats && stats.size > 50 * 1024 * 1024) return null;
-
-        const duration = await this.getDuration(fileId);
-        if (duration <= 0 || duration > 300) return null;
-
-        const buffer = await this.loadAudio(fileId);
-        if (!buffer) return null;
-
-        const points = generateWaveformPoints(buffer, samples);
-        
-        // Update waveform LRU cache
-        if (this.waveformCache.size >= this.MAX_WAVEFORM_CACHE) {
-            const oldestKey = this.waveformCache.keys().next().value;
-            if (oldestKey) this.waveformCache.delete(oldestKey);
-        }
-        this.waveformCache.set(cacheKey, points);
-        
-        return points;
-    }
-
-    private async loadAudio(url: string): Promise<AudioBuffer | null> {
-        if (!url) return null;
-        let resolvedUrl = await this.resolveEffectiveUrl(url);
-        if (!resolvedUrl) return null;
-
-        const cached = this.bufferCache.get(resolvedUrl);
-        if (cached) return cached;
-
-        // AI Fix: Concurrency Guard
-        const existingPromise = this.loadingPromises.get(resolvedUrl);
-        if (existingPromise) return existingPromise;
-
-        const loadPromise = (async () => {
-            try {
-                // AI Fix: Metadata-first check BEFORE fetch
-                // We allow up to 300s (5 minutes) to be decoded into memory.
-                // This is needed for waveforms. Anything longer is discarded to save RAM.
-                const duration = await this.getDuration(url);
-                if (duration <= 0 || duration > 300) {
-                    return null;
-                }
-
-                const response = await fetch(resolvedUrl);
-                if (!response.ok) {
-                    // One last attempt: maybe the URL resolution was wrong for a DB item?
-                    // Already checked dbItem above, so if we're here, fetch just failed.
-                    return null;
-                }
-
-                const contentLength = response.headers.get('Content-Length');
-                if (contentLength && parseInt(contentLength) > 100 * 1024 * 1024) {
-                    return null;
-                }
-
-                const arrayBuffer = await response.arrayBuffer();
-                const ctx = await this.ensureContext();
-
-                try {
-                    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-                    
-                    // Update buffer LRU cache
-                    if (this.bufferCache.size >= this.MAX_BUFFER_CACHE) {
-                        const oldestKey = this.bufferCache.keys().next().value;
-                        if (oldestKey) this.bufferCache.delete(oldestKey);
-                    }
-                    this.bufferCache.set(resolvedUrl, audioBuffer);
-                    
-                    return audioBuffer;
-                } catch (e) {
-                    console.error('AudioService: Decode error', e);
-                    return null;
-                }
-            } catch (error) {
-                return null;
-            } finally {
-                this.loadingPromises.delete(resolvedUrl);
-                // If we created a blob URL, we should probably revoke it eventually,
-                // but bufferCache depends on it for now.
-            }
-        })();
-
-        this.loadingPromises.set(resolvedUrl, loadPromise);
-        return loadPromise;
-    }
-
-    private async getFileStats(path: string): Promise<{ size: number } | null> {
-        try {
-            return await IpcService.invoke<{ size: number } | null>('get-file-stats', path);
-        } catch (e) {
-            return null;
-        }
-    }
-
-    private async getDuration(url: string): Promise<number> {
-        if (!url) return 0;
-        let resolvedUrl = await this.resolveEffectiveUrl(url);
-        if (!resolvedUrl) return 0;
-
-        if (this.durationCache.has(resolvedUrl)) return this.durationCache.get(resolvedUrl)!;
-
-        // AI Fix: Concurrency Guard for metadata probe
-        const existingPromise = this.durationPromises.get(resolvedUrl);
-        if (existingPromise) return existingPromise;
-
-        const probePromise = (async () => {
-            // AI Fix: Size-based Fast Fail BEFORE media pipeline
-            // If file is > 50MB, assume it's long and avoid probing if we are in a crash-prone state
-            const stats = await this.getFileStats(url);
-            if (!stats) {
-                return 0; // File is missing, don't even try to probe
-            }
-            if (stats.size > 50 * 1024 * 1024) {
-                return 301; // Fake "long enough" duration to trigger streaming
-            }
-
-            return new Promise<number>((resolve) => {
-                const tempAudio = new Audio(resolvedUrl);
-                tempAudio.onloadedmetadata = () => {
-                    const d = tempAudio.duration;
-                    tempAudio.src = '';
-                    tempAudio.load(); // Aggressive release
-                    this.durationCache.set(resolvedUrl, d);
-                    resolve(d);
-                };
-                tempAudio.onerror = () => {
-                    tempAudio.src = '';
-                    resolve(0);
-                };
-                // 5s timeout for probe to prevent hanging
-                setTimeout(() => {
-                    tempAudio.src = '';
-                    resolve(0);
-                }, 5000);
-            });
-        })().finally(() => {
-            this.durationPromises.delete(resolvedUrl);
-        });
-
-        this.durationPromises.set(resolvedUrl, probePromise);
-        return probePromise;
+        const ctx = await this.ensureContext();
+        return this.loader.getWaveform(fileId, samples, ctx);
     }
 
     public async sync(
@@ -471,17 +244,17 @@ class AudioService {
         if (!scope?.fileId) return null;
 
         const ctx = await this.ensureContext();
-        const resolvedUrl = await this.resolveEffectiveUrl(scope.fileId);
+        const resolvedUrl = await this.loader.resolveEffectiveUrl(scope.fileId);
         if (!resolvedUrl) return null;
 
         // AI Fix (Proactive Guard): Check duration FIRST with a metadata probe
         // This avoids fetching the whole 2GB file if it's just meant for streaming.
-        const cachedBuffer = this.bufferCache.get(resolvedUrl);
+        const cachedBuffer = this.loader.bufferCache.get(resolvedUrl);
         let duration = cachedBuffer ? cachedBuffer.duration : 0;
         let isLongFile = false;
 
         if (!cachedBuffer) {
-            duration = await this.getDuration(scope.fileId);
+            duration = await this.loader.getDuration(scope.fileId);
             // If duration is > 300s (5 minutes), we treat it as a long file and bypass decode
             if (duration > 300) {
                 isLongFile = true;
@@ -508,10 +281,10 @@ class AudioService {
             audio.crossOrigin = "anonymous";
         } else {
             // Buffered path (fetch + decode)
-            buffer = await this.loadAudio(scope.fileId);
+            buffer = await this.loader.loadAudio(scope.fileId, ctx);
             if (!buffer) {
                 // Fallback to streaming if buffer loading failed (e.g. file too large but duration was missing)
-                if (duration === 0) duration = await this.getDuration(scope.fileId);
+                if (duration === 0) duration = await this.loader.getDuration(scope.fileId);
                 
                 if (duration === 0) {
                     audio = new Audio(resolvedUrl);
@@ -655,7 +428,6 @@ class AudioService {
         return { duration: finalDuration, startTime: now };
     }
 
-
     public stopScope(scopeId: string, fadeDuration: number) {
         const track = this.activeTracks.get(scopeId);
         if (!track || !this.audioContext) return;
@@ -767,7 +539,7 @@ class AudioService {
      * Returns the underlying file ID for a scope
      */
     public getFileId(scopeId: string): string | undefined {
-        return this.activeTracks.get(scopeId)?.scope?.[ 'fileId' ];
+        return this.activeTracks.get(scopeId)?.scope?.fileId;
     }
 
     public playTrack(scopeId: string) {
@@ -839,20 +611,15 @@ class AudioService {
     public dispose() {
         this.stopAll(0);
         
-        // Revoke all blob URLs
-        this.blobUrlCache.forEach(url => {
+        // Revoke all blob URLs in loader
+        this.loader.blobUrlCache.forEach(url => {
             try { URL.revokeObjectURL(url); } catch (_) {}
         });
         
-        this.blobUrlCache.clear();
-        this.bufferCache.clear();
-        this.waveformCache.clear();
-        this.durationCache.clear();
-        this.loadingPromises.clear();
-        this.resolvePromises.clear();
-        this.durationPromises.clear();
-        
-        console.log('🔊 [AudioService] Disposed and resources released.');
+        this.loader.blobUrlCache.clear();
+        this.loader.bufferCache.clear();
+        this.loader.waveformCache.clear();
+        this.loader.durationCache.clear();
     }
 }
 

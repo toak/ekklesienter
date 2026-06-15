@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useAtom, useSetAtom } from 'jotai';
 import { editingCanvasItemIdAtom, textCommandAtom, type TextCommand } from '@/core/store/uiAtoms';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
+import { useShallow } from 'zustand/react/shallow';
 import {
     Eye, Trash2, Plus, Move, Layers, Palette,
     Wand2, Link2, Unlink, Target, Sun, BoxSelect,
@@ -34,7 +35,7 @@ interface IItemPropertiesProps {
     t: (key: string, fallback?: string) => string;
 }
 
-export const ItemProperties: React.FC<IItemPropertiesProps> = ({
+const ItemPropertiesComponent: React.FC<IItemPropertiesProps> = ({
     selectedIds,
     canvasItems,
     updateCanvasItems,
@@ -42,9 +43,11 @@ export const ItemProperties: React.FC<IItemPropertiesProps> = ({
     isPreview,
     t
 }) => {
-    const previewSlideId = usePresentationStore(s => s.previewSlideId);
-    const batchUpdateCanvasItems = usePresentationStore(s => s.updateCanvasItems);
-    const takeSnapshot = usePresentationStore(s => s.takeSnapshot);
+    const { previewSlideId, updateCanvasItems: batchUpdateCanvasItems, takeSnapshot } = usePresentationStore(useShallow(s => ({
+        previewSlideId: s.previewSlideId,
+        updateCanvasItems: s.updateCanvasItems,
+        takeSnapshot: s.takeSnapshot
+    })));
     const [editingId] = useAtom(editingCanvasItemIdAtom);
     const setTextCommand = useSetAtom(textCommandAtom);
 
@@ -510,3 +513,5 @@ const EffectRow: React.FC<{
         </div>
     );
 };
+
+export const ItemProperties = React.memo(ItemPropertiesComponent);

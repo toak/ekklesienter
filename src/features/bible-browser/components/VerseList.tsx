@@ -1,5 +1,6 @@
-import React, { useMemo, useEffect, useRef, useState } from 'react';
+import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Verse } from '@/core/types';
 import { List, Edit, CheckCircle2, Trash2, Plus } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -17,15 +18,14 @@ interface VerseItemProps {
   verse: Verse;
   isActive: boolean;
   isSelected: boolean;
-  isDragging: boolean;
   onSelect: (verse: Verse, event: React.MouseEvent) => void;
-  onMouseDown: (e: React.MouseEvent) => void;
+  onMouseDown: (e: React.MouseEvent, verse: Verse) => void;
   onMouseEnter: (verse: Verse) => void;
   onContextMenu: (e: React.MouseEvent, verseId: number) => void;
 }
 
 const VerseItem = React.memo(({
-  verse, isActive, isSelected, isDragging,
+  verse, isActive, isSelected,
   onSelect, onMouseDown, onMouseEnter, onContextMenu,
 }: VerseItemProps) => {
   const itemRef = useRef<HTMLButtonElement>(null);
@@ -39,8 +39,12 @@ const VerseItem = React.memo(({
   return (
     <button
       ref={itemRef}
-      onMouseDown={onMouseDown}
-      onClick={(e) => onSelect(verse, e)}
+      onMouseDown={(e) => onMouseDown(e, verse)}
+      onClick={(e) => {
+        // Ignore keyboard-triggered clicks (Enter/Space) since global shortcuts handle Enter
+        if (e.detail === 0) return;
+        onSelect(verse, e);
+      }}
       onMouseEnter={() => onMouseEnter(verse)}
       onContextMenu={(e) => { if (verse.id) onContextMenu(e, verse.id); }}
       className={cn(
@@ -48,7 +52,7 @@ const VerseItem = React.memo(({
         isActive && !isSelected && 'bg-accent/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.05)]',
         isSelected && !isActive && 'bg-accent/20',
         isSelected && isActive && 'bg-accent/25',
-        !isActive && !isSelected && !isDragging && 'hover:bg-white/5',
+        !isActive && !isSelected && 'hover:bg-white/5 [.is-dragging_&]:hover:bg-transparent',
       )}
     >
       <div className="flex gap-4 pointer-events-none">
@@ -97,8 +101,7 @@ const VerseItem = React.memo(({
   prev.verse.id === next.verse.id &&
   prev.verse.text === next.verse.text &&
   prev.isActive === next.isActive &&
-  prev.isSelected === next.isSelected &&
-  prev.isDragging === next.isDragging
+  prev.isSelected === next.isSelected
 );
 
 const VerseList: React.FC = () => {
@@ -124,7 +127,28 @@ const VerseList: React.FC = () => {
     exitMultiVerseMode,
     lastClickedVerseId,
     setLastClickedVerseId,
-  } = useBibleStore();
+  } = useBibleStore(useShallow(s => ({
+    activeVerse: s.activeVerse,
+    clickVerse: s.clickVerse,
+    commitToProjector: s.commitToProjector,
+    currentBookId: s.currentBookId,
+    currentChapter: s.currentChapter,
+    updateVerseText: s.updateVerseText,
+    currentTranslationId: s.currentTranslationId,
+    secondTranslationId: s.secondTranslationId,
+    setSecondTranslation: s.setSecondTranslation,
+    navigateNext: s.navigateNext,
+    navigatePrev: s.navigatePrev,
+    selectedVerses: s.selectedVerses,
+    setSelectedVerses: s.setSelectedVerses,
+    toggleVerseSelection: s.toggleVerseSelection,
+    selectVerseRange: s.selectVerseRange,
+    isMultiVerseMode: s.isMultiVerseMode,
+    projectorIsLive: s.projectorIsLive,
+    exitMultiVerseMode: s.exitMultiVerseMode,
+    lastClickedVerseId: s.lastClickedVerseId,
+    setLastClickedVerseId: s.setLastClickedVerseId,
+  })));
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; verseId: number } | null>(null);
@@ -150,8 +174,8 @@ const VerseList: React.FC = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (editingId !== null) return;
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      const target = e.target;
+      if (target instanceof HTMLElement && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
 
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -177,7 +201,7 @@ const VerseList: React.FC = () => {
   }, [editingId, selectedVerses, isMultiVerseMode, commitToProjector, navigateNext, navigatePrev]);
 
   // ─── Clicks ───────────────────────────────────────────────────────────────
-  const handleSelect = (verse: Verse, e: React.MouseEvent) => {
+  const handleSelect = useCallback((verse: Verse, e: React.MouseEvent) => {
     if (e.metaKey || e.ctrlKey) {
       toggleVerseSelection(verse);
       setLastClickedVerseId(verse.id || null);
@@ -193,10 +217,10 @@ const VerseList: React.FC = () => {
     if (isMultiVerseMode) exitMultiVerseMode();
     clickVerse(verse);
     setLastClickedVerseId(verse.id || null);
-  };
+  }, [toggleVerseSelection, setLastClickedVerseId, lastClickedVerseId, verses, selectVerseRange, isMultiVerseMode, exitMultiVerseMode, clickVerse]);
 
   // ─── Drag ─────────────────────────────────────────────────────────────────
-  const handleMouseDown = (e: React.MouseEvent, verse: Verse) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent, verse: Verse) => {
     if (e.button !== 0) return;
 
     // Clear any existing timeout
@@ -212,13 +236,18 @@ const VerseList: React.FC = () => {
 
     // We do NOT call e.preventDefault() here anymore because it prevents 
     // the 'onClick' event from firing, which we use for selection.
-  };
+  }, []);
 
-  const handleMouseEnter = (verse: Verse) => {
+  const handleMouseEnter = useCallback((verse: Verse) => {
     if (isDragging && dragStartVerse) {
       selectVerseRange(dragStartVerse, verse, verses);
     }
-  };
+  }, [isDragging, dragStartVerse, selectVerseRange, verses]);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    setContextMenu({ x: e.clientX, y: e.clientY, verseId: id });
+  }, []);
 
   useEffect(() => {
     const up = () => {
@@ -236,19 +265,19 @@ const VerseList: React.FC = () => {
     };
   }, []);
 
-  const handleSave = async (newText: string) => {
+  const handleSave = useCallback(async (newText: string) => {
     if (editingId !== null) {
       const verse = verses.find(v => v.id === editingId);
       if (verse) await updateVerseText(verse, newText);
       setEditingId(null);
     }
-  };
+  }, [editingId, verses, updateVerseText]);
 
   return (
     <div className="flex flex-col h-full bg-stone-900/40 backdrop-blur-xl border-r border-white/5 overflow-hidden">
       <div className="p-4 border-b border-white/5 flex justify-between items-center bg-stone-950/20 backdrop-blur-md">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 bg-accent/20 rounded-lg">
+          <div className="p-1.5 bg-accent/20 rounded-xl">
             <List className="w-4 h-4 text-accent" />
           </div>
           <h2 className="font-bold text-stone-200 text-sm uppercase">{t('verses')}</h2>
@@ -258,7 +287,7 @@ const VerseList: React.FC = () => {
         </div>
       </div>
 
-      <div className={cn('flex-1 overflow-y-auto no-scrollbar relative', isDragging && 'select-none')}>
+      <div className={cn('flex-1 overflow-y-auto no-scrollbar relative', isDragging && 'select-none is-dragging')}>
         {verses.map((verse) =>
           editingId === verse.id ? (
             <VerseEditor
@@ -273,11 +302,10 @@ const VerseList: React.FC = () => {
               verse={verse}
               isActive={activeVerse?.id === verse.id}
               isSelected={selectedVerses.some(v => v.id === verse.id)}
-              isDragging={isDragging}
               onSelect={handleSelect}
-              onMouseDown={(e) => handleMouseDown(e, verse)}
+              onMouseDown={handleMouseDown}
               onMouseEnter={handleMouseEnter}
-              onContextMenu={(e, id) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, verseId: id }); }}
+              onContextMenu={handleContextMenu}
             />
           )
         )}
@@ -312,7 +340,7 @@ const VerseList: React.FC = () => {
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); setSecondTranslation(null); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-stone-950/50 hover:bg-red-500/20 text-stone-600 hover:text-red-400 rounded-lg transition-all opacity-0 group-hover:opacity-100 shadow-xl"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 bg-stone-950/50 hover:bg-red-500/20 text-stone-600 hover:text-red-400 rounded-xl transition-all opacity-0 group-hover:opacity-100 shadow-xl"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>

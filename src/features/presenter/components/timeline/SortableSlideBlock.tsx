@@ -27,6 +27,7 @@ export interface SortableSlideBlockProps {
     isMultiSelect?: boolean;
     isSubItemSelected?: boolean;
     isMultiDragHidden?: boolean;
+    dragActiveId?: string | null;
     setContextMenu: (menu: { x: number; y: number; slideId: string; presentationId: string } | null) => void;
 }
 
@@ -53,6 +54,7 @@ export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
     isMultiSelect,
     isSubItemSelected,
     isMultiDragHidden,
+    dragActiveId,
     navigationParentSlideId,
     setContextMenu
 }) => {
@@ -62,11 +64,12 @@ export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
         setNodeRef,
         transform,
         transition,
-        isDragging,
     } = useSortable({ id: slide.id });
 
+    const isCurrentDragging = slide.id === dragActiveId;
+
     const style: React.CSSProperties = {
-        transform: transform && !isDragging
+        transform: transform && !isCurrentDragging
             ? CSS.Transform.toString(transform)
             : undefined,
         transition,
@@ -85,17 +88,21 @@ export const SortableSlideBlock = React.memo<SortableSlideBlockProps>(({
             ref={setNodeRef}
             style={{
                 ...style,
-                visibility: isDragging ? 'hidden' : undefined,
+                visibility: isCurrentDragging ? 'hidden' : undefined,
+                // Collapse hidden multi-drag items to zero width — they must not
+                // reserve layout space, otherwise the drop-target gap = N * slide width
+                // instead of always being exactly one slide width.
+                ...(isMultiDragHidden ? { width: 0, overflow: 'hidden', padding: 0, margin: 0, minWidth: 0, gap: 0 } : {}),
             }}
             className={cn(
                 "relative flex items-center h-fit",
-                isDragging && "z-50"
+                isCurrentDragging && "z-50"
             )}
         >
             {/* Drop placeholder — always in DOM, toggled via CSS only (no DOM mutation on drag) */}
             <div
                 className="absolute inset-0 rounded-xl border-2 border-dashed border-accent/30 bg-accent/5 pointer-events-none"
-                style={{ visibility: isDragging ? 'visible' : 'hidden' }}
+                style={{ visibility: isCurrentDragging ? 'visible' : 'hidden' }}
             />
             <TransitionSeparator slide={slide} activePresentationId={activePresentationId} />
             <SlideTile

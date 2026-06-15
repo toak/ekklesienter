@@ -1,5 +1,5 @@
 import { StateCreator } from 'zustand';
-import { ISlide, ICanvasSlide, IVerseSlide, ITimerSlide, ICanvasItem, IPresentationFile, IServiceFile, IPresentationSummary, IStyleLayer, BackgroundSettings, IAudioScope, ITimerSettings, IVideoSettings, ITemplate, IPresentationBin, ISlideTransition } from '@/core/types';
+import { ISlide, ICanvasSlide, IVerseSlide, ITimerSlide, ICanvasItem, IPresentationFile, IServiceFile, IPresentationSummary, IStyleLayer, BackgroundSettings, IAudioScope, ITimerSettings, IVideoSettings, ITemplate, IPresentationBin, ISlideTransition, IMediaItem } from '@/core/types';
 
 export interface PresentationState {
     activeServiceId: string | null;
@@ -95,6 +95,7 @@ export interface PresentationState {
     duplicateSlide: (presentationId: string, slideId: string) => Promise<void>;
     duplicateSlides: (presentationId: string, slideIds: string[]) => Promise<void>;
     moveSlide: (presentationId: string, slideId: string, direction: 'back' | 'forth' | 'start' | 'end') => Promise<void>;
+    moveSlides: (presentationId: string, slideIds: string[], direction: 'back' | 'forth' | 'start' | 'end') => Promise<void>;
     removeSlide: (presentationId: string, slideId: string) => Promise<void>;
     removeSlides: (presentationId: string, slideIds: string[]) => Promise<void>;
 
@@ -115,8 +116,8 @@ export interface PresentationState {
     removeCanvasItem: (slideId: string, itemId: string) => Promise<void>;
     reorderCanvasItem: (slideId: string, itemId: string, direction: 'up' | 'down') => Promise<void>;
     duplicateCanvasItems: (slideId: string, itemIds: string[]) => Promise<string[]>;
-    setMediaBackground: (slideId: string, mediaItem: any) => Promise<void>;
-    addMediaLayer: (slideId: string, mediaItem: any, position?: { x: number, y: number }) => Promise<void>;
+    setMediaBackground: (slideId: string, mediaItem: IMediaItem) => Promise<void>;
+    addMediaLayer: (slideId: string, mediaItem: IMediaItem, position?: { x: number, y: number }) => Promise<void>;
 
     // Timer Actions
     updateTimerSettings: (slideId: string, settings: Partial<ITimerSettings>) => Promise<void>;
@@ -127,7 +128,11 @@ export interface PresentationState {
     // History Actions
     undo: () => Promise<void>;
     redo: () => Promise<void>;
-    takeSnapshot: (slideId: string) => Promise<void>;
+    /**
+     * Push a "before" snapshot of the given presentation's slides array.
+     * Must be called BEFORE any mutating operation.
+     */
+    takeSnapshot: (presentationId: string) => Promise<void>;
     navigateNext: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
     navigatePrev: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
 

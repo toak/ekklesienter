@@ -5,7 +5,7 @@ import { ILogoEntry } from '@/core/types';
  * Service for managing logo persistence in IndexedDB.
  * Centralizes all logo CRUD operations to keep UI hooks lean.
  */
-export const LogoService = {
+export const logoService = {
     /**
      * Saves a logo entry (image blob + metadata) to the logos table.
      * Uses `put` for upsert semantics.
@@ -36,3 +36,6 @@ export const LogoService = {
         return await db.logos.toArray();
     }
 };
+
+/** @deprecated Use logoService instead. */
+export const LogoService = logoService;

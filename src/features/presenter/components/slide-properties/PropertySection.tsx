@@ -74,7 +74,7 @@ export const PropertySection: React.FC<IPropertySectionProps> = ({
                     <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-80">{displayTitle}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                    {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
+                    {extra && <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{extra}</div>}
                     <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", isOpen ? "" : "-rotate-90 opacity-40")} />
                 </div>
             </div>

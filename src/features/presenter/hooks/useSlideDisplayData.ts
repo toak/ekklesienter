@@ -8,12 +8,39 @@ import { useMetadata } from './useMetadata';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useShallow } from 'zustand/react/shallow';
 import { appModeAtom, previewFontSizeAtom, showReferenceAtom, activeOverrideAtom } from '@/core/store/uiAtoms';
-import { Verse, ISlide, ICanvasSlide, PresenterSettings, SlideDisplayProps } from '@/core/types';
+import { Verse, ISlide, ICanvasSlide, PresenterSettings, SlideDisplayProps, IBlock, ITemplate, IPresentationFile } from '@/core/types';
+
+export interface UseSlideDisplayDataReturn {
+  appMode: 'scripture' | 'presentation';
+  settings: PresenterSettings;
+  activeVerse: Verse | null;
+  isMultiVerseMode: boolean;
+  multiVerses: Verse[];
+  parallelVerse: Verse | null;
+  presentation: IPresentationFile | null | undefined;
+  selectedSlide: ISlide | null | undefined;
+  bibleVerses: Verse[] | null;
+  bibleSecondVerse: Verse | null;
+  blocksMap: Map<string, IBlock>;
+  templatesMap: Map<string, ITemplate>;
+  previewFontSize: number;
+  showRef: boolean;
+  activeOverride: string | null;
+  presentationStore: {
+    selectedPresentationId: string | null;
+    activePresentationId: string | null;
+    selectedPresentation: IPresentationFile | null;
+    activePresentation: IPresentationFile | null;
+    previewSlideId: string | null;
+    lastTransitionTrigger: number;
+    navigationDirection: 'forward' | 'backward';
+  };
+}
 
 /**
  * Hook to orchestrate all data fetching and store state for SlideDisplay
  */
-export function useSlideDisplayData(options: SlideDisplayProps) {
+export function useSlideDisplayData(options: SlideDisplayProps): UseSlideDisplayDataReturn {
   const { 
     isProjector,
     activeVerse: propVerse,
@@ -25,8 +52,13 @@ export function useSlideDisplayData(options: SlideDisplayProps) {
     settings: propSettings 
   } = options;
 
-  const bibleStore = useBibleStore();
-  const { settings: globalSettings } = usePresenterStore();
+  const bibleStore = useBibleStore(useShallow(s => ({
+    activeVerse: s.activeVerse,
+    isMultiVerseMode: s.isMultiVerseMode,
+    selectedVerses: s.selectedVerses,
+    secondTranslationId: s.secondTranslationId
+  })));
+  const { settings: globalSettings } = usePresenterStore(useShallow(s => ({ settings: s.settings })));
   
   const presentationStore = usePresentationStore(useShallow(s => ({
     selectedPresentationId: s.selectedPresentationId,

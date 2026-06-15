@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { ChevronDown } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import ContextMenu, { ContextMenuItem } from './ContextMenu';
 import { cn } from '@/core/utils/cn';
 
@@ -28,15 +29,17 @@ export const DropdownSelector: React.FC<DropdownSelectorProps> = ({
     value,
     options,
     onChange,
-    placeholder = 'Select...',
+    placeholder,
     className,
     icon,
     renderSelected
 }) => {
+    const { t } = useTranslation();
     const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
 
     const activeOption = options.find(o => o.value === value);
+    const displayPlaceholder = placeholder || t('select', 'Select...');
 
     const handleToggle = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -67,7 +70,7 @@ export const DropdownSelector: React.FC<DropdownSelectorProps> = ({
                 <div className="flex items-center gap-2.5 min-w-0">
                     {icon && <span className="text-stone-500 group-hover:text-accent transition-colors shrink-0">{icon}</span>}
                     <div className="truncate font-bold tracking-tight">
-                        {renderSelected ? renderSelected(activeOption) : (activeOption?.label || placeholder)}
+                        {renderSelected ? renderSelected(activeOption) : (activeOption?.label || displayPlaceholder)}
                     </div>
                 </div>
                 <ChevronDown className={cn(
@@ -85,7 +88,7 @@ export const DropdownSelector: React.FC<DropdownSelectorProps> = ({
                     <div className="max-h-[300px] overflow-y-auto no-scrollbar py-1 min-w-[180px]">
                         {options.length === 0 ? (
                             <div className="px-4 py-3 text-[10px] font-bold text-stone-600 uppercase tracking-widest text-center">
-                                No options available
+                                {t('no_options', 'No options available')}
                             </div>
                         ) : (
                             options.map((option) => (
@@ -109,3 +112,4 @@ export const DropdownSelector: React.FC<DropdownSelectorProps> = ({
 };
 
 export default DropdownSelector;
+

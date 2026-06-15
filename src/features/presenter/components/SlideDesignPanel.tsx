@@ -493,7 +493,7 @@ const SlideDesignPanel: React.FC = () => {
                                         {selectedIds.length > 1 && (
                                             <div className="flex items-center justify-between px-2 py-1.5 mb-2 bg-accent/8 border border-accent/15 rounded-xl">
                                                 <span className="text-[9px] font-bold text-accent uppercase tracking-wider">
-                                                    {selectedIds.length} {t('selected', { defaultValue: 'selected' })}
+                                                    {t('selected_count', { count: selectedIds.length, defaultValue: '{{count}} selected' })}
                                                 </span>
                                                 <button
                                                     onClick={() => setSelectedIds([])}

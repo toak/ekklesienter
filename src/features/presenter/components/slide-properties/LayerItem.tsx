@@ -184,7 +184,7 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                 </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center w-6 opacity-0 group-hover:opacity-100 transition-opacity gap-0.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center justify-center w-6 opacity-0 group-hover:opacity-100 transition-opacity gap-0.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <button
                     onClick={() => onUpdate({ visible: !layer.visible })}
                     onMouseDown={(e) => e.preventDefault()}
@@ -195,7 +195,7 @@ export const LayerItem: React.FC<ILayerItemProps> = React.memo(({
                 </button>
             </div>
 
-            <div className="flex flex-col items-center justify-center w-6 opacity-0 group-hover:opacity-100 transition-opacity gap-0.5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col items-center justify-center w-6 opacity-0 group-hover:opacity-100 transition-opacity gap-0.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
                 <button
                     onClick={onRemove}
                     onMouseDown={(e) => e.preventDefault()}

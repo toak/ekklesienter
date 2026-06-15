@@ -2,11 +2,13 @@ import React, { useRef, useState, useMemo } from 'react';
 import { useTranslation, Trans } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
-import { BibleService } from '@/core/services/BibleService';
+import { BibleService } from '@/core/services/bibleService';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Upload, Trash2, CheckCircle, AlertCircle, Loader2, BookOpen, Plus, Search, ChevronDown, ChevronRight, X } from 'lucide-react';
-import { BibleData } from '@/core/types';
+import { BibleData, Translation } from '@/core/types';
 import ParserWorker from '@/core/workers/parser.worker?worker';
+import { zefaniaParser } from '@/core/parsers/zefaniaParser';
 import { cn } from '@/core/utils/cn';
 import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
 
@@ -14,28 +16,31 @@ import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
  * Helper to highlight search matches
  */
 const SearchHighlight: React.FC<{ text: string; query: string }> = ({ text, query }) => {
-    if (!query) return <>{text}</>;
-    const parts = text.split(new RegExp(`(${query})`, 'gi'));
-    return (
-        <>
-            {parts.map((part, i) =>
-                part.toLowerCase() === query.toLowerCase()
-                    ? <mark key={i} className="bg-accent/30 text-accent px-0.5 rounded-sm ring-1 ring-accent/20">{part}</mark>
-                    : part
-            )}
-        </>
-    );
+    let content = <>{text}</>;
+    if (query) {
+        const parts = text.split(new RegExp(`(${query})`, 'gi'));
+        content = (
+            <>
+                {parts.map((part, i) =>
+                    part.toLowerCase() === query.toLowerCase()
+                        ? <mark key={i} className="bg-accent/30 text-accent px-0.5 rounded-sm ring-1 ring-accent/20">{part}</mark>
+                        : part
+                )}
+            </>
+        );
+    }
+    return content;
 };
 
 interface BibleRowProps {
-    translation: any;
+    translation: Translation;
     isSelected: boolean;
     isSecondary: boolean;
     searchQuery: string;
     onSelect: () => void;
     onSelectSecondary: () => void;
     onDelete: (tId: string) => Promise<void>;
-    onContextMenu: (e: React.MouseEvent, translation: any) => void;
+    onContextMenu: (e: React.MouseEvent, translation: Translation) => void;
 }
 
 const BibleRow: React.FC<BibleRowProps> = ({
@@ -66,7 +71,7 @@ const BibleRow: React.FC<BibleRowProps> = ({
         >
             <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className={cn(
-                    "p-2 rounded-lg shrink-0 transition-colors",
+                    "p-2 rounded-xl shrink-0 transition-colors",
                     isSelected ? "bg-accent text-accent-foreground shadow-lg shadow-accent/20" : "bg-stone-950 text-stone-600 group-hover/row:text-stone-400"
                 )}>
                     <BookOpen className="w-4 h-4" />
@@ -99,16 +104,18 @@ const BibleRow: React.FC<BibleRowProps> = ({
 
             <div className="flex items-center gap-2 shrink-0 ml-4">
                 {isConfirmingDelete ? (
-                    <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-300" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-300">
                         <button
-                            onClick={() => setIsConfirmingDelete(false)}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(false); }}
                             className="px-2 py-1 text-[10px] font-bold text-stone-500 hover:text-stone-300 transition-colors"
                         >
                             {t('cancel')}
                         </button>
                         <button
-                            onClick={() => onDelete(translation.id)}
-                            className="px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-lg shadow-lg shadow-red-500/20 active:scale-95 transition-all"
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onDelete(translation.id); }}
+                            className="px-3 py-1 bg-red-500 text-white text-[10px] font-bold rounded-xl shadow-lg shadow-red-500/20 active:scale-95 transition-all"
                         >
                             {t('confirm_delete')}
                         </button>
@@ -116,7 +123,7 @@ const BibleRow: React.FC<BibleRowProps> = ({
                 ) : (
                     <button
                         onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(true); }}
-                        className="p-2 text-stone-700 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all opacity-0 group-hover/row:opacity-100"
+                        className="p-2 text-stone-700 hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all opacity-0 group-hover/row:opacity-100"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
@@ -128,7 +135,12 @@ const BibleRow: React.FC<BibleRowProps> = ({
 
 const BibleManager: React.FC = () => {
     const { t } = useTranslation();
-    const { currentTranslationId, secondTranslationId, setTranslation, setSecondTranslation } = useBibleStore();
+    const { currentTranslationId, secondTranslationId, setTranslation, setSecondTranslation } = useBibleStore(useShallow(state => ({
+        currentTranslationId: state.currentTranslationId,
+        secondTranslationId: state.secondTranslationId,
+        setTranslation: state.setTranslation,
+        setSecondTranslation: state.setSecondTranslation
+    })));
     const translations = useLiveQuery(() => BibleService.getAllTranslations()) || [];
 
     const [searchQuery, setSearchQuery] = useState('');
@@ -136,7 +148,7 @@ const BibleManager: React.FC = () => {
     const [importing, setImporting] = useState(false);
     const [progress, setProgress] = useState<{ current: number; total: number; filename: string } | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; translation: any } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; translation: Translation } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Grouping & Filtering Logic
@@ -171,54 +183,61 @@ const BibleManager: React.FC = () => {
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 setProgress({ current: i + 1, total: files.length, filename: file.name });
-                const worker = new ParserWorker();
+                let importedTranslationId: string | null = null;
 
-                await new Promise<void>((resolve, reject) => {
-                    worker.onmessage = async (msg) => {
-                        const { type, data, error, progress: chunkProgress } = msg.data;
+                if (file.name.toLowerCase().endsWith('.xml')) {
+                    try {
+                        const text = await file.text();
+                        const data = await zefaniaParser.parse(text, file.name);
+                        await BibleService.saveBibleData(data);
+                        importedTranslationId = data.translation?.id ?? null;
+                    } catch (e: any) {
+                        throw new Error(`XML Import Error: ${e.message}`);
+                    }
+                } else if (file.name.toLowerCase().match(/\.sqlite3?$/)) {
+                    const worker = new ParserWorker();
+                    await new Promise<void>((resolve, reject) => {
+                        let settled = false;
+                        const safeResolve = () => { if (!settled) { settled = true; resolve(); } };
+                        const safeReject = (err: unknown) => { if (!settled) { settled = true; reject(err); } };
 
-                        try {
-                            if (type === 'metadata') {
-                                // Save translation info and books structure first
-                                await BibleService.saveTranslationAndBooks(data.translation, data.books);
-                            } else if (type === 'chunk') {
-                                // Save a block of verses (e.g. 2000 at a time)
-                                await BibleService.saveVerseChunk(data);
-                                // Update internal progress if needed (could show percentage in UI)
-                                if (chunkProgress !== undefined) {
-                                    // Optionally update progress UI with file internal percentage
+                        worker.onmessage = async (msg) => {
+                            const { type, data, error } = msg.data;
+                            try {
+                                if (type === 'metadata') {
+                                    // Save translation info and books structure first
+                                    await BibleService.saveTranslationAndBooks(data.translation, data.books);
+                                    importedTranslationId = data.translation.id;
+                                } else if (type === 'chunk') {
+                                    // Save a block of verses (e.g. 2000 at a time)
+                                    await BibleService.saveVerseChunk(data);
+                                } else if (type === 'success') {
+                                    worker.terminate();
+                                    safeResolve();
+                                } else if (type === 'error') {
+                                    throw new Error(error);
                                 }
-                            } else if (type === 'success') {
-                                // Fallback for XML path which still returns full data, or just completion signal
-                                if (data) {
-                                     await BibleService.saveBibleData(data);
-                                }
+                            } catch (e) {
                                 worker.terminate();
-                                resolve();
-                            } else if (type === 'error') {
-                                throw new Error(error);
+                                safeReject(e);
                             }
-                        } catch (e) {
-                            worker.terminate();
-                            reject(e);
-                        }
-                    };
-                    worker.onerror = (err) => { worker.terminate(); reject(err); };
+                        };
+                        worker.onerror = (err) => { worker.terminate(); safeReject(err); };
 
-                    if (file.name.toLowerCase().endsWith('.xml')) {
-                        file.text().then(text => worker.postMessage({ fileType: 'xml', content: text, fileName: file.name }));
-                    } else if (file.name.toLowerCase().match(/\.sqlite3?$/)) {
                         file.arrayBuffer().then(buffer => worker.postMessage({ fileType: 'sqlite', content: buffer, fileName: file.name }));
-                    } else reject(new Error(t('unsupported_format', 'Unsupported format')));
-                });
+                    });
+                } else {
+                    throw new Error(t('unsupported_format', 'Unsupported format'));
+                }
+
+                // Reindex any unindexed verses for this translation in the background
+                if (importedTranslationId) {
+                    db.reindexTranslationVerses(importedTranslationId);
+                }
+
                 importedCount++;
             }
         } catch (err) {
-            console.error('[BibleManager] Full Import error context:', {
-                error: err,
-                message: err instanceof Error ? err.message : String(err),
-                stack: err instanceof Error ? err.stack : 'N/A'
-            });
             setError(err instanceof Error ? err.message : t('import_failed', 'Import failed'));
         } finally {
             setImporting(false);
@@ -238,7 +257,7 @@ const BibleManager: React.FC = () => {
         }
     };
 
-    const handleContextMenu = (e: React.MouseEvent, translation: any) => {
+    const handleContextMenu = (e: React.MouseEvent, translation: Translation) => {
         e.preventDefault();
         setContextMenu({
             x: e.clientX,

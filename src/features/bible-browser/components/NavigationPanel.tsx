@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getBookName, getBookSection, BOOK_ORDER } from '@/core/data/bookData';
+import { Book } from '@/core/types';
 import { useTranslation } from 'react-i18next';
 import { Music } from 'lucide-react';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
@@ -29,7 +31,7 @@ interface NavigationPanelProps {
 }
 
 const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () => {} }) => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const lang = i18n.language?.substring(0, 2) || 'en';
   const isRu = lang === 'ru';
   
@@ -40,12 +42,26 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
     setChapter, 
     setActiveVerse, 
     currentTranslationId 
-  } = useBibleStore();
+  } = useBibleStore(useShallow(s => ({
+    currentBookId: s.currentBookId,
+    currentChapter: s.currentChapter,
+    setBook: s.setBook,
+    setChapter: s.setChapter,
+    setActiveVerse: s.setActiveVerse,
+    currentTranslationId: s.currentTranslationId
+  })));
 
-  const activeService = usePresentationStore(s => s.activeService);
-  const activeServiceId = usePresentationStore(s => s.activeServiceId);
-  const graceLibSection = usePresentationStore(s => s.graceLibSection);
-  const setGraceLibSection = usePresentationStore(s => s.setGraceLibSection);
+  const {
+    activeService,
+    activeServiceId,
+    graceLibSection,
+    setGraceLibSection
+  } = usePresentationStore(useShallow(s => ({
+    activeService: s.activeService,
+    activeServiceId: s.activeServiceId,
+    graceLibSection: s.graceLibSection,
+    setGraceLibSection: s.setGraceLibSection
+  })));
 
   // 1. Logic Hooks
   const { 
@@ -80,7 +96,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
     const booksMap = new Map();
     books.forEach(b => booksMap.set(b.bookId, b));
     
-    const ordered: any[] = [];
+    const ordered: Book[] = [];
     const usedIds = new Set();
 
     BOOK_ORDER.forEach((info) => {
@@ -103,7 +119,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
 
     const query = searchQuery.toLowerCase();
     const primaryItem = parseResult.items[0];
-    const bookSearchPart = primaryItem?.bookId || parseResult.originalQuery.split(/\d/)[0].trim().toLowerCase();
+    const bookSearchPart = primaryItem?.bookId?.toLowerCase() || parseResult.originalQuery.split(/\d/)[0].trim().toLowerCase();
 
     return sortedBooks.filter(book => {
       const bName = getBookName(book.bookId, lang).toLowerCase();
@@ -115,7 +131,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
   const currentBook = useMemo(() => books.find(b => b.bookId === currentBookId), [books, currentBookId]);
 
   // 3. Callbacks
-  const handleBookSelect = (bookId: string) => {
+  const handleBookSelect = useCallback((bookId: string) => {
     setBook(bookId);
     const primaryItem = parseResult.items[0];
     if (primaryItem?.type === 'reference' && primaryItem.bookId === bookId && primaryItem.chapter) {
@@ -128,7 +144,26 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
           .then(v => v && setActiveVerse(v));
       }
     }
-  };
+  }, [setBook, parseResult, setChapter, currentTranslationId, setActiveVerse]);
+
+  const handleSearchResultClick = useCallback((res: any) => {
+    setBook(res.verse.bookId);
+    setChapter(res.verse.chapter);
+    setActiveVerse(res.verse);
+    setSearchQuery('');
+  }, [setBook, setChapter, setActiveVerse, setSearchQuery]);
+
+  const handleServiceSelect = useCallback((id: string) => {
+    usePresentationStore.getState().setActiveService(id);
+  }, []);
+
+  const handleTranslationSelect = useCallback((id: string) => {
+    useBibleStore.getState().setTranslation(id);
+  }, []);
+
+  const handleClosePicker = useCallback(() => {
+    setIsPickerOpen(false);
+  }, [setIsPickerOpen]);
 
   return (
     <div ref={resizer.containerRef} className="flex flex-col h-full bg-stone-900/80 backdrop-blur-xl border-r border-white/5 relative z-20 @container">
@@ -149,12 +184,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
           <SearchOverlay
             isSearching={isSearching}
             searchResults={searchResults}
-            onResultClick={(res) => {
-              setBook(res.verse.bookId);
-              setChapter(res.verse.chapter);
-              setActiveVerse(res.verse);
-              setSearchQuery('');
-            }}
+            onResultClick={handleSearchResultClick}
             lang={lang}
           />
         )}
@@ -197,7 +227,7 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
               <div className="px-1 mb-3 flex items-center justify-between shrink-0">
                 <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1.5">
                   <Music className="w-3 h-3" />
-                  Media Pool
+                  {t('media_pool.title', 'Media Pool')}
                 </span>
               </div>
               <MediaPoolPanel />
@@ -220,8 +250,8 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
       {isPickerOpen && appMode === 'presentation' && (
         <ServicePicker
           currentServiceId={activeServiceId}
-          onSelect={(id) => usePresentationStore.getState().setActiveService(id)}
-          onClose={() => setIsPickerOpen(false)}
+          onSelect={handleServiceSelect}
+          onClose={handleClosePicker}
           triggerRect={triggerRect}
         />
       )}
@@ -238,8 +268,8 @@ const NavigationPanel: React.FC<NavigationPanelProps> = ({ onOpenSettings = () =
       {isPickerOpen && appMode === 'scripture' && (
         <TranslationPicker
           currentTranslationId={currentTranslationId}
-          onSelect={(id) => useBibleStore.getState().setTranslation(id)}
-          onClose={() => setIsPickerOpen(false)}
+          onSelect={handleTranslationSelect}
+          onClose={handleClosePicker}
           triggerRect={triggerRect}
         />
       )}

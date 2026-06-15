@@ -99,8 +99,8 @@ export const TemplatePickerGrid: React.FC<TemplatePickerGridProps> = ({
                 className="w-full aspect-video rounded-xl border-2 border-white/5 hover:border-white/20 bg-stone-900 relative overflow-hidden transition-all hover:scale-[1.02] cursor-pointer"
               >
                 <SlideContentRenderer template={currentView.template} block={block} variables={{}} lang={lang} isPreview={true} scale={180 / 1920} canvasItems={slides[0] === 'base' ? (currentView.template.canvasItems || []) : slides[0].canvasItems} backgroundOverride={slides[0] === 'base' ? undefined : slides[0].backgroundOverride} hideOverlays={true} />
-                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-[10px] font-black uppercase text-white tracking-widest px-3 py-1 bg-stone-900/80 rounded-full border border-white/10">{slides.length} {t('slides')}</span></div>
-                <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent px-2.5 py-2 z-20"><span className="text-[9px] font-black uppercase tracking-wider text-white">{block ? (isRu ? block.nameRu : block.name) : bId}</span></div>
+                <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"><span className="text-[10px] font-black uppercase text-white tracking-widest px-3 py-1 bg-stone-900/80 rounded-full border border-white/10">{t('slides_count', { count: slides.length, defaultValue: '{{count}} slides' })}</span></div>
+                <div className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent px-2.5 py-2 z-20"><span className="text-[9px] font-black uppercase tracking-wider text-white">{block ? (isRu ? block.nameRu : block.name) : t('unknown_category', 'Unknown Category')}</span></div>
               </button>
             </div>
           );

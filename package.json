@@ -1,7 +1,7 @@
 {
   "name": "ekklesienter",
   "private": true,
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "Premium Bible presentation and worship software",
   "author": "Boris Smiyan",
   "main": "dist-electron/main.js",
@@ -26,7 +26,7 @@
     "productName": "Ekklesienter",
     "icon": "build/icon.png",
     "directories": {
-      "output": "release"
+      "output": "release/modern"
     },
     "files": [
       "dist/**/*",
@@ -44,7 +44,10 @@
           "target": "dmg",
           "arch": "universal"
         }
-      ]
+      ],
+      "extendInfo": {
+        "LSMinimumSystemVersion": "12.0.0"
+      }
     },
     "extraResources": [
       {
@@ -56,6 +59,7 @@
       }
     ],
     "win": {
+      "artifactName": "${productName} Setup ${version}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -68,8 +72,14 @@
       ]
     },
     "nsis": {
+      "oneClick": true,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "deleteAppDataOnUninstall": false,
       "include": "electron/installer.nsh"
-    }
+    },
+    "artifactName": "Ekklesienter-${version}-macOS12+.${ext}"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

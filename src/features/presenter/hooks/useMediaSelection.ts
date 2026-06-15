@@ -3,13 +3,21 @@ import { useTranslation } from 'react-i18next';
 import { db } from '@/core/db';
 import { IMediaItem } from '@/core/types';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useShallow } from 'zustand/react/shallow';
+
+export interface UseMediaSelectionReturn {
+  selectedIds: Set<string>;
+  setSelectedIds: React.Dispatch<React.SetStateAction<Set<string>>>;
+  handleItemClick: (itemId: string, e: React.MouseEvent) => void;
+  handleBulkDelete: () => void;
+}
 
 /**
  * Hook to manage media selection, bulk actions, and keyboard shortcuts.
  */
-export function useMediaSelection(visibleItems: IMediaItem[]) {
+export function useMediaSelection(visibleItems: IMediaItem[]): UseMediaSelectionReturn {
   const { t } = useTranslation();
-  const { openModal } = useModalStore();
+  const { openModal } = useModalStore(useShallow(s => ({ openModal: s.openModal })));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
 

@@ -18,23 +18,23 @@ export const themeAccentAtom = atom('amber'); // amber, rose, blue, stone
 
 // Layout
 export const sidebarOpenAtom = atom(true);
-export const historyOpenAtom = atom(false);
-export const searchOpenAtom = atom(false);
-export const canvasZoomAtom = atom<number>(1.0);
+export const historyOpenAtom = atom(false) as PrimitiveAtom<boolean>;
+export const searchOpenAtom = atom(false) as PrimitiveAtom<boolean>;
+export const canvasZoomAtom = atom(1.0) as PrimitiveAtom<number>;
 export const canvasOffsetAtom = atom<{ x: number, y: number }>({ x: 0, y: 0 });
-export const slideDesignPanelOpenAtom = atom<boolean>(false);
+export const slideDesignPanelOpenAtom = atom(false) as PrimitiveAtom<boolean>;
 export const latestInteractionAreaAtom = atom<'canvas' | 'timeline' | 'audio'>('timeline');
-export const selectedCanvasItemIdsAtom = atom<string[]>([]);
+export const selectedCanvasItemIdsAtom = atom([] as string[]) as PrimitiveAtom<string[]>;
 export const timelineHeightAtom = atom(236); // Strictly limited to 236px
 export const isTimelineHoveredAtom = atom(false);
-export const editingCanvasItemIdAtom = atom<string | null>(null);
+export const editingCanvasItemIdAtom = atom(null as string | null) as PrimitiveAtom<string | null>;
 export const selectedTransitionSlideIdAtom = atom(null as string | null) as PrimitiveAtom<string | null>;
 
 export type SlideDesignTab = 'background' | 'elements' | 'style' | 'audio' | 'timer' | 'transition' | 'video';
 export const slideDesignTabAtom = atom<SlideDesignTab>('style');
 
 export type CanvasTool = 'select' | 'text' | 'pan' | 'image' | 'video' | 'shape' | 'stroke' | 'effect' | string;
-export const canvasToolAtom = atom<CanvasTool>('select');
+export const canvasToolAtom = atom('select' as CanvasTool) as PrimitiveAtom<CanvasTool>;
 
 export interface TextCommand {
   command: 'bold' | 'italic' | 'underline' | 'strikethrough' | 'foreColor' | 'fontName' | 'fontSize' | 'undo' | 'redo' | 'scriptStyle' | 'textCase' | 'listType' | 'underlineStyle' | 'lineHeight' | 'letterSpacing' | 'paragraphSpacing' | 'fontWeight';
@@ -45,8 +45,8 @@ export const textCommandAtom = atom<TextCommand | null>(null as TextCommand | nu
 
 // Live Overrides
 export type OverrideType = 'blackout' | 'whiteout' | 'logo';
-export const activeOverrideAtom = atom<OverrideType | null>(null);
-export const liveLogoAtom = atom<ILogo | null>(null as ILogo | null);
+export const activeOverrideAtom = atom(null as OverrideType | null) as PrimitiveAtom<OverrideType | null>;
+export const liveLogoAtom = atom(null as ILogo | null) as PrimitiveAtom<ILogo | null>;
 // Left Panel State
 export const selectedLeftBlockIdAtom = atom<string>('worship');
 

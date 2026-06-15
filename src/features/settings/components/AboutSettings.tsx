@@ -14,7 +14,7 @@ interface ChangelogEntry {
 const AboutSettings: React.FC = () => {
     const { t } = useTranslation();
 
-    const changelogEntries = t('changelog_entries', { returnObjects: true }) as ChangelogEntry[] | any;
+    const changelogEntries = (t('changelog_entries', { returnObjects: true }) as ChangelogEntry[]) || [];
 
     return (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
@@ -72,7 +72,7 @@ const AboutSettings: React.FC = () => {
                             <div className="space-y-6">
                                 {/* Date & Version Label */}
                                 <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-2 px-3 py-1 bg-stone-900/60 border border-white/5 rounded-lg">
+                                    <div className="flex items-center gap-2 px-3 py-1 bg-stone-900/60 border border-white/5 rounded-xl">
                                         <Calendar className="w-3 h-3 text-stone-500" />
                                         <span className="text-[10px] text-stone-400 font-black uppercase tracking-widest">{entry.date}</span>
                                     </div>

@@ -45,8 +45,8 @@ export const TypographySection: React.FC<ITypographySectionProps> = ({
 
     const [isFontPopoverOpen, setIsFontPopoverOpen] = useState(false);
     const [isWeightPopoverOpen, setIsWeightPopoverOpen] = useState(false);
-    const fontAnchorRef = useRef<HTMLDivElement>(null);
-    const weightAnchorRef = useRef<HTMLDivElement>(null);
+    const fontAnchorRef = useRef<HTMLButtonElement>(null);
+    const weightAnchorRef = useRef<HTMLButtonElement>(null);
 
     const getSelectionValue = <T,>(getter: (item: ICanvasItem) => T): T | 'mixed' => 
         CanvasService.getSelectionState(selectedIds, canvasItems, getter);
@@ -88,10 +88,16 @@ export const TypographySection: React.FC<ITypographySectionProps> = ({
         <PropertySection title={t('typography')} icon={Type}>
             <div className="space-y-4">
                 <div className="flex flex-col gap-2 bg-black/20 p-3 rounded-xl border border-white/5 select-none hover:bg-black/30 transition-colors group">
-                    <div ref={fontAnchorRef} onClick={() => setIsFontPopoverOpen(true)} onMouseDown={(e) => e.preventDefault()} className="flex items-center justify-between opacity-50 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <button
+                        type="button"
+                        ref={fontAnchorRef}
+                        onClick={() => setIsFontPopoverOpen(true)}
+                        onMouseDown={(e) => e.preventDefault()}
+                        className="w-full flex items-center justify-between opacity-50 group-hover:opacity-100 transition-opacity cursor-pointer bg-transparent border-0 p-0 font-normal text-left outline-hidden"
+                    >
                         <span className="text-[9px] text-stone-500 font-black uppercase tracking-[0.2em]">{getSelectionValue(i => i.text?.fontFamily || 'Inter')}</span>
                         <ChevronDown className="w-3 h-3 text-stone-600" />
-                    </div>
+                    </button>
                     <FloatingPopover isOpen={isFontPopoverOpen} onClose={() => setIsFontPopoverOpen(false)} anchorRef={fontAnchorRef} title={t('font_library')} width={280}>
                         <FontLibrary value={getSelectionValue(i => i.text?.fontFamily || 'Inter') as string} onSelect={(family) => {
                             if (editingId && selectedIds.includes(editingId)) {
@@ -112,10 +118,16 @@ export const TypographySection: React.FC<ITypographySectionProps> = ({
                     </FloatingPopover>
                     <div className="h-px bg-white/5" />
                     <div className="flex items-center justify-between">
-                        <div ref={weightAnchorRef} onClick={() => setIsWeightPopoverOpen(true)} onMouseDown={(e) => e.preventDefault()} className="flex items-center gap-1 cursor-pointer">
+                        <button
+                            type="button"
+                            ref={weightAnchorRef}
+                            onClick={() => setIsWeightPopoverOpen(true)}
+                            onMouseDown={(e) => e.preventDefault()}
+                            className="flex items-center gap-1 cursor-pointer bg-transparent border-0 p-0 font-normal text-left outline-hidden"
+                        >
                             <span className="text-[10px] text-stone-300 font-bold tracking-tight">{getWeightName(getSelectionValue(i => i.text?.fontWeight || '400') as string, t)}</span>
                             <ChevronDown className="w-2.5 h-2.5 text-stone-600" />
-                        </div>
+                        </button>
                         <FloatingPopover isOpen={isWeightPopoverOpen} onClose={() => setIsWeightPopoverOpen(false)} anchorRef={weightAnchorRef} title={t('font_weight')} width={200}>
                             <FontWeightPicker family={getSelectionValue(i => i.text?.fontFamily || 'Inter') as string} value={getSelectionValue(i => i.text?.fontWeight || 'Bold') as string} onSelect={(weight) => {
                                 const parsed = normalizeFontStyle(weight);

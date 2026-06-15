@@ -15,7 +15,7 @@ interface NavigationFooterProps {
   isRu: boolean;
 }
 
-export const NavigationFooter: React.FC<NavigationFooterProps> = ({
+export const NavigationFooter: React.FC<NavigationFooterProps> = React.memo(({
   appMode,
   currentTranslationId,
   currentBookId,
@@ -28,13 +28,17 @@ export const NavigationFooter: React.FC<NavigationFooterProps> = ({
   const { t } = useTranslation();
   const footerRef = React.useRef<HTMLButtonElement>(null);
 
+  const scriptureTitle = currentBookId ? `${getBookName(currentBookId, lang)} ${currentChapter || ''}` : t('select_passage');
+  const serviceTitle = activeService ? (isRu ? activeService.nameRu : activeService.name) : t('select_service', 'Select Service');
+
   return (
     <div className="p-3 border-t border-white/5 bg-stone-950/40 relative z-30">
       {appMode === 'scripture' ? (
         <button
           ref={footerRef}
           onClick={() => onBadgeClick(footerRef.current)}
-          title={currentBookId ? `${getBookName(currentBookId, lang)} ${currentChapter || ''}` : t('select_passage')}
+          title={scriptureTitle}
+          aria-label={scriptureTitle}
           className="w-full h-[60px] flex items-center gap-3 p-3 rounded-2xl bg-stone-900/40 border border-white/5 hover:border-accent/40 hover:bg-stone-800/60 transition-all group active:scale-95 shadow-xl shadow-black/20"
         >
           <div className="min-w-10 h-8 px-2 rounded-xl bg-accent flex items-center justify-center border border-accent/20 shadow-lg shadow-accent/10 shrink-0 group-hover:shadow-accent/20 transition-all">
@@ -53,7 +57,8 @@ export const NavigationFooter: React.FC<NavigationFooterProps> = ({
         <button
           ref={footerRef}
           onClick={() => onBadgeClick(footerRef.current)}
-          title={activeService ? (isRu ? activeService.nameRu : activeService.name) : t('select_service', 'Select Service')}
+          title={serviceTitle}
+          aria-label={serviceTitle}
           className="w-full h-[60px] flex items-center gap-3 p-3 rounded-2xl bg-stone-900/40 border border-white/5 hover:border-accent/40 hover:bg-stone-800/60 transition-all group active:scale-95 shadow-xl shadow-black/20"
         >
           <div className="min-w-10 h-8 px-2 rounded-xl bg-accent flex items-center justify-center border border-accent/20 shadow-lg shadow-accent/10 shrink-0 group-hover:shadow-accent/20 transition-all">
@@ -71,4 +76,6 @@ export const NavigationFooter: React.FC<NavigationFooterProps> = ({
       )}
     </div>
   );
-};
+});
+
+NavigationFooter.displayName = 'NavigationFooter';

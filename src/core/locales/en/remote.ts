@@ -26,6 +26,8 @@ export default {
     "select_parallel": "Select Parallel",
     "books": "Books",
     "chapters": "Chapters",
+    "chapters_count_one": "{{count}} chapter",
+    "chapters_count_other": "{{count}} chapters",
     "chapters_short": "CH",
     "verses": "Verses",
     "project_verses": "Project {{count}} Verse(s)",

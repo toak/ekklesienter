@@ -114,6 +114,8 @@ export const PptxImportService = {
 
             // 4. Resolve Theme Colors
             const themeColors: Record<string, string> = {};
+            let themeMajorFont = 'Inter';
+            let themeMinorFont = 'Inter';
             const themeRel = presRelationships.find(r => getAttr(r, 'Type')?.endsWith('theme'));
             const themePath = themeRel ? `ppt/${getAttr(themeRel, 'Target')}` : 'ppt/theme/theme1.xml';
             const themeFile = zip.file(themePath);
@@ -132,6 +134,13 @@ export const PptxImportService = {
                             else if (sys) themeColors[tag] = `#${sys.getAttribute('lastClr') || (tag.startsWith('lt') ? 'ffffff' : '000000')}`;
                         }
                     }
+                }
+                const fontScheme = themeDoc.getElementsByTagNameNS('*', 'fontScheme')[0];
+                if (fontScheme) {
+                    const major = fontScheme.getElementsByTagNameNS('*', 'majorFont')[0];
+                    const minor = fontScheme.getElementsByTagNameNS('*', 'minorFont')[0];
+                    themeMajorFont = major?.getElementsByTagNameNS('*', 'latin')[0]?.getAttribute('typeface') || 'Inter';
+                    themeMinorFont = minor?.getElementsByTagNameNS('*', 'latin')[0]?.getAttribute('typeface') || 'Inter';
                 }
             }
 
@@ -281,14 +290,31 @@ export const PptxImportService = {
                 // Hierarchical Style Inheritor
                 const getInheritedShape = (phType: string | null, phIdx: string | null, doc: Document | null): Element | null => {
                     if (!doc) return null;
-                    const shapes = doc.getElementsByTagNameNS('*', 'sp');
-                    for (let s = 0; s < shapes.length; s++) {
-                        const ph = shapes[s].getElementsByTagNameNS('*', 'ph')[0];
+                    const shapes = [...Array.from(doc.getElementsByTagNameNS('*', 'sp')), ...Array.from(doc.getElementsByTagNameNS('*', 'pic'))];
+                    
+                    // 1. Precise match: match index if provided, or exact type
+                    for (const shape of shapes) {
+                        const ph = shape.getElementsByTagNameNS('*', 'ph')[0];
                         if (ph) {
-                            if (phType && ph.getAttribute('type') === phType) return shapes[s];
-                            if (phIdx && ph.getAttribute('idx') === phIdx) return shapes[s];
+                            const pType = ph.getAttribute('type');
+                            const pIdx = ph.getAttribute('idx');
+                            if (phIdx && pIdx === phIdx) return shape;
+                            if (phType && pType && pType.toLowerCase() === phType.toLowerCase()) return shape;
                         }
                     }
+                    
+                    // 2. Loose fallback: if looking for 'body' or 'title' or 'subTitle', maps to 'obj' placeholder types in some apps
+                    const normalizedType = phType?.toLowerCase();
+                    if (normalizedType && ['body', 'title', 'subtitle', 'ctrtitle'].includes(normalizedType)) {
+                        for (const shape of shapes) {
+                            const ph = shape.getElementsByTagNameNS('*', 'ph')[0];
+                            if (ph) {
+                                const pType = ph.getAttribute('type')?.toLowerCase();
+                                if (pType === 'obj' || pType === 'body') return shape;
+                            }
+                        }
+                    }
+                    
                     return null;
                 };
 
@@ -363,7 +389,21 @@ export const PptxImportService = {
                         pivotX: 50, pivotY: 50,
                         locked: false, visible: true,
                         image: { id: media.id, isFromDb: true },
-                        fills: [],
+                        fills: [
+                            {
+                                id: crypto.randomUUID(),
+                                type: 'image',
+                                visible: true,
+                                opacity: 1,
+                                blendMode: 'normal',
+                                image: {
+                                    url: media.id, // For IndexedDB resource, url is identical to id
+                                    source: 'local',
+                                    id: media.id,
+                                    isFromDb: true
+                                }
+                            }
+                        ],
                         strokes: [],
                         ...(border ? { borderColor: border.borderColor, borderWidth: border.borderWidth } : {})
                     });
@@ -384,6 +424,27 @@ export const PptxImportService = {
 
                     const spPr = sp.getElementsByTagNameNS('*', 'spPr')[0];
                     let xfrm = spPr?.getElementsByTagNameNS('*', 'xfrm')[0];
+
+                    if ((!xfrm || !xfrm.getElementsByTagNameNS('*', 'off')[0] || !xfrm.getElementsByTagNameNS('*', 'ext')[0]) && ph) {
+                        const layoutSp = getInheritedShape(phType, phIdx, layoutDoc);
+                        if (layoutSp) {
+                            const lSpPr = layoutSp.getElementsByTagNameNS('*', 'spPr')[0];
+                            const lXfrm = lSpPr?.getElementsByTagNameNS('*', 'xfrm')[0];
+                            if (lXfrm && lXfrm.getElementsByTagNameNS('*', 'off')[0] && lXfrm.getElementsByTagNameNS('*', 'ext')[0]) {
+                                xfrm = lXfrm;
+                            }
+                        }
+                        if (!xfrm) {
+                            const masterSp = getInheritedShape(phType, phIdx, masterDoc);
+                            if (masterSp) {
+                                const mSpPr = masterSp.getElementsByTagNameNS('*', 'spPr')[0];
+                                const mXfrm = mSpPr?.getElementsByTagNameNS('*', 'xfrm')[0];
+                                if (mXfrm && mXfrm.getElementsByTagNameNS('*', 'off')[0] && mXfrm.getElementsByTagNameNS('*', 'ext')[0]) {
+                                    xfrm = mXfrm;
+                                }
+                            }
+                        }
+                    }
 
                     const inheritedSps: Element[] = [];
                     if (ph) {
@@ -424,15 +485,21 @@ export const PptxImportService = {
                             const sz = el.getAttribute('sz');
                             if (sz && !rSize) rSize = parseInt(sz) / 100;
                             
-                            const latin = el.getElementsByTagNameNS('*', 'latin')[0];
-                            const typeface = latin?.getAttribute('typeface');
-                            if (typeface && !typeface.startsWith('+') && !rFont) {
-                                rFont = typeface;
-                            }
-                            
-                            if (!rColor) {
-                                rColor = resolveColor(el);
-                            }
+                             const latin = el.getElementsByTagNameNS('*', 'latin')[0];
+                             let typeface = latin?.getAttribute('typeface');
+                             if (typeface && !rFont) {
+                                 if (typeface.startsWith('+mj')) {
+                                     rFont = themeMajorFont;
+                                 } else if (typeface.startsWith('+mn')) {
+                                     rFont = themeMinorFont;
+                                 } else {
+                                     rFont = typeface;
+                                 }
+                             }
+                             
+                             if (!rColor) {
+                                 rColor = resolveColor(el);
+                             }
                         };
 
                         checkEl(rPr);
@@ -481,15 +548,32 @@ export const PptxImportService = {
                         let hasParsedFormatting = false;
                         
                         // Vertical Anchor
-                        const bodyPr = txBody.getElementsByTagNameNS('*', 'bodyPr')[0];
-                        const anchor = bodyPr?.getAttribute('anchor');
+                        let bodyPr = txBody.getElementsByTagNameNS('*', 'bodyPr')[0];
+                        let anchor = bodyPr?.getAttribute('anchor');
+                        if (!anchor) {
+                            for (const isp of inheritedSps) {
+                                const ispTxBody = isp.getElementsByTagNameNS('*', 'txBody')[0];
+                                const ispBodyPr = ispTxBody?.getElementsByTagNameNS('*', 'bodyPr')[0];
+                                anchor = ispBodyPr?.getAttribute('anchor');
+                                if (anchor) break;
+                            }
+                        }
                         let alignVertical: 'top' | 'middle' | 'bottom' = 'middle';
                         if (anchor === 't') alignVertical = 'top';
                         if (anchor === 'b') alignVertical = 'bottom';
 
                         // Horizontal Alignment (from 1st para)
-                        const firstAlgn = paragraphs[0]?.getElementsByTagNameNS('*', 'pPr')[0]?.getAttribute('algn');
-                        let alignHorizontal: 'left' | 'center' | 'right' | 'justify' = 'center';
+                        let firstAlgn = paragraphs[0]?.getElementsByTagNameNS('*', 'pPr')[0]?.getAttribute('algn');
+                        if (!firstAlgn) {
+                            for (const isp of inheritedSps) {
+                                const ispTxBody = isp.getElementsByTagNameNS('*', 'txBody')[0];
+                                const ispPara = ispTxBody?.getElementsByTagNameNS('*', 'p')[0];
+                                firstAlgn = ispPara?.getElementsByTagNameNS('*', 'pPr')[0]?.getAttribute('algn');
+                                if (firstAlgn) break;
+                            }
+                        }
+                        let alignHorizontal: 'left' | 'center' | 'right' | 'justify' = 'left';
+                        if (firstAlgn === 'ctr') alignHorizontal = 'center';
                         if (firstAlgn === 'l') alignHorizontal = 'left';
                         if (firstAlgn === 'r') alignHorizontal = 'right';
                         if (firstAlgn === 'just') alignHorizontal = 'justify';

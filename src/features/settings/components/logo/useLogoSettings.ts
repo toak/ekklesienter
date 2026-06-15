@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
-import { LogoService } from '@/core/services/LogoService';
+import { useShallow } from 'zustand/react/shallow';
+import { LogoService } from '@/core/services/logoService';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { ILogo, ILogoGroup } from '@/core/types';
 
 export const useLogoSettings = () => {
@@ -11,7 +12,16 @@ export const useLogoSettings = () => {
     const {
         settings, addCustomLogo, removeCustomLogo, setActiveLogo,
         addLogoGroup, removeLogoGroup, addLogosToGroup, moveLogoToGroup
-    } = usePresenterStore();
+    } = usePresenterStore(useShallow(state => ({
+        settings: state.settings,
+        addCustomLogo: state.addCustomLogo,
+        removeCustomLogo: state.removeCustomLogo,
+        setActiveLogo: state.setActiveLogo,
+        addLogoGroup: state.addLogoGroup,
+        removeLogoGroup: state.removeLogoGroup,
+        addLogosToGroup: state.addLogosToGroup,
+        moveLogoToGroup: state.moveLogoToGroup
+    })));
 
     const [isImporting, setIsImporting] = useState(false);
     const [showCreateGroup, setShowCreateGroup] = useState(false);

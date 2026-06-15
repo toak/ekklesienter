@@ -3,9 +3,9 @@ import { EktpService } from './ektpService';
 import { EktmpService } from './ektmpService';
 import { GraceLibExportService } from './GraceLibExportService';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
-import { MediaType } from '@/core/types';
+import { MediaType, ISlide, ICanvasItem } from '@/core/types';
 import { toast } from 'sonner';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 interface ILibraryImportOptions {
     t: any;
@@ -91,7 +91,7 @@ export class LibraryImportService {
             toast.success(t('gracelib_imported', 'GraceLib imported'));
         } 
         else if (name.endsWith('.ektp')) {
-            const presentationId = await EktpService.unpack(file);
+            const presentationId = await EktpService.unpack(file, 0, new Set(), currentBinId);
             const presentation = await db.presentationFiles.get(presentationId);
             if (presentation) {
                 await db.presentationFiles.update(presentationId, {
@@ -110,9 +110,12 @@ export class LibraryImportService {
             const { PptxImportService } = await import('./PptxImportService');
             const presentation = await PptxImportService.convert(file);
             const newId = `imported-pptx-${crypto.randomUUID()}`;
+            const { getUniquePresentationName } = await import('@/core/utils/nameUtils');
+            const uniqueName = await getUniquePresentationName(presentation.name);
             await db.presentationFiles.add({
                 ...presentation,
                 id: newId,
+                name: uniqueName,
                 serviceId: undefined,
                 binId: currentBinId || undefined,
                 updatedAt: new Date(),
@@ -151,7 +154,7 @@ export class LibraryImportService {
         } 
         else if (ext === 'ektp') {
             const file = await this.pathToLocalFile(path, nameStr, 'application/zip');
-            const presentationId = await EktpService.unpack(file);
+            const presentationId = await EktpService.unpack(file, 0, new Set(), currentBinId);
             const presentation = await db.presentationFiles.get(presentationId);
             if (presentation) {
                 await db.presentationFiles.update(presentationId, {
@@ -172,9 +175,12 @@ export class LibraryImportService {
             const { PptxImportService } = await import('./PptxImportService');
             const presentation = await PptxImportService.convert(file);
             const newId = `imported-pptx-${crypto.randomUUID()}`;
+            const { getUniquePresentationName } = await import('@/core/utils/nameUtils');
+            const uniqueName = await getUniquePresentationName(presentation.name);
             await db.presentationFiles.add({
                 ...presentation,
                 id: newId,
+                name: uniqueName,
                 serviceId: undefined,
                 binId: currentBinId || undefined,
                 updatedAt: new Date(),
@@ -235,5 +241,105 @@ export class LibraryImportService {
         const response = await fetch(getLocalResourceUrl(path));
         const blob = await response.blob();
         return new File([blob], fileName, { type });
+    }
+
+    /**
+     * Triggers file selection and imports slides from the chosen .ektp or .pptx file directly into the timeline.
+     */
+    static async selectAndImportSlides(
+        targetPresentationId: string,
+        targetIndex: number,
+        t: any
+    ): Promise<void> {
+        let file: File | null = null;
+
+        if (!IpcService.isElectron()) {
+            file = await new Promise<File | null>((resolve) => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.ektp,.pptx';
+                input.onchange = (e) => {
+                    const files = Array.from((e.target as HTMLInputElement).files || []);
+                    resolve(files.length > 0 ? files[0] : null);
+                };
+                input.click();
+            });
+        } else {
+            try {
+                const files = await IpcService.selectFile({
+                    properties: ['openFile'],
+                    filters: [
+                        { name: 'Presentation Files', extensions: ['ektp', 'pptx'] }
+                    ]
+                });
+                if (files && files.length > 0) {
+                    const nameStr = files[0].split(/[/\\]/).pop() || 'Untitled';
+                    file = await this.pathToLocalFile(files[0], nameStr, 'application/zip');
+                }
+            } catch (error) {
+                console.error('[LibraryImportService] Failed to select file:', error);
+            }
+        }
+
+        if (!file) return;
+
+        try {
+            const name = file.name.toLowerCase();
+            let slides: ISlide[] = [];
+
+            if (name.endsWith('.ektp')) {
+                const tempPresId = await EktpService.unpack(file);
+                const tempPres = await db.presentationFiles.get(tempPresId);
+                if (tempPres) {
+                    slides = tempPres.slides;
+                    await db.presentationFiles.delete(tempPresId);
+                }
+            } else if (name.endsWith('.pptx')) {
+                const { PptxImportService } = await import('./PptxImportService');
+                const presentation = await PptxImportService.convert(file);
+                slides = presentation.slides;
+            }
+
+            if (slides.length === 0) {
+                toast.error(t('no_slides_imported', 'No slides found in the selected file'));
+                return;
+            }
+
+            const targetPres = await db.presentationFiles.get(targetPresentationId);
+            if (!targetPres) return;
+
+            const updatedSlides = [...targetPres.slides];
+            const slideIdMap = new Map<string, string>();
+            
+            const newSlidesToInsert: ISlide[] = slides.map(s => {
+                const cloned: ISlide = structuredClone(s);
+                const newId = crypto.randomUUID();
+                slideIdMap.set(s.id, newId);
+                cloned.id = newId;
+                if (cloned.type === 'normal' && cloned.content && cloned.content.canvasItems) {
+                    cloned.content.canvasItems = cloned.content.canvasItems.map((item: ICanvasItem) => ({
+                        ...item,
+                        id: crypto.randomUUID()
+                    }));
+                }
+                return cloned;
+            });
+
+            updatedSlides.splice(targetIndex, 0, ...newSlidesToInsert);
+            const ordered = updatedSlides.map((s, i) => ({ ...s, order: i }));
+
+            // Update presentation slides via presentation store to notify UI
+            const { usePresentationStore } = await import('@/features/presenter/store/presentationStore');
+            await usePresentationStore.getState().updatePresentationSlides(targetPresentationId, ordered);
+
+            // Select the first imported slide
+            usePresentationStore.getState().setSelectedSlideIds(newSlidesToInsert.map(s => s.id));
+            usePresentationStore.getState().setPreviewSlide(newSlidesToInsert[0].id, targetPresentationId);
+
+            toast.success(t('slides_imported_success', 'Imported {{count}} slides directly to timeline', { count: newSlidesToInsert.length }));
+        } catch (err) {
+            console.error('[LibraryImportService] Failed to import slides from file:', err);
+            toast.error(t('import_slides_failed', 'Failed to import slides from file'));
+        }
     }
 }

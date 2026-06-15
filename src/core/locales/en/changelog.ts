@@ -2,6 +2,17 @@ export default {
     "changelog": "Changelog",
     "changelog_entries": [
         {
+            "version": "v2.2.3",
+            "title": "Remote Controller & Canvas Shortcuts",
+            "date": "June 12, 2026",
+            "description": "Maintenance update introducing scene screens, remote controller loading fixes, and slide editor keyboard improvements.",
+            "features": [
+                "Added a new Scene Screen type for versatile displays",
+                "Fixed remote controller initialization to display the active slide immediately on load",
+                "Small bugs fixes"
+            ]
+        },
+        {
             "version": "v2.2.2",
             "title": "Stability & Performance",
             "date": "April 22, 2026",

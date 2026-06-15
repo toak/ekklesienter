@@ -1,0 +1,1979 @@
+{
+  "communities": {
+    "0": [
+      "src_core_utils_blendengine_ts",
+      "src_core_utils_canvascolorcomputer_ts",
+      "utils_blendengine_applyblendmode",
+      "utils_blendengine_blendcolorburn",
+      "utils_blendengine_blendcolordodge",
+      "utils_blendengine_blenddarken",
+      "utils_blendengine_blenddifference",
+      "utils_blendengine_blendexclusion",
+      "utils_blendengine_blendhardlight",
+      "utils_blendengine_blendlighten",
+      "utils_blendengine_blendmultiply",
+      "utils_blendengine_blendnormal",
+      "utils_blendengine_blendoverlay",
+      "utils_blendengine_blendscreen",
+      "utils_blendengine_blendsoftlight",
+      "utils_blendengine_clamp01",
+      "utils_blendengine_clipcolor",
+      "utils_blendengine_compositeover",
+      "utils_blendengine_csstolinearrgba",
+      "utils_blendengine_findocclusioncutoff",
+      "utils_blendengine_getcomputedcolor",
+      "utils_blendengine_hex2",
+      "utils_blendengine_hextolinearrgba",
+      "utils_blendengine_isopaquenormallayer",
+      "utils_blendengine_linearrgbatocss",
+      "utils_blendengine_linearrgbatohex",
+      "utils_blendengine_lineartosrgb",
+      "utils_blendengine_lum",
+      "utils_blendengine_sat",
+      "utils_blendengine_setlum",
+      "utils_blendengine_setsat",
+      "utils_blendengine_srgbtolinear",
+      "utils_canvascolorcomputer_applystops",
+      "utils_canvascolorcomputer_clamp",
+      "utils_canvascolorcomputer_getaveragecomputedcolor",
+      "utils_canvascolorcomputer_getcomputedcoloratpoint",
+      "utils_canvascolorcomputer_hex2"
+    ],
+    "1": [
+      "services_audioservice_audioservice",
+      "services_audioservice_audioservice_clearpendingdelays",
+      "services_audioservice_audioservice_constructor",
+      "services_audioservice_audioservice_dispose",
+      "services_audioservice_audioservice_ensurecontext",
+      "services_audioservice_audioservice_findactivescope",
+      "services_audioservice_audioservice_getduration",
+      "services_audioservice_audioservice_getfileid",
+      "services_audioservice_audioservice_getfilestats",
+      "services_audioservice_audioservice_getinstance",
+      "services_audioservice_audioservice_getposition",
+      "services_audioservice_audioservice_gettrackprogress",
+      "services_audioservice_audioservice_getwaveform",
+      "services_audioservice_audioservice_isplaying",
+      "services_audioservice_audioservice_loadaudio",
+      "services_audioservice_audioservice_pausetrack",
+      "services_audioservice_audioservice_playscope",
+      "services_audioservice_audioservice_playtrack",
+      "services_audioservice_audioservice_resolveeffectiveurl",
+      "services_audioservice_audioservice_resume",
+      "services_audioservice_audioservice_seektrack",
+      "services_audioservice_audioservice_stopall",
+      "services_audioservice_audioservice_stopscope",
+      "services_audioservice_audioservice_sync",
+      "src_core_utils_audioutils_ts",
+      "src_features_presenter_services_audioservice_ts",
+      "utils_audioutils_dbtogain",
+      "utils_audioutils_gaintodb",
+      "utils_audioutils_generatewaveformpoints"
+    ],
+    "2": [
+      "bible_multiversedisplay_multiversedisplay",
+      "bible_parallelversedisplay_parallelversedisplay",
+      "bible_versedisplay_versedisplay",
+      "data_topicaldata_findtopics",
+      "hooks_usetextfit_usetextfit",
+      "navigation_searchoverlay_getbookname",
+      "services_remotesyncservice_remotesyncservice",
+      "services_remotesyncservice_remotesyncservice_updateremotestate",
+      "src_core_data_topicaldata_ts",
+      "src_core_hooks_usetextfit_ts",
+      "src_core_services_remotesyncservice_ts",
+      "src_features_bible_browser_components_navigation_searchoverlay_tsx",
+      "src_features_bible_browser_utils_bibleutils_ts",
+      "src_features_presenter_components_bible_multiversedisplay_tsx",
+      "src_features_presenter_components_bible_parallelversedisplay_tsx",
+      "src_features_presenter_components_bible_versedisplay_tsx",
+      "src_features_presenter_hooks_usetextfit_ts",
+      "src_features_search_utils_biblesearchutils_ts",
+      "src_features_search_utils_searchparser_ts",
+      "utils_biblesearchutils_findbookidfuzzy",
+      "utils_biblesearchutils_levenshteindistance",
+      "utils_bibleutils_formatmultiversereference",
+      "utils_bibleutils_formatverserange",
+      "utils_searchparser_parsesearchquery",
+      "utils_searchparser_parsesingleitem"
+    ],
+    "3": [
+      "components_slidedesignpanel_async",
+      "components_slidedesignpanel_getalwaystabs",
+      "components_slidedesignpanel_handlebgchange",
+      "components_slidedesignpanel_handlelayerdragend",
+      "components_slidedesignpanel_handleremoveitem",
+      "components_slidedesignpanel_handleupdateitem",
+      "services_thumbnailservice_thumbnailservice",
+      "services_thumbnailservice_thumbnailservice_drawcover",
+      "services_thumbnailservice_thumbnailservice_generate",
+      "services_thumbnailservice_thumbnailservice_generatefromtemplate",
+      "services_thumbnailservice_thumbnailservice_generatevideosequence",
+      "services_thumbnailservice_thumbnailservice_getvisiblelayers",
+      "services_thumbnailservice_thumbnailservice_loadimage",
+      "services_thumbnailservice_thumbnailservice_renderlayer",
+      "services_thumbnailservice_thumbnailservice_rendertextoverlay",
+      "slide_properties_timerfillpicker_timerfillpicker",
+      "src_core_utils_stylemigration_ts",
+      "src_features_presenter_components_slide_properties_timerfillpicker_tsx",
+      "src_features_presenter_components_slidedesignpanel_tsx",
+      "src_features_presenter_services_thumbnailservice_ts",
+      "utils_stylemigration_ensureeffects",
+      "utils_stylemigration_ensurelayers",
+      "utils_stylemigration_migratebackgroundtolayers"
+    ],
+    "4": [
+      "db_index_scripturedatabase",
+      "db_index_scripturedatabase_constructor",
+      "db_index_scripturedatabase_internalinit",
+      "db_index_scripturedatabase_reindextranslationverses",
+      "db_index_scripturedatabase_reindexverses",
+      "db_index_scripturedatabase_sanitize",
+      "db_index_scripturedatabase_seed",
+      "db_index_scripturedatabase_waitforfullready",
+      "parsers_mybibleparser_cleantext",
+      "parsers_mybibleparser_detectmappingtype",
+      "parsers_mybibleparser_mybibleparser",
+      "parsers_mybibleparser_mybibleparser_getsql",
+      "parsers_mybibleparser_mybibleparser_parse",
+      "services_globalsearchservice_highlightmatches",
+      "services_globalsearchservice_performkeywordsearch",
+      "services_globalsearchservice_searchverses",
+      "src_core_db_index_ts",
+      "src_core_parsers_mybibleparser_ts",
+      "src_core_utils_sanitizehtml_ts",
+      "src_features_search_services_globalsearchservice_ts",
+      "utils_biblesearchutils_extractwords",
+      "utils_sanitizehtml_sanitizehtml"
+    ],
+    "5": [
+      "hooks_usemediaurl_getlocalresourceurl",
+      "hooks_usemediaurl_usemediaurl",
+      "media_mediapoolpanel_handlebindrop",
+      "media_mediapoolpanel_handlecreatebin",
+      "media_mediapoolpanel_handledragstart",
+      "media_mediapoolpanel_handleimportmedia",
+      "media_mediapoolpanel_handletimeupdate",
+      "media_mediapoolpanel_toggleplayback",
+      "services_audioservice_audioservice_resolveurl",
+      "services_libraryimportservice_libraryimportservice",
+      "services_libraryimportservice_libraryimportservice_importfileobject",
+      "services_libraryimportservice_libraryimportservice_importfilepath",
+      "services_libraryimportservice_libraryimportservice_importfiles",
+      "services_libraryimportservice_libraryimportservice_pathtolocalfile",
+      "services_libraryimportservice_libraryimportservice_selectandimport",
+      "src_core_hooks_usemediaurl_ts",
+      "src_features_presenter_components_media_mediapoolpanel_tsx",
+      "src_features_presenter_services_libraryimportservice_ts"
+    ],
+    "6": [
+      "slide_editor_inlinetexteditor_applycustomstyle",
+      "slide_editor_inlinetexteditor_compilebackgroundstyles",
+      "slide_editor_inlinetexteditor_handleblur",
+      "slide_editor_inlinetexteditor_handleglobalkeydown",
+      "slide_editor_inlinetexteditor_handleglobalkeyup",
+      "slide_editor_inlinetexteditor_handleinput",
+      "slide_editor_inlinetexteditor_handlekeydown",
+      "slide_editor_inlinetexteditor_handlepaste",
+      "src_core_utils_sanitizepaste_ts",
+      "src_features_presenter_components_slide_editor_inlinetexteditor_tsx",
+      "src_features_presenter_utils_applyblockstyle_ts",
+      "src_features_presenter_utils_normalizecontenteditablehtml_ts",
+      "utils_applyblockstyle_applyblockstyle",
+      "utils_normalizecontenteditablehtml_normalizehtml",
+      "utils_normalizecontenteditablehtml_stripinlinestyleprop",
+      "utils_sanitizepaste_sanitizepastehtml"
+    ],
+    "7": [
+      "fonts_fontlibrary_fetchsystemfonts",
+      "fonts_fontweightpicker_fetchstyles",
+      "fonts_fontweightpicker_getbundledweights",
+      "services_fontservice_findbestmatchstyle",
+      "services_fontservice_getsystemfontdata",
+      "services_fontservice_getsystemfonts",
+      "services_fontservice_getweightname",
+      "services_fontservice_needsfauxbold",
+      "services_fontservice_normalizefontstyle",
+      "slide_properties_typographysection_applytextformat",
+      "slide_properties_typographysection_fetchstyles",
+      "slide_properties_typographysection_getselectionvalue",
+      "src_core_services_fontservice_ts",
+      "src_features_presenter_components_fonts_fontlibrary_tsx",
+      "src_features_presenter_components_fonts_fontweightpicker_tsx",
+      "src_features_presenter_components_slide_properties_typographysection_tsx"
+    ],
+    "8": [
+      "services_mediapackingutils_collectmediarefs",
+      "services_mediapackingutils_extractpathfromlocalresource",
+      "services_mediapackingutils_exttomime",
+      "services_mediapackingutils_findfontmedia",
+      "services_mediapackingutils_getmediablob",
+      "services_mediapackingutils_mimetoext",
+      "services_mediapackingutils_patchmediaids",
+      "services_mediapackingutils_readlocalfilesafe",
+      "services_mediapackingutils_sha256",
+      "services_mediapersistenceservice_mediapersistenceservice",
+      "services_mediapersistenceservice_mediapersistenceservice_ensuremediaindb",
+      "services_mediapersistenceservice_mediapersistenceservice_importmediabatch",
+      "services_mediapersistenceservice_mediapersistenceservice_importmediablob",
+      "services_mediapersistenceservice_mediapersistenceservice_importmediafrompath",
+      "src_features_presenter_services_mediapackingutils_ts",
+      "src_features_presenter_services_mediapersistenceservice_ts"
+    ],
+    "9": [
+      "components_verselist_handlekeydown",
+      "components_verselist_handlemousedown",
+      "components_verselist_handlemouseenter",
+      "components_verselist_handlesave",
+      "components_verselist_handleselect",
+      "components_verselist_up",
+      "services_presentationservice_presentationservice",
+      "services_presentationservice_presentationservice_closeprojector",
+      "services_presentationservice_presentationservice_navigatenext",
+      "services_presentationservice_presentationservice_navigateprev",
+      "services_presentationservice_presentationservice_openglobalmodal",
+      "services_presentationservice_presentationservice_openprojector",
+      "src_core_services_presentationservice_ts",
+      "src_features_bible_browser_components_verselist_tsx"
+    ],
+    "10": [
+      "electron_remote_server_remoteserver",
+      "electron_remote_server_remoteserver_broadcast",
+      "electron_remote_server_remoteserver_constructor",
+      "electron_remote_server_remoteserver_getlocalip",
+      "electron_remote_server_remoteserver_setupexpress",
+      "electron_remote_server_remoteserver_setupipclisteners",
+      "electron_remote_server_remoteserver_setupwebsocket",
+      "electron_remote_server_remoteserver_start",
+      "electron_remote_server_remoteserver_stop",
+      "electron_remote_server_ts"
+    ],
+    "11": [
+      "electron_preload_invoke",
+      "electron_preload_on",
+      "electron_preload_onaspectratiochanged",
+      "electron_preload_readdirectoryrecursive",
+      "electron_preload_readfiledata",
+      "electron_preload_selectfile",
+      "electron_preload_selectfolder",
+      "electron_preload_send",
+      "electron_preload_sub",
+      "electron_preload_ts"
+    ],
+    "12": [
+      "slide_editor_canvashandles_onmove",
+      "slide_editor_canvashandles_resizehandle",
+      "src_core_utils_canvasmath_ts",
+      "src_features_presenter_components_slide_editor_canvashandles_tsx",
+      "utils_canvasmath_calculatemove",
+      "utils_canvasmath_calculatepivot",
+      "utils_canvasmath_calculateresize",
+      "utils_canvasmath_calculaterotation",
+      "utils_canvasmath_getcursorforcorner",
+      "utils_canvasmath_getrotateangle"
+    ],
+    "13": [
+      "hooks_useappinitialization_useappinitialization",
+      "hooks_useaudiosync_useaudiosync",
+      "hooks_usecontrollerlogic_usecontrollerlogic",
+      "hooks_useglobalshortcuts_useglobalshortcuts",
+      "hooks_uselogourl_uselogourl",
+      "src_app_hooks_useappinitialization_ts",
+      "src_app_hooks_useaudiosync_ts",
+      "src_app_hooks_usecontrollerlogic_ts",
+      "src_app_hooks_useglobalshortcuts_ts",
+      "src_core_hooks_uselogourl_ts"
+    ],
+    "14": [
+      "services_ipcservice_ipcservice",
+      "services_ipcservice_ipcservice_invoke",
+      "services_ipcservice_ipcservice_iselectron",
+      "services_ipcservice_ipcservice_on",
+      "services_ipcservice_ipcservice_onaspectratiochanged",
+      "services_ipcservice_ipcservice_selectfile",
+      "services_ipcservice_ipcservice_selectfolder",
+      "services_ipcservice_ipcservice_send",
+      "src_core_services_ipcservice_ts"
+    ],
+    "15": [
+      "services_canvasservice_canvasservice",
+      "services_canvasservice_canvasservice_calculatecropresult",
+      "services_canvasservice_canvasservice_calculatedimensionscale",
+      "services_canvasservice_canvasservice_calculatepivottransformation",
+      "services_canvasservice_canvasservice_calculateradiusupdates",
+      "services_canvasservice_canvasservice_clampcropoffset",
+      "services_canvasservice_canvasservice_getalignmentupdates",
+      "services_canvasservice_canvasservice_getselectionstate",
+      "src_features_presenter_services_canvasservice_ts"
+    ],
+    "16": [
+      "components_customcolorpicker_handlehuemove",
+      "components_customcolorpicker_handlehuepointerdown",
+      "components_customcolorpicker_handlesaturationmove",
+      "components_customcolorpicker_handlesaturationpointerdown",
+      "components_customcolorpicker_hextohsv",
+      "components_customcolorpicker_hsvtohex",
+      "components_customcolorpicker_onmove",
+      "components_customcolorpicker_onup",
+      "src_components_customcolorpicker_tsx"
+    ],
+    "17": [
+      "components_backgroundpicker_addlayer",
+      "components_backgroundpicker_handlefileselect",
+      "components_backgroundpicker_removelayer",
+      "components_backgroundpicker_reorderlayers",
+      "components_backgroundpicker_searchpexels",
+      "components_backgroundpicker_searchunsplash",
+      "components_backgroundpicker_updatelayer",
+      "src_features_presenter_components_backgroundpicker_tsx"
+    ],
+    "18": [
+      "display_livemediatoolbar_formattime",
+      "display_livemediatoolbar_handlekeydown",
+      "display_livemediatoolbar_handlemousemove",
+      "display_livemediatoolbar_handlemouseup",
+      "display_livemediatoolbar_handlemutetoggle",
+      "display_livemediatoolbar_handlespeedchange",
+      "display_livemediatoolbar_handlevolumechange",
+      "src_features_presenter_components_display_livemediatoolbar_tsx"
+    ],
+    "19": [
+      "hooks_useslidetransitionmanager_useslidetransitionmanager",
+      "src_features_presenter_components_display_transitions_slidetransitions_tsx",
+      "src_features_presenter_hooks_useslidetransitionmanager_ts",
+      "transitions_slidetransitions_checkerboardtransition",
+      "transitions_slidetransitions_comicdotstransition",
+      "transitions_slidetransitions_gettransitionvariables",
+      "transitions_slidetransitions_normalizetransitiondirection",
+      "transitions_slidetransitions_normalizetransitiontype"
+    ],
+    "20": [
+      "electron_main_broadcastaspectratio",
+      "electron_main_createmainwindow",
+      "electron_main_createmenu",
+      "electron_main_createprojectorwindow",
+      "electron_main_getfiles",
+      "electron_main_seedbundledtemplates",
+      "electron_main_ts"
+    ],
+    "21": [
+      "components_displaysettings_fetchdisplays",
+      "components_displaysettings_setpresenterdisplay",
+      "components_displaysettings_setpreviewdisplay",
+      "components_displaysettings_toggleautodefine",
+      "slide_properties_layoutsettingspicker_updatedisplay",
+      "src_features_presenter_components_slide_properties_layoutsettingspicker_tsx",
+      "src_features_settings_components_displaysettings_tsx"
+    ],
+    "22": [
+      "slide_editor_slidecanvas_async",
+      "slide_editor_slidecanvas_handlecanvasclick",
+      "slide_editor_slidecanvas_handlekey",
+      "slide_editor_slidecanvas_handlepointerdown",
+      "slide_editor_slidecanvas_handlepointermove",
+      "slide_editor_slidecanvas_handlepointerup",
+      "src_features_presenter_components_slide_editor_slidecanvas_tsx"
+    ],
+    "23": [
+      "slide_properties_scrubbableinput_async",
+      "slide_properties_scrubbableinput_handleblur",
+      "slide_properties_scrubbableinput_handlekeydown",
+      "slide_properties_scrubbableinput_handlemove",
+      "slide_properties_scrubbableinput_handlepointerdown",
+      "slide_properties_scrubbableinput_handleup",
+      "src_features_presenter_components_slide_properties_scrubbableinput_tsx"
+    ],
+    "24": [
+      "slide_properties_helpers_cornerbl",
+      "slide_properties_helpers_cornerbr",
+      "slide_properties_helpers_cornertl",
+      "slide_properties_helpers_cornertr",
+      "slide_properties_helpers_createcanvasitem",
+      "slide_properties_helpers_formatduration",
+      "src_features_presenter_components_slide_properties_helpers_tsx"
+    ],
+    "25": [
+      "slide_properties_backgroundpicker_addlayer",
+      "slide_properties_backgroundpicker_handlefileselect",
+      "slide_properties_backgroundpicker_handlesearch",
+      "slide_properties_backgroundpicker_if",
+      "slide_properties_backgroundpicker_removelayer",
+      "slide_properties_backgroundpicker_updatelayer",
+      "src_features_presenter_components_slide_properties_backgroundpicker_tsx"
+    ],
+    "26": [
+      "components_biblebrowser_handleprojectselected",
+      "components_biblebrowser_handleselectbook",
+      "components_biblebrowser_handleselectchapter",
+      "components_biblebrowser_handleselecttranslation",
+      "components_biblebrowser_loadtranslations",
+      "components_biblebrowser_toggleverse",
+      "src_remote_components_biblebrowser_tsx"
+    ],
+    "27": [
+      "src_core_utils_mediacache_ts",
+      "utils_mediacache_mediacache",
+      "utils_mediacache_mediacache_clear",
+      "utils_mediacache_mediacache_getbackgroundurl",
+      "utils_mediacache_mediacache_put",
+      "utils_mediacache_mediacache_release"
+    ],
+    "28": [
+      "services_wakelockservice_wakelockservice",
+      "services_wakelockservice_wakelockservice_handlevisibilitychange",
+      "services_wakelockservice_wakelockservice_setelectronwakelock",
+      "services_wakelockservice_wakelockservice_setwakelock",
+      "services_wakelockservice_wakelockservice_setwebwakelock",
+      "src_core_services_wakelockservice_ts"
+    ],
+    "29": [
+      "src_features_presenter_utils_styleextraction_ts",
+      "utils_styleextraction_calculatestyleupdates",
+      "utils_styleextraction_extractcolorsfromhtml",
+      "utils_styleextraction_getstylehash",
+      "utils_styleextraction_getuniqueselectionstyles",
+      "utils_styleextraction_normalizecolor"
+    ],
+    "30": [
+      "modals_audiopickermodal_handleconfirm",
+      "modals_audiopickermodal_handleimport",
+      "modals_audiopickermodal_handleselect",
+      "src_features_presenter_components_modals_audiopickermodal_tsx",
+      "src_features_presenter_utils_timelineutils_ts",
+      "utils_timelineutils_findoverlappingscopes"
+    ],
+    "31": [
+      "library_presentationselector_handlecreatepresentation",
+      "library_presentationselector_handleexportpresentation",
+      "library_presentationselector_handleimportpresentation",
+      "library_presentationselector_handlerenamepresentation",
+      "library_presentationselector_handletoggle",
+      "src_features_presenter_components_library_presentationselector_tsx"
+    ],
+    "32": [
+      "library_servicepicker_handlecreateservice",
+      "library_servicepicker_handledeleteservice",
+      "library_servicepicker_handleexportservice",
+      "library_servicepicker_handleimportservice",
+      "library_servicepicker_handlerenameservice",
+      "src_features_presenter_components_library_servicepicker_tsx"
+    ],
+    "33": [
+      "display_videosliderenderer_formattime",
+      "display_videosliderenderer_handlemousemove",
+      "display_videosliderenderer_handlemouseup",
+      "display_videosliderenderer_handler",
+      "display_videosliderenderer_isplaying",
+      "src_features_presenter_components_display_videosliderenderer_tsx"
+    ],
+    "34": [
+      "slide_properties_itemproperties_getselectionvalue",
+      "slide_properties_itemproperties_handlealign",
+      "slide_properties_itemproperties_handledimensionchange",
+      "slide_properties_itemproperties_handlepivotchange",
+      "slide_properties_itemproperties_handleradiuschange",
+      "src_features_presenter_components_slide_properties_itemproperties_tsx"
+    ],
+    "35": [
+      "slide_properties_backgroundcropmodal_handleapply",
+      "slide_properties_backgroundcropmodal_handleimageload",
+      "slide_properties_backgroundcropmodal_handlemousedown",
+      "slide_properties_backgroundcropmodal_handlemousemove",
+      "slide_properties_backgroundcropmodal_handlemouseup",
+      "src_features_presenter_components_slide_properties_backgroundcropmodal_tsx"
+    ],
+    "36": [
+      "components_quicksearchmodal_getbookname",
+      "components_quicksearchmodal_handleselectkeyword",
+      "components_quicksearchmodal_handleselectreference",
+      "components_quicksearchmodal_handleselecttopic",
+      "components_quicksearchmodal_togglesection",
+      "src_features_search_components_quicksearchmodal_tsx"
+    ],
+    "37": [
+      "components_floatingpopover_floatingpopover",
+      "src_components_floatingpopover_tsx",
+      "src_features_presenter_components_timeline_slidetimeline_tsx",
+      "src_shared_ui_contextmenu_tsx",
+      "timeline_slidetimeline_createportal",
+      "ui_contextmenu_contextmenu"
+    ],
+    "38": [
+      "components_customslider_handlepointerdown",
+      "components_customslider_handlepointermove",
+      "components_customslider_handlepointerup",
+      "components_customslider_onmove",
+      "components_customslider_onup",
+      "src_components_customslider_tsx"
+    ],
+    "39": [
+      "src_core_utils_stripinlinestyles_ts",
+      "utils_stripinlinestyles_cameltokebab",
+      "utils_stripinlinestyles_hasnonstyleattributes",
+      "utils_stripinlinestyles_iswrapperelement",
+      "utils_stripinlinestyles_stripinlinestyles"
+    ],
+    "40": [
+      "data_bookdata_getbookname",
+      "data_bookdata_getbookorder",
+      "data_bookdata_getbooksection",
+      "data_bookdata_getsectioncolors",
+      "src_core_data_bookdata_ts"
+    ],
+    "41": [
+      "services_ffmpegservice_ffmpegservice",
+      "services_ffmpegservice_ffmpegservice_load",
+      "services_ffmpegservice_ffmpegservice_trimmedia",
+      "services_ffmpegservice_ffmpegservice_trimmediabyid",
+      "src_core_services_ffmpegservice_ts"
+    ],
+    "42": [
+      "components_biblemanager_handlecontextmenu",
+      "components_biblemanager_handledelete",
+      "components_biblemanager_handleimport",
+      "components_biblemanager_togglelang",
+      "src_features_settings_components_biblemanager_tsx"
+    ],
+    "43": [
+      "slide_editor_rotationdial_async",
+      "slide_editor_rotationdial_handlerotationchange",
+      "slide_editor_rotationdial_onmove",
+      "slide_editor_rotationdial_onup",
+      "src_features_presenter_components_slide_editor_rotationdial_tsx"
+    ],
+    "44": [
+      "slide_editor_slideeditortoolbar_handler",
+      "slide_editor_slideeditortoolbar_handleselect",
+      "slide_editor_slideeditortoolbar_hide",
+      "slide_editor_slideeditortoolbar_show",
+      "src_features_presenter_components_slide_editor_slideeditortoolbar_tsx"
+    ],
+    "45": [
+      "modals_presentationimportmodal_handleimport",
+      "modals_presentationimportmodal_handleselectall",
+      "modals_presentationimportmodal_modalaudioscope",
+      "modals_presentationimportmodal_toggleslideselection",
+      "src_features_presenter_components_modals_presentationimportmodal_tsx"
+    ],
+    "46": [
+      "display_projectorview_findlogo",
+      "display_projectorview_handlecommand",
+      "display_projectorview_handlekeydown",
+      "display_projectorview_reportratio",
+      "src_features_presenter_components_display_projectorview_tsx"
+    ],
+    "47": [
+      "slide_properties_transitiontabcontent_handledirectionchange",
+      "slide_properties_transitiontabcontent_handledurationchange",
+      "slide_properties_transitiontabcontent_handletypechange",
+      "slide_properties_transitiontabcontent_supportsdirection",
+      "src_features_presenter_components_slide_properties_transitiontabcontent_tsx"
+    ],
+    "48": [
+      "slide_properties_inlinebackgroundpicker_handleaddlayer",
+      "slide_properties_inlinebackgroundpicker_handledragend",
+      "slide_properties_inlinebackgroundpicker_handleremovelayer",
+      "slide_properties_inlinebackgroundpicker_handleupdatelayer",
+      "src_features_presenter_components_slide_properties_inlinebackgroundpicker_tsx"
+    ],
+    "49": [
+      "slide_properties_layeritem_getbackgroundvalue",
+      "slide_properties_layeritem_getdisplaytext",
+      "slide_properties_layeritem_handleopacitychange",
+      "slide_properties_layeritem_handleopacitydragstart",
+      "src_features_presenter_components_slide_properties_layeritem_tsx"
+    ],
+    "50": [
+      "components_gradientpicker_handleanglechange",
+      "components_gradientpicker_onmove",
+      "components_gradientpicker_onup",
+      "components_gradientpicker_swapcolors",
+      "src_components_gradientpicker_tsx"
+    ],
+    "51": [
+      "components_compactcolorpicker_hextohsv",
+      "components_compactcolorpicker_hsvtohex",
+      "components_compactcolorpicker_onmove",
+      "components_compactcolorpicker_onup",
+      "src_components_compactcolorpicker_tsx"
+    ],
+    "52": [
+      "src_core_utils_markdownutils_tsx",
+      "utils_markdownutils_processchildren",
+      "utils_markdownutils_processversetext",
+      "utils_markdownutils_truncatemiddle"
+    ],
+    "53": [
+      "slide_editor_canvasitemview_getborderradius",
+      "slide_editor_canvasitemview_hasanyradius",
+      "slide_editor_canvasitemview_rendercontent",
+      "src_features_presenter_components_slide_editor_canvasitemview_tsx"
+    ],
+    "54": [
+      "src_features_presenter_components_timeline_timelinedroppablezone_tsx",
+      "timeline_timelinedroppablezone_handlenativedragleave",
+      "timeline_timelinedroppablezone_handlenativedragover",
+      "timeline_timelinedroppablezone_handlenativedrop"
+    ],
+    "55": [
+      "hooks_useintersection_useintersection",
+      "src_core_hooks_useintersection_ts",
+      "src_features_presenter_components_timeline_slidetile_tsx",
+      "timeline_slidetile_slidetile"
+    ],
+    "56": [
+      "slide_properties_timertabcontent_handledragend",
+      "slide_properties_timertabcontent_handledropfrommediapool",
+      "slide_properties_timertabcontent_handlereplaceaudio",
+      "src_features_presenter_components_slide_properties_timertabcontent_tsx"
+    ],
+    "57": [
+      "hooks_usemetadata_usemetadata",
+      "hooks_useslidedisplaydata_useslidedisplaydata",
+      "src_features_presenter_hooks_usemetadata_ts",
+      "src_features_presenter_hooks_useslidedisplaydata_ts"
+    ],
+    "58": [
+      "app_app_app",
+      "hooks_usewakelock_usewakelock",
+      "src_app_app_tsx",
+      "src_features_presenter_hooks_usewakelock_ts"
+    ],
+    "59": [
+      "services_biblenavigationservice_biblenavigationservice",
+      "services_biblenavigationservice_biblenavigationservice_getnextverse",
+      "services_biblenavigationservice_biblenavigationservice_getprevverse",
+      "src_features_bible_browser_services_biblenavigationservice_ts"
+    ],
+    "60": [
+      "modals_promptmodal_handlecancel",
+      "modals_promptmodal_handleconfirm",
+      "modals_promptmodal_handlekeydown",
+      "src_shared_ui_modals_promptmodal_tsx"
+    ],
+    "61": [
+      "ekklesienter_find_i18n_issues_main",
+      "ekklesienter_find_i18n_issues_walk_source_files",
+      "find_i18n_issues_py"
+    ],
+    "62": [
+      "parsers_zefaniaparser_zefaniaparser",
+      "parsers_zefaniaparser_zefaniaparser_parse",
+      "src_core_parsers_zefaniaparser_ts"
+    ],
+    "63": [
+      "components_remotesettings_handlecopyurl",
+      "components_remotesettings_startserver",
+      "src_features_settings_components_remotesettings_tsx"
+    ],
+    "64": [
+      "renderers_shaperenderer_roundedrect",
+      "renderers_shaperenderer_shaperenderer",
+      "src_features_presenter_components_slide_editor_renderers_shaperenderer_tsx"
+    ],
+    "65": [
+      "modals_audioconflictmodal_handlereplace",
+      "modals_audioconflictmodal_handleshift",
+      "src_features_presenter_components_modals_audioconflictmodal_tsx"
+    ],
+    "66": [
+      "modals_savenestedconfirmmodal_handlekeeplocal",
+      "modals_savenestedconfirmmodal_handleupdateoriginal",
+      "src_features_presenter_components_modals_savenestedconfirmmodal_tsx"
+    ],
+    "67": [
+      "modals_presentationpickermodal_handleadd",
+      "modals_presentationpickermodal_modalaudioscope",
+      "src_features_presenter_components_modals_presentationpickermodal_tsx"
+    ],
+    "68": [
+      "library_presentationlibrary_handleoverridetemplateslideinlibrary",
+      "library_presentationlibrary_handletemplateclick",
+      "src_features_presenter_components_library_presentationlibrary_tsx"
+    ],
+    "69": [
+      "display_slidebackground_renderlayercontent",
+      "display_slidebackground_updateurl",
+      "src_features_presenter_components_display_slidebackground_tsx"
+    ],
+    "70": [
+      "src_features_presenter_components_display_timer_styles_timerstyleutils_tsx",
+      "timer_styles_timerstyleutils_getfillcolor",
+      "timer_styles_timerstyleutils_timerfill"
+    ],
+    "71": [
+      "src_features_presenter_components_display_timer_styles_flipclockstyle_tsx",
+      "timer_styles_flipclockstyle_fliptextsvg",
+      "timer_styles_flipclockstyle_handleanimationend"
+    ],
+    "72": [
+      "slide_properties_referencestylepicker_stylepreview",
+      "slide_properties_referencestylepicker_updatereference",
+      "src_features_presenter_components_slide_properties_referencestylepicker_tsx"
+    ],
+    "73": [
+      "slide_properties_customizationpanel_handlecancel",
+      "slide_properties_customizationpanel_handledone",
+      "src_features_presenter_components_slide_properties_customizationpanel_tsx"
+    ],
+    "74": [
+      "slide_properties_translationlabelpicker_handlefontselect",
+      "slide_properties_translationlabelpicker_updatelabel",
+      "src_features_presenter_components_slide_properties_translationlabelpicker_tsx"
+    ],
+    "75": [
+      "backgroundpicker_adjustmentpanel_updateadjustments",
+      "backgroundpicker_adjustmentpanel_updatemedia",
+      "src_features_presenter_components_slide_properties_backgroundpicker_adjustmentpanel_tsx"
+    ],
+    "76": [
+      "src_shared_ui_errorboundary_tsx",
+      "ui_errorboundary_componentdidcatch",
+      "ui_errorboundary_getderivedstatefromerror"
+    ],
+    "77": [
+      "modals_confirmmodal_handlecancel",
+      "modals_confirmmodal_handleconfirm",
+      "src_shared_ui_modals_confirmmodal_tsx"
+    ],
+    "78": [
+      "remote_remoteapp_handlemediatoggle",
+      "remote_remoteapp_handleoverridetoggle",
+      "src_remote_remoteapp_tsx"
+    ],
+    "79": [
+      "hooks_useremotesocket_getwsurl",
+      "hooks_useremotesocket_useremotesocket",
+      "src_remote_hooks_useremotesocket_ts"
+    ],
+    "80": [
+      "ekklesienter_find_i18n_issues_walk",
+      "find_i18n_issues_js"
+    ],
+    "81": [
+      "src_core_utils_cn_ts",
+      "utils_cn_cn"
+    ],
+    "82": [
+      "src_core_utils_effectutils_ts",
+      "utils_effectutils_geteffectsstyle"
+    ],
+    "83": [
+      "src_core_utils_isequal_ts",
+      "utils_isequal_isequal"
+    ],
+    "84": [
+      "src_core_utils_fontloader_ts",
+      "utils_fontloader_loadfontoffline"
+    ],
+    "85": [
+      "components_performancemonitor_performancemonitor",
+      "src_core_components_performancemonitor_tsx"
+    ],
+    "86": [
+      "hooks_usethrottle_usethrottle",
+      "src_core_hooks_usethrottle_ts"
+    ],
+    "87": [
+      "hooks_usecontainfit_usecontainfit",
+      "src_core_hooks_usecontainfit_ts"
+    ],
+    "88": [
+      "hooks_useresizable_useresizable",
+      "src_core_hooks_useresizable_ts"
+    ],
+    "89": [
+      "src_core_store_historystore_ts",
+      "store_historystore_getbackgroundidentity"
+    ],
+    "90": [
+      "components_appmodals_appmodals",
+      "src_app_components_appmodals_tsx"
+    ],
+    "91": [
+      "components_versepreviews_getbookname",
+      "src_app_components_versepreviews_tsx"
+    ],
+    "92": [
+      "components_datasettings_handlereset",
+      "src_features_settings_components_datasettings_tsx"
+    ],
+    "93": [
+      "components_settingsmodal_rendercontent",
+      "src_features_settings_components_settingsmodal_tsx"
+    ],
+    "94": [
+      "logo_uselogosettings_uselogosettings",
+      "src_features_settings_components_logo_uselogosettings_ts"
+    ],
+    "95": [
+      "slide_editor_slidecontentrenderer_formatfontfamily",
+      "src_features_presenter_components_slide_editor_slidecontentrenderer_tsx"
+    ],
+    "96": [
+      "slide_editor_variableeditor_handleupdate",
+      "src_features_presenter_components_slide_editor_variableeditor_tsx"
+    ],
+    "97": [
+      "slide_editor_logicalcanvas_logicalcanvas",
+      "src_features_presenter_components_slide_editor_logicalcanvas_tsx"
+    ],
+    "98": [
+      "slide_editor_canvasselectionframe_canvasselectionframe",
+      "src_features_presenter_components_slide_editor_canvasselectionframe_tsx"
+    ],
+    "99": [
+      "renderers_textrenderer_compilebackgroundstyles",
+      "src_features_presenter_components_slide_editor_renderers_textrenderer_tsx"
+    ],
+    "100": [
+      "renderers_strokerenderer_getradii",
+      "src_features_presenter_components_slide_editor_renderers_strokerenderer_tsx"
+    ],
+    "101": [
+      "modals_templatepickermodal_onselecttemplate",
+      "src_features_presenter_components_modals_templatepickermodal_tsx"
+    ],
+    "102": [
+      "src_features_presenter_components_display_timer_styles_olddigitalstyle_tsx",
+      "timer_styles_olddigitalstyle_segmentdigit"
+    ],
+    "103": [
+      "fonts_fontpicker_handlefontselect",
+      "src_features_presenter_components_fonts_fontpicker_tsx"
+    ],
+    "104": [
+      "src_features_presenter_components_timeline_timelineresizer_tsx",
+      "timeline_timelineresizer_timelineresizer"
+    ],
+    "105": [
+      "src_features_presenter_components_timeline_transitionseparator_tsx",
+      "timeline_transitionseparator_isend"
+    ],
+    "106": [
+      "src_features_presenter_components_timeline_audioscopeblock_tsx",
+      "timeline_audioscopeblock_istechnicalid"
+    ],
+    "107": [
+      "audioscopeblock_audiowaveform_fetchwaveform",
+      "src_features_presenter_components_timeline_audioscopeblock_audiowaveform_tsx"
+    ],
+    "108": [
+      "audioscopeblock_useaudioscopedrag_useaudioscopedrag",
+      "src_features_presenter_components_timeline_audioscopeblock_useaudioscopedrag_ts"
+    ],
+    "109": [
+      "hooks_usetimelineoperations_usetimelineoperations",
+      "src_features_presenter_components_timeline_hooks_usetimelineoperations_ts"
+    ],
+    "110": [
+      "hooks_usetimelinelayout_usetimelinelayout",
+      "src_features_presenter_components_timeline_hooks_usetimelinelayout_ts"
+    ],
+    "111": [
+      "hooks_usetimelineshortcuts_usetimelineshortcuts",
+      "src_features_presenter_components_timeline_hooks_usetimelineshortcuts_ts"
+    ],
+    "112": [
+      "hooks_usetimelinedraganddrop_usetimelinedraganddrop",
+      "src_features_presenter_components_timeline_hooks_usetimelinedraganddrop_ts"
+    ],
+    "113": [
+      "slide_properties_playlistitemrow_handlecontextmenu",
+      "src_features_presenter_components_slide_properties_playlistitemrow_tsx"
+    ],
+    "114": [
+      "slide_properties_timeractionstep_handledown",
+      "src_features_presenter_components_slide_properties_timeractionstep_tsx"
+    ],
+    "115": [
+      "slide_properties_videotabcontent_extractposterframe",
+      "src_features_presenter_components_slide_properties_videotabcontent_tsx"
+    ],
+    "116": [
+      "slide_properties_audiotabcontent_istechnicalid",
+      "src_features_presenter_components_slide_properties_audiotabcontent_tsx"
+    ],
+    "117": [
+      "slide_properties_layerrow_getlabel",
+      "src_features_presenter_components_slide_properties_layerrow_tsx"
+    ],
+    "118": [
+      "backgroundpicker_videosequencepreview_videosequencepreview",
+      "src_features_presenter_components_slide_properties_backgroundpicker_videosequencepreview_tsx"
+    ],
+    "119": [
+      "media_mediaitemcard_formattime",
+      "src_features_presenter_components_media_mediaitemcard_tsx"
+    ],
+    "120": [
+      "hooks_usetimeraudio_usetimeraudio",
+      "src_features_presenter_hooks_usetimeraudio_ts"
+    ],
+    "121": [
+      "hooks_usemediapooldata_usemediapooldata",
+      "src_features_presenter_hooks_usemediapooldata_ts"
+    ],
+    "122": [
+      "hooks_usetimercore_usetimercore",
+      "src_features_presenter_hooks_usetimercore_ts"
+    ],
+    "123": [
+      "hooks_usebibleselection_usebibleselection",
+      "src_features_presenter_hooks_usebibleselection_ts"
+    ],
+    "124": [
+      "hooks_uselibraryinteraction_uselibraryinteraction",
+      "src_features_presenter_hooks_uselibraryinteraction_ts"
+    ],
+    "125": [
+      "hooks_usevideoplayback_usevideoplayback",
+      "src_features_presenter_hooks_usevideoplayback_ts"
+    ],
+    "126": [
+      "hooks_usetemplatepickerdata_usetemplatepickerdata",
+      "src_features_presenter_hooks_usetemplatepickerdata_ts"
+    ],
+    "127": [
+      "hooks_usecanvasinteraction_usecanvasinteraction",
+      "src_features_presenter_hooks_usecanvasinteraction_ts"
+    ],
+    "128": [
+      "hooks_usemediaselection_usemediaselection",
+      "src_features_presenter_hooks_usemediaselection_ts"
+    ],
+    "129": [
+      "hooks_usetemplatepickeractions_usetemplatepickeractions",
+      "src_features_presenter_hooks_usetemplatepickeractions_ts"
+    ],
+    "130": [
+      "slices_createtemplateslice_createtemplateslice",
+      "src_features_presenter_store_slices_createtemplateslice_ts"
+    ],
+    "131": [
+      "slices_createslidedesignslice_createslidedesignslice",
+      "src_features_presenter_store_slices_createslidedesignslice_ts"
+    ],
+    "132": [
+      "slices_createaudioslice_createaudioslice",
+      "src_features_presenter_store_slices_createaudioslice_ts"
+    ],
+    "133": [
+      "slices_createpresentationslice_createpresentationslice",
+      "src_features_presenter_store_slices_createpresentationslice_ts"
+    ],
+    "134": [
+      "slices_createnestedpresentationslice_createnestedpresentationslice",
+      "src_features_presenter_store_slices_createnestedpresentationslice_ts"
+    ],
+    "135": [
+      "slices_createnavigationslice_createnavigationslice",
+      "src_features_presenter_store_slices_createnavigationslice_ts"
+    ],
+    "136": [
+      "slices_createslideoperationsslice_createslideoperationsslice",
+      "src_features_presenter_store_slices_createslideoperationsslice_ts"
+    ],
+    "137": [
+      "slices_createcanvasslice_createcanvasslice",
+      "src_features_presenter_store_slices_createcanvasslice_ts"
+    ],
+    "138": [
+      "components_verseeditor_handlekeydown",
+      "src_features_bible_browser_components_verseeditor_tsx"
+    ],
+    "139": [
+      "components_historypanel_getbookname",
+      "src_features_bible_browser_components_historypanel_tsx"
+    ],
+    "140": [
+      "components_navigationpanel_handlebookselect",
+      "src_features_bible_browser_components_navigationpanel_tsx"
+    ],
+    "141": [
+      "navigation_booklist_getsectionname",
+      "src_features_bible_browser_components_navigation_booklist_tsx"
+    ],
+    "142": [
+      "navigation_gracelibpanel_gracelibpanel",
+      "src_features_bible_browser_components_navigation_gracelibpanel_tsx"
+    ],
+    "143": [
+      "hooks_usenavigationsearch_usenavigationsearch",
+      "src_features_bible_browser_hooks_usenavigationsearch_ts"
+    ],
+    "144": [
+      "hooks_usenavigationstate_usenavigationstate",
+      "src_features_bible_browser_hooks_usenavigationstate_ts"
+    ],
+    "145": [
+      "hooks_useverticalresize_useverticalresize",
+      "src_features_bible_browser_hooks_useverticalresize_ts"
+    ],
+    "146": [
+      "src_shared_ui_confirmdialog_tsx",
+      "ui_confirmdialog_handler"
+    ],
+    "147": [
+      "src_shared_ui_dropdownselector_tsx",
+      "ui_dropdownselector_handletoggle"
+    ],
+    "148": [
+      "src_shared_ui_translationpicker_tsx",
+      "ui_translationpicker_search"
+    ],
+    "149": [
+      "src_remote_utils_mediaurlrewriter_ts",
+      "utils_mediaurlrewriter_rewritemediaurls"
+    ],
+    "150": [
+      "components_remoteslides_isvideoslide",
+      "src_remote_components_remoteslides_tsx"
+    ],
+    "151": [
+      "components_remoteheader_remoteheader",
+      "src_remote_components_remoteheader_tsx"
+    ],
+    "152": [
+      "components_remotelogin_handlesubmit",
+      "src_remote_components_remotelogin_tsx"
+    ],
+    "153": [
+      "test_idb_js"
+    ],
+    "154": [
+      "vite_config_ts"
+    ],
+    "155": [
+      "src_projector_tsx"
+    ],
+    "156": [
+      "src_main_tsx"
+    ],
+    "157": [
+      "src_electron_d_ts"
+    ],
+    "158": [
+      "src_core_i18n_ts"
+    ],
+    "159": [
+      "src_core_types_ts"
+    ],
+    "160": [
+      "src_core_constants_ts"
+    ],
+    "161": [
+      "src_core_types_canvas_ts"
+    ],
+    "162": [
+      "src_core_types_video_ts"
+    ],
+    "163": [
+      "src_core_types_audio_ts"
+    ],
+    "164": [
+      "src_core_types_template_ts"
+    ],
+    "165": [
+      "src_core_types_settings_ts"
+    ],
+    "166": [
+      "src_core_types_app_ts"
+    ],
+    "167": [
+      "src_core_types_presentation_ts"
+    ],
+    "168": [
+      "src_core_types_timer_ts"
+    ],
+    "169": [
+      "src_core_types_bible_ts"
+    ],
+    "170": [
+      "src_core_types_style_ts"
+    ],
+    "171": [
+      "src_core_types_error_ts"
+    ],
+    "172": [
+      "src_core_types_media_ts"
+    ],
+    "173": [
+      "src_core_locales_en_ts"
+    ],
+    "174": [
+      "src_core_locales_ru_ts"
+    ],
+    "175": [
+      "src_core_locales_ru_settings_ts"
+    ],
+    "176": [
+      "src_core_locales_ru_app_ts"
+    ],
+    "177": [
+      "src_core_locales_ru_common_ts"
+    ],
+    "178": [
+      "src_core_locales_ru_changelog_ts"
+    ],
+    "179": [
+      "src_core_locales_ru_presentation_ts"
+    ],
+    "180": [
+      "src_core_locales_ru_design_ts"
+    ],
+    "181": [
+      "src_core_locales_ru_remote_ts"
+    ],
+    "182": [
+      "src_core_locales_ru_bible_ts"
+    ],
+    "183": [
+      "src_core_locales_en_settings_ts"
+    ],
+    "184": [
+      "src_core_locales_en_app_ts"
+    ],
+    "185": [
+      "src_core_locales_en_common_ts"
+    ],
+    "186": [
+      "src_core_locales_en_changelog_ts"
+    ],
+    "187": [
+      "src_core_locales_en_presentation_ts"
+    ],
+    "188": [
+      "src_core_locales_en_design_ts"
+    ],
+    "189": [
+      "src_core_locales_en_remote_ts"
+    ],
+    "190": [
+      "src_core_locales_en_bible_ts"
+    ],
+    "191": [
+      "src_core_constants_zindex_ts"
+    ],
+    "192": [
+      "src_core_utils_blobdebugger_ts"
+    ],
+    "193": [
+      "src_core_utils_blendengine_test_ts"
+    ],
+    "194": [
+      "src_core_utils_toast_tsx"
+    ],
+    "195": [
+      "src_core_styles_fonts_ts"
+    ],
+    "196": [
+      "src_core_components_loadingscreen_tsx"
+    ],
+    "197": [
+      "src_core_workers_parser_worker_ts"
+    ],
+    "198": [
+      "src_core_data_logodata_ts"
+    ],
+    "199": [
+      "src_core_data_fonts_ts"
+    ],
+    "200": [
+      "src_core_data_bibledata_ts"
+    ],
+    "201": [
+      "src_core_data_presentationdata_ts"
+    ],
+    "202": [
+      "src_core_services_livesyncservice_ts"
+    ],
+    "203": [
+      "src_core_services_errorloggingservice_ts"
+    ],
+    "204": [
+      "src_core_services_logoservice_ts"
+    ],
+    "205": [
+      "src_core_services_bibleservice_ts"
+    ],
+    "206": [
+      "src_core_store_uiatoms_ts"
+    ],
+    "207": [
+      "src_core_store_loadingstore_ts"
+    ],
+    "208": [
+      "src_core_store_displaystore_ts"
+    ],
+    "209": [
+      "src_core_store_modalstore_ts"
+    ],
+    "210": [
+      "src_app_components_apptoolbar_tsx"
+    ],
+    "211": [
+      "src_app_components_appsidebar_tsx"
+    ],
+    "212": [
+      "src_app_components_index_ts"
+    ],
+    "213": [
+      "src_app_components_statusoverlay_tsx"
+    ],
+    "214": [
+      "src_app_layouts_controllerlayout_tsx"
+    ],
+    "215": [
+      "src_test_setup_tsx"
+    ],
+    "216": [
+      "src_features_settings_components_overridesettings_tsx"
+    ],
+    "217": [
+      "src_features_settings_components_logosettings_tsx"
+    ],
+    "218": [
+      "src_features_settings_components_settingssidebar_tsx"
+    ],
+    "219": [
+      "src_features_settings_components_aboutsettings_tsx"
+    ],
+    "220": [
+      "src_features_settings_components_generalsettings_tsx"
+    ],
+    "221": [
+      "src_features_settings_components_shortcutssettings_tsx"
+    ],
+    "222": [
+      "src_features_settings_components_logo_movedropdown_tsx"
+    ],
+    "223": [
+      "src_features_settings_components_logo_creategroupdialog_tsx"
+    ],
+    "224": [
+      "src_features_settings_components_logo_logogrid_tsx"
+    ],
+    "225": [
+      "src_features_settings_components_logo_logocard_tsx"
+    ],
+    "226": [
+      "src_features_presenter_constants_transitions_ts"
+    ],
+    "227": [
+      "src_features_presenter_components_slide_editor_renderers_effectrenderer_tsx"
+    ],
+    "228": [
+      "src_features_presenter_components_modals_bibleselectionpreview_tsx"
+    ],
+    "229": [
+      "src_features_presenter_components_modals_templatepickeroverlays_tsx"
+    ],
+    "230": [
+      "src_features_presenter_components_modals_bibleselectionheader_tsx"
+    ],
+    "231": [
+      "src_features_presenter_components_modals_bibleselectionmodal_tsx"
+    ],
+    "232": [
+      "src_features_presenter_components_modals_templatepickercontextmenu_tsx"
+    ],
+    "233": [
+      "src_features_presenter_components_modals_bibleselectionchapters_tsx"
+    ],
+    "234": [
+      "src_features_presenter_components_modals_bibleselectionverselist_tsx"
+    ],
+    "235": [
+      "src_features_presenter_components_modals_bibleselectionsidebar_tsx"
+    ],
+    "236": [
+      "src_features_presenter_components_modals_templatepickergrid_tsx"
+    ],
+    "237": [
+      "src_features_presenter_components_library_libraryheader_tsx"
+    ],
+    "238": [
+      "src_features_presenter_components_library_templatepreviewitem_tsx"
+    ],
+    "239": [
+      "src_features_presenter_components_library_librarymediasection_tsx"
+    ],
+    "240": [
+      "src_features_presenter_components_library_librarytemplatessection_tsx"
+    ],
+    "241": [
+      "src_features_presenter_components_library_templateitem_tsx"
+    ],
+    "242": [
+      "src_features_presenter_components_library_presentationselector_test_tsx"
+    ],
+    "243": [
+      "src_features_presenter_components_library_librarypresentationssection_tsx"
+    ],
+    "244": [
+      "src_features_presenter_components_library_gracelibbin_tsx"
+    ],
+    "245": [
+      "src_features_presenter_components_library_librarycontextmenu_tsx"
+    ],
+    "246": [
+      "src_features_presenter_components_display_slidecontentorchestrator_tsx"
+    ],
+    "247": [
+      "src_features_presenter_components_display_projectorview_test_tsx"
+    ],
+    "248": [
+      "src_features_presenter_components_display_timersliderenderer_tsx"
+    ],
+    "249": [
+      "src_features_presenter_components_display_slidedisplay_tsx"
+    ],
+    "250": [
+      "src_features_presenter_components_display_timer_styles_serenestyle_tsx"
+    ],
+    "251": [
+      "src_features_presenter_components_display_timer_styles_neobrutaliststyle_tsx"
+    ],
+    "252": [
+      "src_features_presenter_components_display_timer_styles_neonstyle_tsx"
+    ],
+    "253": [
+      "src_features_presenter_components_display_timer_styles_brutaliststyle_tsx"
+    ],
+    "254": [
+      "src_features_presenter_components_display_timer_styles_bolddigitalstyle_tsx"
+    ],
+    "255": [
+      "src_features_presenter_components_display_timer_styles_vhscrtstyle_tsx"
+    ],
+    "256": [
+      "src_features_presenter_components_display_timer_styles_minimalringstyle_tsx"
+    ],
+    "257": [
+      "src_features_presenter_components_display_timer_styles_aurorastyle_tsx"
+    ],
+    "258": [
+      "src_features_presenter_components_fonts_fontprewarmer_tsx"
+    ],
+    "259": [
+      "src_features_presenter_components_timeline_smartbadge_test_tsx"
+    ],
+    "260": [
+      "src_features_presenter_components_timeline_slidetimeline_test_tsx"
+    ],
+    "261": [
+      "src_features_presenter_components_timeline_smartbadge_tsx"
+    ],
+    "262": [
+      "src_features_presenter_components_timeline_audiotrack_tsx"
+    ],
+    "263": [
+      "src_features_presenter_components_timeline_timelinetoolbar_tsx"
+    ],
+    "264": [
+      "src_features_presenter_components_timeline_nestedpresentationtile_tsx"
+    ],
+    "265": [
+      "src_features_presenter_components_timeline_sortableslideblock_tsx"
+    ],
+    "266": [
+      "src_features_presenter_components_timeline_timeraudioclip_tsx"
+    ],
+    "267": [
+      "src_features_presenter_components_timeline_timelinedragoverlaycontent_tsx"
+    ],
+    "268": [
+      "src_features_presenter_components_timeline_timelineslidetrack_tsx"
+    ],
+    "269": [
+      "src_features_presenter_components_timeline_trackcontainer_tsx"
+    ],
+    "270": [
+      "src_features_presenter_components_timeline_timelinetrackheaders_tsx"
+    ],
+    "271": [
+      "src_features_presenter_components_timeline_audioscopeblock_audiocontrols_tsx"
+    ],
+    "272": [
+      "src_features_presenter_components_slide_properties_timertriggeritem_tsx"
+    ],
+    "273": [
+      "src_features_presenter_components_slide_properties_slidecolors_tsx"
+    ],
+    "274": [
+      "src_features_presenter_components_slide_properties_advancedtextsettings_tsx"
+    ],
+    "275": [
+      "src_features_presenter_components_slide_properties_propertysection_tsx"
+    ],
+    "276": [
+      "src_features_presenter_components_slide_properties_index_ts"
+    ],
+    "277": [
+      "src_features_presenter_components_slide_properties_sortablecanvasitem_tsx"
+    ],
+    "278": [
+      "src_features_presenter_components_slide_properties_backgroundpicker_typeselector_tsx"
+    ],
+    "279": [
+      "src_features_presenter_components_slide_properties_backgroundpicker_layerstack_tsx"
+    ],
+    "280": [
+      "src_features_presenter_components_slide_properties_backgroundpicker_mediasourcepanel_tsx"
+    ],
+    "281": [
+      "src_features_presenter_components_media_mediapooltoolbar_tsx"
+    ],
+    "282": [
+      "src_features_presenter_components_media_mediapoolcontextmenu_tsx"
+    ],
+    "283": [
+      "src_features_presenter_components_media_mediapoolbreadcrumb_tsx"
+    ],
+    "284": [
+      "src_features_presenter_services_ektpservice_ts"
+    ],
+    "285": [
+      "src_features_presenter_services_pptximportservice_ts"
+    ],
+    "286": [
+      "src_features_presenter_services_mediapersistenceservice_test_ts"
+    ],
+    "287": [
+      "src_features_presenter_services_ektmpservice_test_ts"
+    ],
+    "288": [
+      "src_features_presenter_services_canvasservice_test_ts"
+    ],
+    "289": [
+      "src_features_presenter_services_ektpservice_test_ts"
+    ],
+    "290": [
+      "src_features_presenter_services_ektservice_test_ts"
+    ],
+    "291": [
+      "src_features_presenter_services_ektmpservice_ts"
+    ],
+    "292": [
+      "src_features_presenter_services_ektservice_ts"
+    ],
+    "293": [
+      "src_features_presenter_services_gracelibexportservice_ts"
+    ],
+    "294": [
+      "src_features_presenter_services_presentationdataservice_ts"
+    ],
+    "295": [
+      "src_features_presenter_services_presenterservice_ts"
+    ],
+    "296": [
+      "src_features_presenter_store_presenterstore_ts"
+    ],
+    "297": [
+      "src_features_presenter_store_types_ts"
+    ],
+    "298": [
+      "src_features_presenter_store_presentationstore_ts"
+    ],
+    "299": [
+      "src_features_presenter_store_presentationstore_test_ts"
+    ],
+    "300": [
+      "src_features_presenter_store_slices_createnestedpresentationslice_test_ts"
+    ],
+    "301": [
+      "src_features_search_utils_searchparser_test_ts"
+    ],
+    "302": [
+      "src_features_bible_browser_components_navigation_navigationheader_tsx"
+    ],
+    "303": [
+      "src_features_bible_browser_components_navigation_navigationfooter_tsx"
+    ],
+    "304": [
+      "src_features_bible_browser_components_navigation_chaptergrid_tsx"
+    ],
+    "305": [
+      "src_features_bible_browser_components_navigation_modepicker_tsx"
+    ],
+    "306": [
+      "src_features_bible_browser_store_biblestore_ts"
+    ],
+    "307": [
+      "src_features_bible_browser_store_biblestore_test_ts"
+    ],
+    "308": [
+      "src_remote_main_tsx"
+    ],
+    "309": [
+      "src_remote_components_previewscaler_tsx"
+    ],
+    "310": [
+      "src_remote_components_remotefooter_tsx"
+    ],
+    "311": [
+      "src_remote_components_slidethumbnail_tsx"
+    ]
+  },
+  "cohesion": {
+    "0": 0.1,
+    "1": 0.12,
+    "2": 0.1,
+    "3": 0.13,
+    "4": 0.12,
+    "5": 0.14,
+    "6": 0.13,
+    "7": 0.15,
+    "8": 0.18,
+    "9": 0.15,
+    "10": 0.2,
+    "11": 0.31,
+    "12": 0.22,
+    "13": 0.2,
+    "14": 0.39,
+    "15": 0.22,
+    "16": 0.33,
+    "17": 0.29,
+    "18": 0.25,
+    "19": 0.32,
+    "20": 0.29,
+    "21": 0.43,
+    "22": 0.29,
+    "23": 0.29,
+    "24": 0.29,
+    "25": 0.38,
+    "26": 0.33,
+    "27": 0.4,
+    "28": 0.53,
+    "29": 0.53,
+    "30": 0.33,
+    "31": 0.33,
+    "32": 0.33,
+    "33": 0.33,
+    "34": 0.33,
+    "35": 0.33,
+    "36": 0.33,
+    "37": 0.33,
+    "38": 0.33,
+    "39": 0.4,
+    "40": 0.5,
+    "41": 0.6,
+    "42": 0.4,
+    "43": 0.5,
+    "44": 0.4,
+    "45": 0.4,
+    "46": 0.5,
+    "47": 0.4,
+    "48": 0.4,
+    "49": 0.4,
+    "50": 0.5,
+    "51": 0.4,
+    "52": 0.5,
+    "53": 0.5,
+    "54": 0.5,
+    "55": 0.5,
+    "56": 0.5,
+    "57": 0.5,
+    "58": 0.5,
+    "59": 0.5,
+    "60": 0.83,
+    "61": 1.0,
+    "62": 0.67,
+    "63": 0.67,
+    "64": 0.67,
+    "65": 0.67,
+    "66": 0.67,
+    "67": 0.67,
+    "68": 0.67,
+    "69": 0.67,
+    "70": 0.67,
+    "71": 0.67,
+    "72": 0.67,
+    "73": 0.67,
+    "74": 1.0,
+    "75": 0.67,
+    "76": 0.67,
+    "77": 0.67,
+    "78": 0.67,
+    "79": 0.67,
+    "80": 1.0,
+    "81": 1.0,
+    "82": 1.0,
+    "83": 1.0,
+    "84": 1.0,
+    "85": 1.0,
+    "86": 1.0,
+    "87": 1.0,
+    "88": 1.0,
+    "89": 1.0,
+    "90": 1.0,
+    "91": 1.0,
+    "92": 1.0,
+    "93": 1.0,
+    "94": 1.0,
+    "95": 1.0,
+    "96": 1.0,
+    "97": 1.0,
+    "98": 1.0,
+    "99": 1.0,
+    "100": 1.0,
+    "101": 1.0,
+    "102": 1.0,
+    "103": 1.0,
+    "104": 1.0,
+    "105": 1.0,
+    "106": 1.0,
+    "107": 1.0,
+    "108": 1.0,
+    "109": 1.0,
+    "110": 1.0,
+    "111": 1.0,
+    "112": 1.0,
+    "113": 1.0,
+    "114": 1.0,
+    "115": 1.0,
+    "116": 1.0,
+    "117": 1.0,
+    "118": 1.0,
+    "119": 1.0,
+    "120": 1.0,
+    "121": 1.0,
+    "122": 1.0,
+    "123": 1.0,
+    "124": 1.0,
+    "125": 1.0,
+    "126": 1.0,
+    "127": 1.0,
+    "128": 1.0,
+    "129": 1.0,
+    "130": 1.0,
+    "131": 1.0,
+    "132": 1.0,
+    "133": 1.0,
+    "134": 1.0,
+    "135": 1.0,
+    "136": 1.0,
+    "137": 1.0,
+    "138": 1.0,
+    "139": 1.0,
+    "140": 1.0,
+    "141": 1.0,
+    "142": 1.0,
+    "143": 1.0,
+    "144": 1.0,
+    "145": 1.0,
+    "146": 1.0,
+    "147": 1.0,
+    "148": 1.0,
+    "149": 1.0,
+    "150": 1.0,
+    "151": 1.0,
+    "152": 1.0,
+    "153": 1.0,
+    "154": 1.0,
+    "155": 1.0,
+    "156": 1.0,
+    "157": 1.0,
+    "158": 1.0,
+    "159": 1.0,
+    "160": 1.0,
+    "161": 1.0,
+    "162": 1.0,
+    "163": 1.0,
+    "164": 1.0,
+    "165": 1.0,
+    "166": 1.0,
+    "167": 1.0,
+    "168": 1.0,
+    "169": 1.0,
+    "170": 1.0,
+    "171": 1.0,
+    "172": 1.0,
+    "173": 1.0,
+    "174": 1.0,
+    "175": 1.0,
+    "176": 1.0,
+    "177": 1.0,
+    "178": 1.0,
+    "179": 1.0,
+    "180": 1.0,
+    "181": 1.0,
+    "182": 1.0,
+    "183": 1.0,
+    "184": 1.0,
+    "185": 1.0,
+    "186": 1.0,
+    "187": 1.0,
+    "188": 1.0,
+    "189": 1.0,
+    "190": 1.0,
+    "191": 1.0,
+    "192": 1.0,
+    "193": 1.0,
+    "194": 1.0,
+    "195": 1.0,
+    "196": 1.0,
+    "197": 1.0,
+    "198": 1.0,
+    "199": 1.0,
+    "200": 1.0,
+    "201": 1.0,
+    "202": 1.0,
+    "203": 1.0,
+    "204": 1.0,
+    "205": 1.0,
+    "206": 1.0,
+    "207": 1.0,
+    "208": 1.0,
+    "209": 1.0,
+    "210": 1.0,
+    "211": 1.0,
+    "212": 1.0,
+    "213": 1.0,
+    "214": 1.0,
+    "215": 1.0,
+    "216": 1.0,
+    "217": 1.0,
+    "218": 1.0,
+    "219": 1.0,
+    "220": 1.0,
+    "221": 1.0,
+    "222": 1.0,
+    "223": 1.0,
+    "224": 1.0,
+    "225": 1.0,
+    "226": 1.0,
+    "227": 1.0,
+    "228": 1.0,
+    "229": 1.0,
+    "230": 1.0,
+    "231": 1.0,
+    "232": 1.0,
+    "233": 1.0,
+    "234": 1.0,
+    "235": 1.0,
+    "236": 1.0,
+    "237": 1.0,
+    "238": 1.0,
+    "239": 1.0,
+    "240": 1.0,
+    "241": 1.0,
+    "242": 1.0,
+    "243": 1.0,
+    "244": 1.0,
+    "245": 1.0,
+    "246": 1.0,
+    "247": 1.0,
+    "248": 1.0,
+    "249": 1.0,
+    "250": 1.0,
+    "251": 1.0,
+    "252": 1.0,
+    "253": 1.0,
+    "254": 1.0,
+    "255": 1.0,
+    "256": 1.0,
+    "257": 1.0,
+    "258": 1.0,
+    "259": 1.0,
+    "260": 1.0,
+    "261": 1.0,
+    "262": 1.0,
+    "263": 1.0,
+    "264": 1.0,
+    "265": 1.0,
+    "266": 1.0,
+    "267": 1.0,
+    "268": 1.0,
+    "269": 1.0,
+    "270": 1.0,
+    "271": 1.0,
+    "272": 1.0,
+    "273": 1.0,
+    "274": 1.0,
+    "275": 1.0,
+    "276": 1.0,
+    "277": 1.0,
+    "278": 1.0,
+    "279": 1.0,
+    "280": 1.0,
+    "281": 1.0,
+    "282": 1.0,
+    "283": 1.0,
+    "284": 1.0,
+    "285": 1.0,
+    "286": 1.0,
+    "287": 1.0,
+    "288": 1.0,
+    "289": 1.0,
+    "290": 1.0,
+    "291": 1.0,
+    "292": 1.0,
+    "293": 1.0,
+    "294": 1.0,
+    "295": 1.0,
+    "296": 1.0,
+    "297": 1.0,
+    "298": 1.0,
+    "299": 1.0,
+    "300": 1.0,
+    "301": 1.0,
+    "302": 1.0,
+    "303": 1.0,
+    "304": 1.0,
+    "305": 1.0,
+    "306": 1.0,
+    "307": 1.0,
+    "308": 1.0,
+    "309": 1.0,
+    "310": 1.0,
+    "311": 1.0
+  },
+  "gods": [
+    {
+      "id": "services_audioservice_audioservice",
+      "label": "AudioService",
+      "degree": 25
+    },
+    {
+      "id": "electron_remote_server_remoteserver",
+      "label": "RemoteServer",
+      "degree": 9
+    },
+    {
+      "id": "services_thumbnailservice_thumbnailservice",
+      "label": "ThumbnailService",
+      "degree": 9
+    },
+    {
+      "id": "db_index_scripturedatabase",
+      "label": "ScriptureDatabase",
+      "degree": 8
+    },
+    {
+      "id": "services_ipcservice_ipcservice",
+      "label": "IpcService",
+      "degree": 8
+    },
+    {
+      "id": "services_canvasservice_canvasservice",
+      "label": "CanvasService",
+      "degree": 8
+    },
+    {
+      "id": "navigation_searchoverlay_getbookname",
+      "label": "getBookName()",
+      "degree": 7
+    },
+    {
+      "id": "utils_blendengine_applyblendmode",
+      "label": "applyBlendMode()",
+      "degree": 6
+    },
+    {
+      "id": "utils_blendengine_getcomputedcolor",
+      "label": "getComputedColor()",
+      "degree": 6
+    },
+    {
+      "id": "utils_canvascolorcomputer_getcomputedcoloratpoint",
+      "label": "getComputedColorAtPoint()",
+      "degree": 6
+    }
+  ],
+  "surprises": [
+    {
+      "source": "async()",
+      "target": "ensureLayers()",
+      "source_files": [
+        "src/features/presenter/components/SlideDesignPanel.tsx",
+        "src/core/utils/styleMigration.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `async()` unexpectedly reaches hub `ensureLayers()`"
+    },
+    {
+      "source": "TimerFillPicker()",
+      "target": "ensureLayers()",
+      "source_files": [
+        "src/features/presenter/components/slide-properties/TimerFillPicker.tsx",
+        "src/core/utils/styleMigration.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `TimerFillPicker()` unexpectedly reaches hub `ensureLayers()`"
+    },
+    {
+      "source": "useControllerLogic()",
+      "target": "useLogoUrl()",
+      "source_files": [
+        "src/app/hooks/useControllerLogic.ts",
+        "src/core/hooks/useLogoUrl.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `useLogoUrl()` unexpectedly reaches hub `useControllerLogic()`"
+    },
+    {
+      "source": "useControllerLogic()",
+      "target": "useGlobalShortcuts()",
+      "source_files": [
+        "src/app/hooks/useControllerLogic.ts",
+        "src/app/hooks/useGlobalShortcuts.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `useGlobalShortcuts()` unexpectedly reaches hub `useControllerLogic()`"
+    },
+    {
+      "source": "useControllerLogic()",
+      "target": "useAppInitialization()",
+      "source_files": [
+        "src/app/hooks/useControllerLogic.ts",
+        "src/app/hooks/useAppInitialization.ts"
+      ],
+      "confidence": "INFERRED",
+      "relation": "calls",
+      "why": "inferred connection - not explicitly stated in source; peripheral node `useAppInitialization()` unexpectedly reaches hub `useControllerLogic()`"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `isOpaqueNormalLayer()` connect `Community 0` to `Community 3`?",
+      "why": "High betweenness centrality (0.002) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `AudioService` connect `Community 1` to `Community 5`?",
+      "why": "High betweenness centrality (0.002) - this node is a cross-community bridge."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.12 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 2` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 3` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.13 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 4` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.12 - nodes in this community are weakly interconnected."
+    }
+  ]
+}

@@ -96,13 +96,13 @@ export const EktpService = {
         // 4. Handle Nested Presentations recursively
         const nestedFolder = zip.folder('nested');
         for (const slide of presentation.slides) {
-            if (slide.type === 'nested') {
-                const ns = slide as INestedSlide;
-                if (!ns.presentationId) continue;
-
+            const ns = slide as any;
+            const nestedId = slide.type === 'nested' ? ns.presentationId : (ns.masterPresentationId || ns.linkedPresentationId || ns.localNestedPresentationId);
+            
+            if (nestedId) {
                 try {
                     // Recursive call passing our shared parentHashSet to allow global media deduplication
-                    const { blob: nestedBlob, manifest: nestedManifest } = await this.pack(ns.presentationId, parentHashSet);
+                    const { blob: nestedBlob, manifest: nestedManifest } = await this.pack(nestedId, parentHashSet);
                     const nestedHash = await sha256(nestedBlob);
 
                     ns.ektpHash = nestedHash; // Replace link ID with self-verifying hash
@@ -111,7 +111,10 @@ export const EktpService = {
                     Object.assign(manifest, nestedManifest);
 
                     // The nested archive must not carry over our local system ID mapping!
-                    delete (ns as any).presentationId;
+                    delete ns.presentationId;
+                    delete ns.masterPresentationId;
+                    delete ns.linkedPresentationId;
+                    delete ns.localNestedPresentationId;
                 } catch (e) {
                     console.error(`Failed to pack nested presentation on slide ${slide.id}`, e);
                 }
@@ -197,7 +200,7 @@ export const EktpService = {
     /**
      * Translates a .ektp blob to database, expanding Media/Nested content cleanly avoiding DB conflicts
      */
-    async unpack(blob: Blob | File, depth: number = 0, importStack: Set<string> = new Set()): Promise<string> {
+    async unpack(blob: Blob | File, depth: number = 0, importStack: Set<string> = new Set(), binId?: string): Promise<string> {
         // Deep recursive circuit breaker limits depth tracking
         if (depth > 2) throw new Error('Nested EKTP depth limit exceeded (configured max 2 levels).');
 
@@ -212,6 +215,10 @@ export const EktpService = {
         // Have we already fully imported this presentation across ANY library tree?
         const existing = await db.presentationFiles.where('ektpHash').equals(fileHash).first();
         if (existing && existing.id) {
+            // Ensure the existing presentation is associated with the active bin if requested
+            if (binId && existing.binId !== binId) {
+                await db.presentationFiles.update(existing.id, { binId });
+            }
             return existing.id; // Just re-link it and skip import!
         }
 
@@ -232,6 +239,9 @@ export const EktpService = {
         presentation.isMaster = false;
         presentation.ektpHash = fileHash; // Crucial to mark identity
 
+        const { getUniquePresentationName } = await import('@/core/utils/nameUtils');
+        presentation.name = await getUniquePresentationName(presentation.name);
+
         if (!presentation.id) {
             throw new Error('Invalid .ektp file: missing core presentation schema requirements (id)');
         }
@@ -248,6 +258,20 @@ export const EktpService = {
         // Assign a net new ID inside IndexedDB so we aren't colliding UUID clusters globally across churches
         const newPresentationId = crypto.randomUUID();
         presentation.id = newPresentationId;
+        
+        // Strip out foreign keys that don't belong on this system
+        delete presentation.serviceId;
+        presentation.binId = binId || undefined;
+        delete presentation.workflowId;
+
+        // Regenerate Audio Scope IDs to prevent collision on duplicate imports
+        if (Array.isArray(presentation.audioScopes)) {
+            presentation.audioScopes = presentation.audioScopes.map(scope => ({
+                ...scope,
+                id: crypto.randomUUID(),
+                presentationId: newPresentationId
+            }));
+        }
 
         // Restore file system handle link binding hook
         if ('name' in blob && (blob as any).handle) {
@@ -266,23 +290,39 @@ export const EktpService = {
             }
         }
 
+        // Regenerate slide-level audio scopes as well
+        presentation.slides.forEach(slide => {
+            if ('audioScopes' in slide && Array.isArray((slide as any).audioScopes)) {
+                (slide as any).audioScopes = (slide as any).audioScopes.map((scope: any) => ({
+                    ...scope,
+                    id: crypto.randomUUID(),
+                    presentationId: newPresentationId
+                }));
+            }
+        });
+
         // Recurse into Nested blocks independently triggering downstream dedup evaluation before unpacking memory
-        const nestedSlides = presentation.slides.filter(s => s.type === 'nested') as INestedSlide[];
+        const nestedSlides = presentation.slides.filter(s => (s as any).ektpHash);
 
         await Promise.all(nestedSlides.map(async (slide) => {
-            if (!slide.ektpHash) return;
+            const ns = slide as any;
+            if (!ns.ektpHash) return;
             try {
-                const nestedBlob = await zip.file(`nested/${slide.ektpHash}.ektp`)?.async('blob');
+                const nestedBlob = await zip.file(`nested/${ns.ektpHash}.ektp`)?.async('blob');
                 if (!nestedBlob) throw new Error("Nested archive missing in ZIP target tree");
 
-                // Recursion handles deduplication under the hood
-                const childId = await this.unpack(nestedBlob, depth + 1, importStack);
+                // Recursion handles deduplication under the hood, passing binId down so it is imported to the pool
+                const childId = await this.unpack(nestedBlob, depth + 1, importStack, binId);
 
                 // Cross link resolution completion state
-                slide.presentationId = childId;
-                delete (slide as any).ektpHash;
+                if (slide.type === 'nested') {
+                    ns.presentationId = childId;
+                } else {
+                    ns.masterPresentationId = childId;
+                }
+                delete ns.ektpHash;
             } catch (e) {
-                console.error(`Failed to load nested presentation ${slide.ektpHash}`, e);
+                console.error(`Failed to load nested presentation ${ns.ektpHash}`, e);
             }
         }));
 

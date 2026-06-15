@@ -142,7 +142,12 @@ const CustomizationPanel: React.FC = () => {
             {/* Left Side: Live Preview */}
             <div ref={previewRef} className="flex-1 relative overflow-hidden p-6 flex items-center justify-center">
                 {/* Close/Cancel Backdrop Click */}
-                <div className="absolute inset-0 cursor-zoom-out" onClick={handleCancel} />
+                <button
+                    type="button"
+                    aria-label={t('cancel', 'Cancel')}
+                    className="absolute inset-0 w-full h-full bg-transparent border-0 cursor-zoom-out pointer-events-auto"
+                    onClick={handleCancel}
+                />
 
                 <LogicalCanvas
                     containerClassName="bg-black shadow-[0_40px_100px_rgba(0,0,0,0.8)] border border-white/10 ring-1 ring-white/5"

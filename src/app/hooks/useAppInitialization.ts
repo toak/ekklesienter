@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { EktmpService } from '@/features/presenter/services/ektmpService';
 import { useLoadingStore } from '@/core/store/loadingStore';
 import { db } from '@/core/db';

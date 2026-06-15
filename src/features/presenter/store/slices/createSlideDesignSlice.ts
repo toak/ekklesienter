@@ -5,9 +5,9 @@ export const createSlideDesignSlice: PresentationSliceCreator = (set, get) => ({
     lastTransitionTrigger: 0,
 
     updateSlideBackground: async (slideId, background) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -97,6 +97,8 @@ export const createSlideDesignSlice: PresentationSliceCreator = (set, get) => ({
 
         const pres = await db.presentationFiles.get(selectedPresentationId);
         if (!pres) return;
+
+        await get().takeSnapshot(selectedPresentationId);
 
         const newSlides = pres.slides.map(s => {
             if (s.type === 'normal') {

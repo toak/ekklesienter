@@ -11,6 +11,7 @@ vi.mock('@/core/db', () => ({
       get: vi.fn(),
       update: vi.fn(),
       add: vi.fn(),
+      toArray: vi.fn().mockResolvedValue([]),
       where: vi.fn().mockReturnThis(),
       equals: vi.fn().mockReturnThis(),
       filter: vi.fn().mockReturnThis(),
@@ -22,6 +23,11 @@ vi.mock('@/core/db', () => ({
     },
     logos: {
       get: vi.fn(),
+    },
+    audioScopes: {
+      where: vi.fn().mockReturnThis(),
+      equals: vi.fn().mockReturnThis(),
+      toArray: vi.fn().mockResolvedValue([]),
     },
   },
 }));
@@ -35,8 +41,7 @@ vi.mock('jszip', () => {
       generateAsync: vi.fn().mockResolvedValue(new Blob(['test-zip'], { type: 'application/zip' })),
     };
   });
-  // @ts-ignore
-  mockJSZip.loadAsync = vi.fn();
+  (mockJSZip as any).loadAsync = vi.fn();
   return {
     default: mockJSZip,
   };
@@ -162,6 +167,55 @@ describe('EktpService', () => {
 
       expect(typeof result).toBe('string');
       expect(JSZip.loadAsync).toHaveBeenCalledWith(blob);
+    });
+
+    it('should regenerate audio scope IDs and set binId on unpack', async () => {
+      const mockPresentationJson = JSON.stringify({
+        id: 'p1',
+        binId: 'old-bin',
+        audioScopes: [{ id: 'old-scope-1', fileId: 'audio-file' }],
+        slides: [
+          {
+            id: 's1',
+            type: 'normal',
+            audioScopes: [{ id: 'old-scope-2', fileId: 'audio-file-2' }]
+          }
+        ],
+      });
+
+      const mockZip = {
+        file: vi.fn().mockImplementation((path) => {
+          if (path === 'presentation.json') return { async: vi.fn().mockResolvedValue(mockPresentationJson) };
+          return null;
+        }),
+        folder: vi.fn().mockReturnThis(),
+        files: { 'presentation.json': {} },
+      };
+      (JSZip.loadAsync as any).mockResolvedValue(mockZip);
+
+      const blob = new Blob(['fake-zip'], { type: 'application/zip' });
+      await EktpService.unpack(blob, 0, new Set(), 'new-target-bin');
+
+      expect(db.presentationFiles.add).toHaveBeenCalledWith(expect.objectContaining({
+        binId: 'new-target-bin',
+        audioScopes: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.not.stringContaining('old-scope-1'),
+            fileId: 'audio-file'
+          })
+        ]),
+        slides: expect.arrayContaining([
+          expect.objectContaining({
+            id: 's1',
+            audioScopes: expect.arrayContaining([
+              expect.objectContaining({
+                id: expect.not.stringContaining('old-scope-2'),
+                fileId: 'audio-file-2'
+              })
+            ])
+          })
+        ])
+      }));
     });
   });
 });

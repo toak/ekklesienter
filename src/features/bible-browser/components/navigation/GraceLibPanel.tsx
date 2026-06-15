@@ -8,7 +8,7 @@ interface GraceLibPanelProps {
   onSetGraceLibSection: (section: 'templates' | 'presentations' | 'media') => void;
 }
 
-export const GraceLibPanel: React.FC<GraceLibPanelProps> = ({
+export const GraceLibPanel: React.FC<GraceLibPanelProps> = React.memo(({
   graceLibSection,
   onSetGraceLibSection
 }) => {
@@ -20,7 +20,7 @@ export const GraceLibPanel: React.FC<GraceLibPanelProps> = ({
         <div className="px-1 flex items-center justify-between shrink-0">
           <span className="text-[10px] font-bold text-stone-500 uppercase tracking-widest flex items-center gap-1.5">
             <Layout className="w-3 h-3" />
-            GraceLib
+            {t('grace_lib', 'GraceLib')}
           </span>
         </div>
         <div className="grid grid-cols-1 gap-2 shrink-0">
@@ -52,4 +52,6 @@ export const GraceLibPanel: React.FC<GraceLibPanelProps> = ({
       </div>
     </div>
   );
-};
+});
+
+GraceLibPanel.displayName = 'GraceLibPanel';

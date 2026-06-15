@@ -53,7 +53,7 @@ export const TimerTabContent: React.FC<ITimerTabContentProps> = ({
     const ts = selectedSlide.type === 'normal' 
         ? (selectedSlide as ICanvasSlide).timerSettings 
         : selectedSlide.type === 'timer' 
-            ? (selectedSlide as unknown as ITimerSettings)
+            ? (selectedSlide as ITimerSlide)
             : undefined;
 
     const sensors = useSensors(

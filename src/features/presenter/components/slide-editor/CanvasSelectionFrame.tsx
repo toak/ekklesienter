@@ -10,6 +10,6 @@ export const CanvasSelectionFrame: React.FC<CanvasSelectionFrameProps> = ({ isSe
     if (!isSelected || isEditing) return null;
     
     return (
-        <div className="absolute inset-0 ring-[1.5px] ring-accent ring-offset-0 pointer-events-none z-40" />
+        <div className="absolute inset-0 border-[1.5px] border-accent pointer-events-none z-40" />
     );
 };

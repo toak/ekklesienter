@@ -4,16 +4,18 @@ import { Music } from 'lucide-react';
 import { PreviewScaler } from './PreviewScaler';
 import SlideContentRenderer from '../../features/presenter/components/slide-editor/SlideContentRenderer';
 
+import { ISlide, PresenterSettings } from '../../core/types';
+
 interface SlideThumbnailProps {
-    slide: any;
+    slide: ISlide | null | undefined;
     label: string;
     hasAudio?: boolean;
-    settings?: any;
+    settings?: PresenterSettings | null | undefined;
 }
 
 export const SlideThumbnail = ({ slide, label, hasAudio, settings }: SlideThumbnailProps) => {
     const { t } = useTranslation();
-    const showAudio = hasAudio || slide?.audio || (slide?.audioScopes && slide.audioScopes.length > 0);
+    const showAudio = hasAudio || (slide?.type === 'normal' && (slide.audio || (slide.audioScopes && slide.audioScopes.length > 0)));
 
     return (
         <div className="flex-1 flex flex-col gap-2 min-w-0">

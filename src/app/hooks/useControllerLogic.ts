@@ -24,10 +24,10 @@ import { useModalStore, ModalType } from '@/core/store/modalStore';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
 import { useLogoUrl } from '@/core/hooks/useLogoUrl';
 import { LiveSyncService } from '@/core/services/liveSyncService';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { BibleNavigationService } from '@/features/bible-browser/services/BibleNavigationService';
-import { RemoteSyncService } from '@/core/services/RemoteSyncService';
-import { PresentationService } from '@/core/services/PresentationService';
+import { RemoteSyncService } from '@/core/services/remoteSyncService';
+import { PresentationService } from '@/core/services/presentationService';
 import { useAppInitialization } from './useAppInitialization';
 import { useAudioSync } from './useAudioSync';
 import { useGlobalShortcuts } from './useGlobalShortcuts';
@@ -49,8 +49,8 @@ export function useControllerLogic() {
   const [designPanelOpen, setDesignPanelOpen] = useAtom(slideDesignPanelOpenAtom);
   const isTimelineHovered = useAtom(isTimelineHoveredAtom)[0];
   const selectedCanvasItemIds = useAtom(selectedCanvasItemIdsAtom)[0];
-  const [activeOverride, setActiveOverride] = useAtom(activeOverrideAtom) as any;
-  const [activeLogo, setActiveLogo] = useAtom(liveLogoAtom) as any;
+  const [activeOverride, setActiveOverride] = useAtom(activeOverrideAtom);
+  const [activeLogo, setActiveLogo] = useAtom(liveLogoAtom);
 
   // --- Component Local State ---
   const [projectorOpen, setProjectorOpen] = useState(false);
@@ -148,12 +148,48 @@ export function useControllerLogic() {
   }, []);
 
   const handleNext = useCallback(async (detached?: boolean, preferLiveAnchor?: boolean) => {
-    await PresentationService.navigateNext(appMode as any, detached, preferLiveAnchor);
+    await PresentationService.navigateNext(appMode, detached, preferLiveAnchor);
   }, [appMode]);
 
   const handlePrev = useCallback(async (detached?: boolean, preferLiveAnchor?: boolean) => {
-    await PresentationService.navigatePrev(appMode as any, detached, preferLiveAnchor);
+    await PresentationService.navigatePrev(appMode, detached, preferLiveAnchor);
   }, [appMode]);
+
+  // --- Remote State Management ---
+
+  const updateRemoteState = useCallback(async () => {
+    const { 
+      activePresentation: aPres, 
+      selectedPresentation: sPres, 
+      presentationStack: pStack 
+    } = usePresentationStore.getState();
+
+    await RemoteSyncService.updateRemoteState({
+        appMode,
+        activeVerse,
+        activePresentation: aPres,
+        selectedPresentation: sPres,
+        presentationStack: pStack,
+        projectorIsLive,
+        liveSlideId,
+        previewSlideId,
+        lang,
+        themeAccent,
+        isPlaying,
+        activeOverride,
+        activeLogo,
+        activeLogoUrl,
+        settings
+    });
+  }, [appMode, activeVerse, activePresentation, projectorIsLive, liveSlideId, previewSlideId, lang, themeAccent, isPlaying, activeOverride, activeLogoUrl, activeLogo, settings, selectedPresentation]);
+
+  useEffect(() => { updateRemoteState(); }, [updateRemoteState]);
+
+  useEffect(() => {
+    if (!IpcService.isElectron()) return;
+    const unsub = IpcService.on('remote:request-state', () => updateRemoteState());
+    return () => unsub();
+  }, [updateRemoteState]);
 
   // --- Shortcuts ---
   useGlobalShortcuts({
@@ -167,7 +203,8 @@ export function useControllerLogic() {
     handlePrev,
     openProjector,
     closeProjector,
-    toggleOverride
+    toggleOverride,
+    onRequestRemoteUpdate: updateRemoteState
   });
 
   // --- Handshakes & Status Listeners ---
@@ -221,7 +258,7 @@ export function useControllerLogic() {
     if (!IpcService.isElectron()) return;
     const unsub = IpcService.on('remote:request-media', async ({ id, requestId }) => {
         try {
-            let entry: any = await db.backgrounds.get(id);
+            let entry: { data?: Blob; mimeType?: string } | undefined = await db.backgrounds.get(id);
             if (!entry) entry = await db.mediaPool.get(id);
 
             if (entry?.data) {
@@ -242,41 +279,6 @@ export function useControllerLogic() {
   }, []);
 
 
-  // --- Remote State Management ---
-
-  const updateRemoteState = useCallback(async () => {
-    const { 
-      activePresentation: aPres, 
-      selectedPresentation: sPres, 
-      presentationStack: pStack 
-    } = usePresentationStore.getState();
-
-    await RemoteSyncService.updateRemoteState({
-        appMode,
-        activeVerse,
-        activePresentation: aPres,
-        selectedPresentation: sPres,
-        presentationStack: pStack,
-        projectorIsLive,
-        liveSlideId,
-        previewSlideId,
-        lang,
-        themeAccent,
-        isPlaying,
-        activeOverride,
-        activeLogo,
-        activeLogoUrl,
-        settings
-    });
-  }, [appMode, activeVerse, activePresentation, projectorIsLive, liveSlideId, previewSlideId, lang, themeAccent, isPlaying, activeOverride, activeLogoUrl, activeLogo, settings, selectedPresentation]);
-
-  useEffect(() => { updateRemoteState(); }, [updateRemoteState]);
-
-  useEffect(() => {
-    if (!IpcService.isElectron()) return;
-    const unsub = IpcService.on('remote:request-state', () => updateRemoteState());
-    return () => unsub();
-  }, [updateRemoteState]);
 
   const isBibleSlide = useMemo(() => {
     if (!activePresentation || !previewSlideId) return false;

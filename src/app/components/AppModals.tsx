@@ -9,6 +9,7 @@ import AudioConflictModal from '@/features/presenter/components/modals/AudioConf
 import SaveNestedConfirmModal from '@/features/presenter/components/modals/SaveNestedConfirmModal';
 import PresentationImportModal from '@/features/presenter/components/modals/PresentationImportModal';
 import PresentationPickerModal from '@/features/presenter/components/modals/PresentationPickerModal';
+import { BackgroundCropModal } from '@/features/presenter/components/slide-properties/BackgroundCropModal';
 
 interface AppModalsProps {
     settingsOpen: boolean;
@@ -38,6 +39,7 @@ export const AppModals: React.FC<AppModalsProps> = ({
             <SaveNestedConfirmModal />
             <PresentationImportModal />
             <PresentationPickerModal />
+            <BackgroundCropModal />
 
             {/* Global Overlays (controlled via local App state) */}
             <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />

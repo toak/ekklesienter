@@ -1,13 +1,18 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePresenterStore } from '@/features/presenter/store/presenterStore';
+import { useShallow } from 'zustand/react/shallow';
 import { Maximize, Scan, Square, RectangleHorizontal, Layout } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { CustomSlider } from '@/components/CustomSlider';
 
 export const LayoutSettingsPicker: React.FC = () => {
     const { t } = useTranslation();
-    const { settings: globalSettings, draftSettings, updateDraft } = usePresenterStore();
+    const { settings: globalSettings, draftSettings, updateDraft } = usePresenterStore(useShallow(s => ({
+        settings: s.settings,
+        draftSettings: s.draftSettings,
+        updateDraft: s.updateDraft
+    })));
 
     const settings = draftSettings || globalSettings;
     const { display } = settings;

@@ -31,7 +31,7 @@ export const TimelineToolbar: React.FC<TimelineToolbarProps> = ({
                 </span>
                 <div className="h-4 w-px bg-white/5" />
                 <span className="text-[10px] font-bold text-stone-600 uppercase tracking-widest">
-                    {slideCount} {t('slides', 'Slides')}
+                    {t('slides_count', { count: slideCount, defaultValue: '{{count}} Slides' })}
                 </span>
 
                 {/* Detached Mode Warning */}

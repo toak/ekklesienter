@@ -24,7 +24,7 @@ interface ITemplatePreviewItemProps {
  * Renders a preview item for a template or template slide in the library.
  * Includes a live preview rendered via SlideContentRenderer and action buttons.
  */
-export const TemplatePreviewItem: React.FC<ITemplatePreviewItemProps> = ({
+export const TemplatePreviewItem: React.FC<ITemplatePreviewItemProps> = React.memo(({
     template,
     selectedBlock,
     selectedSlide,
@@ -132,4 +132,4 @@ export const TemplatePreviewItem: React.FC<ITemplatePreviewItemProps> = ({
             )}
         </button>
     );
-};
+});

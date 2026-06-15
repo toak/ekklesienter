@@ -41,7 +41,7 @@ export const TimelineDragOverlayContent: React.FC<TimelineDragOverlayContentProp
     const visibleSlides = draggedSlides.slice(0, maxVisible);
 
     return (
-        <div className="relative pointer-events-none" style={{ width: 128, height: 72 }}>
+        <div className="relative pointer-events-none" style={{ width: 128, height: 72, transform: 'scale(0.85)', transformOrigin: 'center' }}>
             {/* Render back-to-front so the first card is on top */}
             {visibleSlides.map((s, idx) => {
                 const reverseIdx = maxVisible - 1 - idx;

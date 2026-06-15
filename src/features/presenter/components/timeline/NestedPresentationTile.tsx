@@ -9,7 +9,7 @@ import {
     Presentation
 } from 'lucide-react';
 import SlideContentRenderer from '../slide-editor/SlideContentRenderer';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 const ICON_MAP: Record<string, React.FC<{ className?: string; strokeWidth?: number }>> = {
     Presentation
@@ -42,14 +42,14 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
     onContextMenu,
 }) => {
     const { t } = useTranslation();
-    const { setPreviewSlide, setLiveSlide, setActivePresentation, toggleSlideExpansion } = usePresentationStore();
+    const { setPreviewSlide, setLiveSlide, setActivePresentation, toggleSlideExpansion, activePresentationId } = usePresentationStore();
 
     if (!slide.isExpanded) return null;
 
     const isLinked = slide.type === 'normal' && Boolean((slide as ICanvasSlide).linkedPresentationId);
 
     return (
-        <div className="flex items-center gap-2 px-2 bg-white/2 rounded-2xl border border-white/5 py-3">
+        <div data-parent-id={slide.id} className="flex items-center gap-2 px-2 bg-white/2 rounded-2xl border border-white/5 py-3">
             {/* Left accent bar */}
             <div className={cn(
                 'w-1 h-12 rounded-full shrink-0',
@@ -73,7 +73,7 @@ const NestedPresentationTile: React.FC<NestedPresentationTileProps> = ({
                             }}
                             onDoubleClick={async () => {
                                 setPreviewSlide(nestedSlide.id, nestedPresentation.id);
-                                setLiveSlide(nestedSlide.id);
+                                setLiveSlide(nestedSlide.id, nestedPresentation.id, activePresentationId || undefined, slide.id);
 
                                 if (IpcService.isElectron()) {
                                     const displaySettings = usePresenterStore.getState().settings.display;

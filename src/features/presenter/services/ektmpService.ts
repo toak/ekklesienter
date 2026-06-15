@@ -6,7 +6,7 @@ import {
 } from '@/core/types';
 import { ThumbnailService } from './ThumbnailService';
 import { APP_VERSION, EKT_SCHEMA_VERSION } from '@/core/constants';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { 
     sha256, collectMediaRefs, patchMediaIds, 
     getMediaBlob, mimeToExt, MediaManifest 

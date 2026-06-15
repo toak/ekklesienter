@@ -11,7 +11,8 @@ import {
     Trash2,
     Upload,
     Download,
-    Layers
+    Layers,
+    Copy
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
@@ -19,6 +20,8 @@ import { cn } from '@/core/utils/cn';
 import { IServiceFile, IPresentationFile } from '@/core/types';
 import { EktService } from '../../services/ektService';
 import { toast } from '@/core/utils/toast';
+import ContextMenu, { ContextMenuItem } from '@/shared/ui/ContextMenu';
+import { getUniqueServiceName, getUniquePresentationName } from '@/core/utils/nameUtils';
 
 interface ServicePickerProps {
     currentServiceId: string | null;
@@ -42,6 +45,11 @@ const ServicePicker: React.FC<ServicePickerProps> = ({
     const [newName, setNewName] = useState('');
     const [renamingId, setRenamingId] = useState<string | null>(null);
     const [renameValue, setRenameValue] = useState('');
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        service: IServiceFile;
+    } | null>(null);
     const isRu = i18n.language?.substring(0, 2) === 'ru';
 
     const services = useLiveQuery(() => db.serviceFiles.orderBy('updatedAt').reverse().toArray()) || [];
@@ -213,7 +221,12 @@ const ServicePicker: React.FC<ServicePickerProps> = ({
 
     return createPortal(
         <div className="fixed inset-0 z-9999 pointer-events-none">
-            <div className="absolute inset-0 bg-transparent pointer-events-auto" onClick={onClose} />
+            <button
+                type="button"
+                aria-label={t('close_menu', 'Close menu')}
+                className="absolute inset-0 w-full h-full bg-transparent border-0 cursor-default pointer-events-auto"
+                onClick={onClose}
+            />
 
             <div
                 className="absolute bg-stone-900/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col max-h-[420px] overflow-hidden animate-in fade-in zoom-in-95 duration-200 pointer-events-auto"
@@ -299,6 +312,11 @@ const ServicePicker: React.FC<ServicePickerProps> = ({
                                     : "hover:bg-white/5 border-transparent hover:border-white/5"
                             )}
                             onClick={() => { if (renamingId !== service.id) { onSelect(service.id); onClose(); } }}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setContextMenu({ x: e.clientX, y: e.clientY, service });
+                            }}
                         >
                             {renamingId === service.id ? (
                                 <div className="flex-1 flex gap-1 min-w-0">
@@ -331,7 +349,7 @@ const ServicePicker: React.FC<ServicePickerProps> = ({
                                                 {isRu ? service.nameRu : service.name}
                                             </span>
                                             <span className="text-[8px] font-bold text-stone-600 uppercase tracking-widest leading-none mt-0.5">
-                                                {service.presentationIds.length} {t('presentations', 'presentations')}
+                                                {t('presentations_count', { count: service.presentationIds.length, defaultValue: '{{count}} presentations' })}
                                             </span>
                                         </div>
                                     </div>
@@ -388,6 +406,91 @@ const ServicePicker: React.FC<ServicePickerProps> = ({
                         {t('import_service', 'Import Service (.ekt)')}
                     </button>
                 </div>
+
+                {contextMenu && (
+                    <ContextMenu
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        onClose={() => setContextMenu(null)}
+                    >
+                        <ContextMenuItem
+                            icon={<Copy className="w-3 h-3" />}
+                            label={t('duplicate', 'Duplicate')}
+                            onClick={async () => {
+                                const serviceId = crypto.randomUUID();
+                                const now = new Date();
+                                const newName = await getUniqueServiceName(contextMenu.service.name);
+
+                                const duplicatedPresIds: string[] = [];
+                                let newMasterPresId = '';
+
+                                for (const presId of contextMenu.service.presentationIds) {
+                                    const originalPres = await db.presentationFiles.get(presId);
+                                    if (originalPres) {
+                                        const clonePres = structuredClone(originalPres);
+                                        clonePres.id = crypto.randomUUID();
+                                        clonePres.serviceId = serviceId;
+                                        clonePres.createdAt = now;
+                                        clonePres.updatedAt = now;
+                                        clonePres.lastOpened = now;
+                                        
+                                        if (originalPres.id === contextMenu.service.masterPresentationId) {
+                                            clonePres.name = `${newName} (Master)`;
+                                            clonePres.isMaster = true;
+                                            newMasterPresId = clonePres.id;
+                                        } else {
+                                            clonePres.name = await getUniquePresentationName(originalPres.name);
+                                        }
+                                        await db.presentationFiles.add(clonePres);
+                                        duplicatedPresIds.push(clonePres.id);
+                                    }
+                                }
+
+                                await db.serviceFiles.add({
+                                    id: serviceId,
+                                    name: newName,
+                                    nameRu: newName,
+                                    description: contextMenu.service.description || '',
+                                    presentationIds: duplicatedPresIds,
+                                    masterPresentationId: newMasterPresId,
+                                    createdAt: now,
+                                    updatedAt: now,
+                                    lastOpened: now
+                                });
+
+                                toast.success(t('service_duplicated', 'Service duplicated'));
+                                setContextMenu(null);
+                            }}
+                        />
+                        <ContextMenuItem
+                            icon={<Edit3 className="w-3 h-3" />}
+                            label={t('rename', 'Rename')}
+                            onClick={() => {
+                                setRenamingId(contextMenu.service.id);
+                                setRenameValue(contextMenu.service.name);
+                                setContextMenu(null);
+                            }}
+                        />
+                        <ContextMenuItem
+                            icon={<Upload className="w-3 h-3" />}
+                            label={t('export', 'Export')}
+                            onClick={() => {
+                                handleExportService(contextMenu.service.id);
+                                setContextMenu(null);
+                            }}
+                        />
+                        <div className="h-px bg-white/5 my-1 mx-2" />
+                        <ContextMenuItem
+                            icon={<Trash2 className="w-3 h-3" />}
+                            label={t('delete', 'Delete')}
+                            danger
+                            onClick={() => {
+                                handleDeleteService(contextMenu.service.id);
+                                setContextMenu(null);
+                            }}
+                        />
+                    </ContextMenu>
+                )}
             </div>
         </div>,
         document.body

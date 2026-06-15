@@ -1,5 +1,3 @@
-import { BibleData } from '@/core/types';
-import { zefaniaParser } from '@/core/parsers/zefaniaParser';
 import { myBibleParser } from '@/core/parsers/myBibleParser';
 
 /* eslint-disable no-restricted-globals */
@@ -8,12 +6,7 @@ self.onmessage = async (e: MessageEvent) => {
     const { fileType, content, fileName } = e.data;
 
     try {
-        let data: BibleData;
-
-        if (fileType === 'xml') {
-            data = await zefaniaParser.parse(content as string, fileName);
-            self.postMessage({ type: 'success', data });
-        } else if (fileType === 'sqlite') {
+        if (fileType === 'sqlite') {
             await myBibleParser.parse(content as ArrayBuffer, fileName, (type, data, progress) => {
                 if (type === 'metadata') {
                     self.postMessage({ type: 'metadata', data });

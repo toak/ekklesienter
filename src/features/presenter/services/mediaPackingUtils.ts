@@ -1,6 +1,6 @@
 import { db } from '@/core/db';
 import { IStyleLayer, ISlide, ICanvasSlide, ITimerSlide, SlideType, IAudioScope } from '@/core/types';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 export interface MediaManifest {
     [contentHash: string]: {
@@ -245,7 +245,7 @@ export async function collectMediaRefs(
                 }
             }
         } else if (type === 'verse') {
-            const s = slide as unknown as ICanvasSlide; // Verses use canvas layout
+            const s = slide as ISlide & { backgroundOverride?: IStyleLayer[] }; // Verses use canvas layout background override
             if (s.backgroundOverride) collectFromLayers(s.backgroundOverride, 'background');
         } else if (type === 'video') {
             const s = slide as any; // Legacy video slides are loosely typed

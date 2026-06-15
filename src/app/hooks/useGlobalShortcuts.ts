@@ -2,12 +2,23 @@ import { useCallback, useEffect } from 'react';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
 import { usePresentationStore } from '@/features/presenter/store/presentationStore';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { db } from '@/core/db';
-import { OverrideType } from '@/core/store/uiAtoms';
-import { Verse } from '@/core/types';
+import { getDefaultStore } from 'jotai';
+import { 
+    OverrideType,
+    slidePreviewHoveredAtom,
+    selectedCanvasItemIdsAtom,
+    editingCanvasItemIdAtom,
+    canvasToolAtom,
+    historyOpenAtom,
+    searchOpenAtom,
+    latestInteractionAreaAtom,
+    canvasZoomAtom
+} from '@/core/store/uiAtoms';
+import { Verse, ShapeType } from '@/core/types';
 import { createCanvasItem } from '@/features/presenter/components/slide-properties/helpers';
 import { LiveSyncService } from '@/core/services/liveSyncService';
 
@@ -15,7 +26,7 @@ interface IGlobalShortcutsProps {
     appMode: 'scripture' | 'presentation';
     previewSlideId: string | null;
     activePresentation: any;
-    activeVerse: any;
+    activeVerse: Verse | null;
     selectedCanvasItemIds: string[];
     isTimelineHovered: boolean;
     handleNext: (detached?: boolean, preferLiveAnchor?: boolean) => Promise<void>;
@@ -23,6 +34,8 @@ interface IGlobalShortcutsProps {
     openProjector: () => Promise<void>;
     closeProjector: () => void;
     toggleOverride: (type: OverrideType) => void;
+    /** Directly triggers a remote state push, bypassing the IPC round-trip. */
+    onRequestRemoteUpdate: () => void;
 }
 
 /**
@@ -39,7 +52,8 @@ export function useGlobalShortcuts({
     handlePrev,
     openProjector,
     closeProjector,
-    toggleOverride
+    toggleOverride,
+    onRequestRemoteUpdate,
 }: IGlobalShortcutsProps) {
     const { t } = useTranslation();
     const undo = usePresentationStore(s => s.undo);
@@ -67,23 +81,19 @@ export function useGlobalShortcuts({
         }
 
         const isMod = e.metaKey || e.ctrlKey;
+        const store = getDefaultStore();
+        const isPreviewHovered = store.get(slidePreviewHoveredAtom);
 
         // Enter: Contextual Actions or Open Projector
         if (e.key === 'Enter') {
             if (appMode === 'presentation') {
-                const uiState = await import('@/core/store/uiAtoms');
-                const defaultStoreContext = await import('jotai/vanilla');
-                const store = defaultStoreContext.getDefaultStore();
-
-                const isPreviewHovered = store.get(uiState.slidePreviewHoveredAtom);
-
                 // 1. Hovering over Slide Preview AND items selected -> Edit selected text
                 if (isPreviewHovered) {
-                    const selectedItemIds = store.get(uiState.selectedCanvasItemIdsAtom);
+                    const selectedItemIds = store.get(selectedCanvasItemIdsAtom);
                     if (selectedItemIds.length > 0) {
                         const firstId = selectedItemIds[selectedItemIds.length - 1];
-                        store.set(uiState.editingCanvasItemIdAtom as any, firstId);
-                        store.set(uiState.canvasToolAtom, 'text');
+                        store.set(editingCanvasItemIdAtom, firstId);
+                        store.set(canvasToolAtom, 'text');
                         e.preventDefault?.();
                         return;
                     }
@@ -140,11 +150,9 @@ export function useGlobalShortcuts({
 
         // Ctrl+H: Toggle History
         if (isMod && (e.code === 'KeyH' || e.key.toLowerCase() === 'h')) {
-            const uiState = await import('@/core/store/uiAtoms');
-            const defaultStoreContext = await import('jotai/vanilla');
-            const store = defaultStoreContext.getDefaultStore();
+            const store = getDefaultStore();
             e.preventDefault?.();
-            store.set(uiState.historyOpenAtom as any, (prev: boolean) => !prev);
+            store.set(historyOpenAtom, (prev: boolean) => !prev);
         }
 
         // H: Sync Preview to Live (Layout independent)
@@ -166,11 +174,9 @@ export function useGlobalShortcuts({
 
         // Ctrl+F: Open search
         if (isMod && (e.code === 'KeyF' || e.key.toLowerCase() === 'f')) {
-            const uiState = await import('@/core/store/uiAtoms');
-            const defaultStoreContext = await import('jotai/vanilla');
-            const store = defaultStoreContext.getDefaultStore();
+            const store = getDefaultStore();
             e.preventDefault?.();
-            store.set(uiState.searchOpenAtom as any, true);
+            store.set(searchOpenAtom, true);
         }
 
         // Live Controls shortcuts
@@ -203,10 +209,8 @@ export function useGlobalShortcuts({
 
         // Slide Management Shortcuts
         if (appMode === 'presentation') {
-            const uiState = await import('@/core/store/uiAtoms');
-            const defaultStoreContext = await import('jotai/vanilla');
-            const store = defaultStoreContext.getDefaultStore();
-            const area = store.get(uiState.latestInteractionAreaAtom);
+            const store = getDefaultStore();
+            const area = store.get(latestInteractionAreaAtom);
 
             const { 
                 previewSlideId, 
@@ -216,6 +220,7 @@ export function useGlobalShortcuts({
                 duplicateCanvasItems,
                 duplicateAudioScope,
                 moveSlide, 
+                moveSlides,
                 removeSlide, 
                 removeSlides,
                 removeCanvasItem,
@@ -229,9 +234,9 @@ export function useGlobalShortcuts({
             if (isMod && (e.code === 'KeyD' || e.key.toLowerCase() === 'd')) {
                 e.preventDefault?.();
                 
-                if (area === 'canvas' && previewSlideId && selectedCanvasItemIds.length > 0) {
+                if ((area === 'canvas' || isPreviewHovered) && previewSlideId && selectedCanvasItemIds.length > 0) {
                     const newIds = await duplicateCanvasItems(previewSlideId, selectedCanvasItemIds);
-                    store.set(uiState.selectedCanvasItemIdsAtom, newIds);
+                    store.set(selectedCanvasItemIdsAtom, newIds);
                 } 
                 else if (area === 'audio' && selectedAudioScopeId) {
                     const newId = await duplicateAudioScope(selectedAudioScopeId);
@@ -247,13 +252,23 @@ export function useGlobalShortcuts({
             }
 
             // ── NAVIGATION ([, ]) ────────────────────────────────────────
-            if (isMod && previewSlideId && selectedPresentationId) {
+            if (isMod && selectedPresentationId) {
                 if (e.key === '[' || e.code === 'BracketLeft') {
                     e.preventDefault?.();
-                    await moveSlide(selectedPresentationId, previewSlideId, e.shiftKey ? 'start' : 'back');
+                    const direction = e.shiftKey ? 'start' : 'back';
+                    if (selectedSlideIds.length > 0) {
+                        await moveSlides(selectedPresentationId, selectedSlideIds, direction);
+                    } else if (previewSlideId) {
+                        await moveSlide(selectedPresentationId, previewSlideId, direction);
+                    }
                 } else if (e.key === ']' || e.code === 'BracketRight') {
                     e.preventDefault?.();
-                    await moveSlide(selectedPresentationId, previewSlideId, e.shiftKey ? 'end' : 'forth');
+                    const direction = e.shiftKey ? 'end' : 'forth';
+                    if (selectedSlideIds.length > 0) {
+                        await moveSlides(selectedPresentationId, selectedSlideIds, direction);
+                    } else if (previewSlideId) {
+                        await moveSlide(selectedPresentationId, previewSlideId, direction);
+                    }
                 }
             }
 
@@ -264,7 +279,7 @@ export function useGlobalShortcuts({
                     for (const id of selectedCanvasItemIds) {
                         await removeCanvasItem(previewSlideId, id);
                     }
-                    store.set(uiState.selectedCanvasItemIdsAtom, []);
+                    store.set(selectedCanvasItemIdsAtom, []);
                 }
                 else if (area === 'audio' && selectedAudioScopeId) {
                     e.preventDefault?.();
@@ -284,21 +299,21 @@ export function useGlobalShortcuts({
             if (!isMod) {
                 if (e.key.toLowerCase() === 'v') {
                     e.preventDefault?.();
-                    store.set(uiState.canvasToolAtom, 'select');
+                    store.set(canvasToolAtom, 'select');
                 } else if (e.key.toLowerCase() === 'h') {
                     e.preventDefault?.();
-                    store.set(uiState.canvasToolAtom, 'pan');
+                    store.set(canvasToolAtom, 'pan');
                 }
             }
 
             // ── ELEMENT CREATION (T, R, O, L) ─────────────────────────────
             if (!isMod && area === 'canvas' && previewSlideId) {
-                const addElement = (type: string, shapeType?: string) => {
-                    const item = createCanvasItem(type as any);
-                    if (shapeType && item.shape) item.shape.shapeType = shapeType as any;
+                const addElement = (type: 'text' | 'shape' | 'stroke' | 'image' | 'video', shapeType?: ShapeType) => {
+                    const item = createCanvasItem(type);
+                    if (shapeType && item.shape) item.shape.shapeType = shapeType;
                     item.x = 50; item.y = 50; // Center
                     addCanvasItem(previewSlideId, item);
-                    store.set(uiState.selectedCanvasItemIdsAtom, [item.id]);
+                    store.set(selectedCanvasItemIdsAtom, [item.id]);
                 };
 
                 if (e.key.toLowerCase() === 't') { e.preventDefault?.(); addElement('text'); }
@@ -311,13 +326,13 @@ export function useGlobalShortcuts({
             if (isMod && area === 'canvas') {
                 if (e.key === '=' || e.key === '+') {
                     e.preventDefault?.();
-                    store.set(uiState.canvasZoomAtom as any, (prev: number) => Math.min(prev + 0.1, 4));
+                    store.set(canvasZoomAtom, (prev: number) => Math.min(prev + 0.1, 4));
                 } else if (e.key === '-') {
                     e.preventDefault?.();
-                    store.set(uiState.canvasZoomAtom as any, (prev: number) => Math.max(prev - 0.1, 0.1));
+                    store.set(canvasZoomAtom, (prev: number) => Math.max(prev - 0.1, 0.1));
                 } else if (e.key === '0') {
                     e.preventDefault?.();
-                    store.set(uiState.canvasZoomAtom as any, 1.0);
+                    store.set(canvasZoomAtom, 1.0);
                 }
             }
         }
@@ -453,9 +468,26 @@ export function useGlobalShortcuts({
                         openProjector();
                     }
                 }
+                else if (command === 'SLIDE_SELECT') {
+                    const selectPayload = payload as { id?: string };
+                    if (selectPayload.id) {
+                        const store = usePresentationStore.getState();
+                        store.setPreviewSlide(selectPayload.id);
+                        store.setLiveSlide(selectPayload.id);
+                        openProjector();
+                    }
+                }
                 else if (command === 'PROJECTOR_START') {
-                    if (previewSlideId) {
-                        setLiveSlide(previewSlideId);
+                    const presState = usePresentationStore.getState();
+                    let target = previewSlideId;
+                    if (!target) {
+                        const pres = presState.selectedPresentation || presState.activePresentation;
+                        if (pres?.slides?.length > 0) {
+                            target = pres.slides[0].id;
+                        }
+                    }
+                    if (target) {
+                        setLiveSlide(target);
                         openProjector();
                     }
                 }
@@ -463,8 +495,10 @@ export function useGlobalShortcuts({
                     closeProjector();
                 }
                 else if (command === 'GET_STATE') {
-                    // Trigger a re-sync of state to remote clients
-                    IpcService.send('remote:request-state');
+                    // Call the remote update callback directly — bypasses the
+                    // broken renderer → main → renderer round-trip that caused
+                    // stale / empty state on the first remote connection.
+                    onRequestRemoteUpdate();
                 }
             });
         }

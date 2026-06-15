@@ -73,9 +73,7 @@ export class ScriptureDatabase extends Dexie {
 
 
         // Seed initial data if needed
-        this.on('populate', () => {
-            this.seed();
-        });
+        this.on('populate', () => this.seed());
 
         // The 'ready' hook in Dexie runs before DB is fully available to the app
         this.on('ready', () => {
@@ -108,11 +106,20 @@ export class ScriptureDatabase extends Dexie {
             // Check if we've already completed v5 reindexing
             const setting = await this.settings.get('verses_indexed_v5');
             if (setting?.value === true) return;
-            
+
+            // Count total unindexed verses for progress reporting
+            const total = await this.verses.filter(v => !v.words || v.words.length === 0).count();
+            if (total === 0) {
+                await this.settings.put({ key: 'verses_indexed_v5', value: true });
+                return;
+            }
+
+            await this.settings.put({ key: 'reindex_progress', value: { indexed: 0, total } });
+
             // Proceed in batches to avoid locking the whole DB for long periods
             const BATCH_SIZE = 1000;
             let offset = 0;
-            let count = 0;
+            let indexed = 0;
 
             while (true) {
                 const batch = await this.verses.offset(offset).limit(BATCH_SIZE).toArray();
@@ -128,19 +135,60 @@ export class ScriptureDatabase extends Dexie {
 
                 if (updates.length > 0) {
                     await this.verses.bulkPut(updates);
-                    count += updates.length;
-                    // Optional: You could expose a callback for this, but for now we'll just log
-                    console.log(`[DB] Reindexed ${count} verses...`);
+                    indexed += updates.length;
+                    // Update progress in settings so UI can react
+                    await this.settings.put({ key: 'reindex_progress', value: { indexed, total } });
                 }
 
                 offset += BATCH_SIZE;
-                // Add a small delay to prevent blocking the UI thread entirely
+                // Yield to event loop to avoid blocking the UI thread
                 await new Promise(r => setTimeout(r, 0));
             }
 
             await this.settings.put({ key: 'verses_indexed_v5', value: true });
+            await this.settings.delete('reindex_progress');
         } catch (err) {
             console.error('[DB] Reindexing failed:', err);
+            await this.settings.delete('reindex_progress').catch(() => {});
+        }
+    }
+
+    /**
+     * Reindexes only the unindexed verses for a specific translation.
+     * Called after importing a new Bible to ensure words are indexed
+     * without triggering a full DB re-scan.
+     */
+    async reindexTranslationVerses(translationId: string): Promise<void> {
+        try {
+            const allVerses = await this.verses
+                .where('translationId')
+                .equals(translationId)
+                .toArray();
+
+            const unindexed = allVerses.filter(v => !v.words || v.words.length === 0);
+            if (unindexed.length === 0) return;
+
+            const total = unindexed.length;
+            await this.settings.put({ key: 'reindex_progress', value: { indexed: 0, total } });
+
+            const BATCH_SIZE = 1000;
+            let indexed = 0;
+
+            for (let i = 0; i < unindexed.length; i += BATCH_SIZE) {
+                const batch = unindexed.slice(i, i + BATCH_SIZE).map(v => ({
+                    ...v,
+                    words: extractWords(v.text)
+                }));
+                await this.verses.bulkPut(batch);
+                indexed += batch.length;
+                await this.settings.put({ key: 'reindex_progress', value: { indexed, total } });
+                await new Promise(r => setTimeout(r, 0));
+            }
+
+            await this.settings.delete('reindex_progress');
+        } catch (err) {
+            console.error('[DB] Translation reindexing failed:', err);
+            await this.settings.delete('reindex_progress').catch(() => {});
         }
     }
 

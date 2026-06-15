@@ -4,7 +4,7 @@ import {
     MousePointer2, ShieldAlert, Zap, GripVertical, Trash2, Import, Volume2 
 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
-import { ISlide, ICanvasSlide, ITimerSettings } from '@/core/types';
+import { ISlide, ICanvasSlide, ITimerSettings, ITimerSlide } from '@/core/types';
 import { ModalType } from '@/core/store/modalStore';
 import type { TFunction } from 'i18next';
 import { useSortable } from '@dnd-kit/sortable';
@@ -156,7 +156,7 @@ export const TimerActionStep: React.FC<ITimerActionStepProps> = ({ action, index
                                 label: `${i + 1}. ${s.notes || (s.type === 'normal' 
                                     ? (s as ICanvasSlide).timerSettings?.prefix || t('slide', 'Slide') 
                                     : s.type === 'timer' 
-                                        ? (s as unknown as ITimerSettings).prefix || t('slide', 'Slide')
+                                        ? (s as ITimerSlide).prefix || t('slide', 'Slide')
                                         : t('slide', 'Slide'))}`
                             }))}
                         />

@@ -11,7 +11,7 @@ interface ChapterGridProps {
   onChapterSelect: (chapter: number) => void;
 }
 
-export const ChapterGrid: React.FC<ChapterGridProps> = ({
+export const ChapterGrid: React.FC<ChapterGridProps> = React.memo(({
   currentBook,
   currentChapter,
   onChapterSelect
@@ -65,4 +65,6 @@ export const ChapterGrid: React.FC<ChapterGridProps> = ({
       </div>
     </div>
   );
-};
+});
+
+ChapterGrid.displayName = 'ChapterGrid';

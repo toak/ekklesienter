@@ -16,7 +16,7 @@ interface ISortableCanvasItemProps {
     t: (key: string, fallback?: string) => string;
 }
 
-export const SortableCanvasItem: React.FC<ISortableCanvasItemProps> = ({
+const SortableCanvasItemComponent: React.FC<ISortableCanvasItemProps> = ({
     item,
     isSelected,
     onSelect,
@@ -111,3 +111,5 @@ export const SortableCanvasItem: React.FC<ISortableCanvasItemProps> = ({
         </div>
     );
 };
+
+export const SortableCanvasItem = React.memo(SortableCanvasItemComponent);

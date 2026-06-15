@@ -230,7 +230,7 @@ export const TemplatePickerOverlays: React.FC<TemplatePickerOverlaysProps> = (pr
                   <span className="text-base shrink-0">{block.icon}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-white truncate">{props.isRu ? block.nameRu : block.name}</p>
-                    <p className="text-[9px] text-stone-500 font-medium">{block.id}</p>
+                    {props.isDev && <p className="text-[9px] text-stone-500 font-medium">{block.id}</p>}
                   </div>
                   <div className="w-4 h-4 rounded-full shrink-0 border border-white/10" style={{ backgroundColor: block.color }} />
                   <button type="button" onClick={() => props.openBlockForm(block)} className="p-1.5 rounded-lg hover:bg-white/10 text-stone-500 hover:text-accent opacity-0 group-hover:opacity-100 transition-all cursor-pointer" aria-label={t('edit_block')}><Pencil className="w-3.5 h-3.5" /></button>

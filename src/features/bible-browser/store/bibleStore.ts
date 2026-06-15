@@ -4,7 +4,7 @@ import { Verse } from '@/core/types';
 import { db } from '@/core/db';
 import { useHistoryStore } from '@/core/store/historyStore';
 import { LiveSyncService } from '@/core/services/liveSyncService';
-import { BibleService } from '@/core/services/BibleService';
+import { BibleService } from '@/core/services/bibleService';
 
 interface BibleStoreState {
   currentTranslationId: string;
@@ -198,10 +198,10 @@ export const useBibleStore = create<BibleStoreState>()(
 
       setSelectedVerses: (verses) => {
         const sorted = [...verses].sort((a, b) => a.verseNumber - b.verseNumber);
-        set({ selectedVerses: sorted });
-        if (sorted.length === 1) {
-          set({ activeVerse: sorted[0] });
-        }
+        set({
+          selectedVerses: sorted,
+          ...(sorted.length === 1 ? { activeVerse: sorted[0] } : {})
+        });
       },
 
       toggleVerseSelection: (verse) => {
@@ -210,10 +210,10 @@ export const useBibleStore = create<BibleStoreState>()(
         const newSelected = isSelected
           ? selectedVerses.filter(v => v.id !== verse.id)
           : [...selectedVerses, verse].sort((a, b) => a.verseNumber - b.verseNumber);
-        set({ selectedVerses: newSelected });
-        if (newSelected.length === 1) {
-          set({ activeVerse: newSelected[0] });
-        }
+        set({
+          selectedVerses: newSelected,
+          ...(newSelected.length === 1 ? { activeVerse: newSelected[0] } : {})
+        });
       },
 
       selectVerseRange: (from, to, allVerses) => {
@@ -222,10 +222,10 @@ export const useBibleStore = create<BibleStoreState>()(
         const range = allVerses
           .filter(v => v.verseNumber >= start && v.verseNumber <= end)
           .sort((a, b) => a.verseNumber - b.verseNumber);
-        set({ selectedVerses: range });
-        if (range.length === 1) {
-          set({ activeVerse: range[0] });
-        }
+        set({
+          selectedVerses: range,
+          ...(range.length === 1 ? { activeVerse: range[0] } : {})
+        });
       },
 
       exitMultiVerseMode: () => {

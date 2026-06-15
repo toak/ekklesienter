@@ -1,12 +1,12 @@
 import { db } from '@/core/db';
 import { PresentationSliceCreator } from '../types';
-import { ICanvasItem, ICanvasSlide, IStyleLayer, ITimerSettings } from '@/core/types';
+import { ICanvasItem, ICanvasSlide, ISlide, IStyleLayer, ITimerSettings, IMediaItem, IVideoSlide } from '@/core/types';
 
 export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
     addCanvasItem: async (slideId, item) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -61,9 +61,9 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     updateCanvasItems: async (slideId, updates) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -92,9 +92,9 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     updateCanvasItemsOrder: async (slideId, items) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -115,9 +115,9 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     removeCanvasItem: async (slideId, itemId) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -141,9 +141,9 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
     },
 
     reorderCanvasItem: async (slideId, itemId, direction) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -174,11 +174,10 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
 
     duplicateCanvasItems: async (slideId: string, itemIds: string[]) => {
         if (itemIds.length === 0) return [];
-        await get().takeSnapshot(slideId);
-        
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return [];
-
+        await get().takeSnapshot(selectedPresentationId);
+        
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
             const active = get().activePresentation;
@@ -218,7 +217,7 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
         return newItems.map(i => i.id);
     },
 
-    setMediaBackground: async (slideId, mediaItem) => {
+    setMediaBackground: async (slideId, mediaItem: IMediaItem) => {
         const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
         const stableId = await MediaPersistenceService.ensureMediaInDb(mediaItem);
 
@@ -246,11 +245,11 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
                     source: 'local',
                 }
             })
-        } as any;
+        } as IStyleLayer;
         await get().updateSlideBackground(slideId, [layer]);
     },
 
-    addMediaLayer: async (slideId, mediaItem, position) => {
+    addMediaLayer: async (slideId, mediaItem: IMediaItem, position) => {
         const { MediaPersistenceService } = await import('../../services/MediaPersistenceService');
         const stableId = await MediaPersistenceService.ensureMediaInDb(mediaItem);
 
@@ -276,34 +275,30 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
                 ...(isVideo ? {
                     video: {
                         url: stableId,
+                        source: 'local',
                         id: stableId,
                         isFromDb: true,
-                        loop: true,
-                        muted: false,
-                        volume: 1,
-                        playbackRate: 1,
-                        startTime: 0
+                        isMuted: false,
+                        isLooping: true
                     }
                 } : {
                     image: {
                         url: stableId,
+                        source: 'local',
                         id: stableId,
-                        isFromDb: true,
-                        fit: 'contain',
-                        flipX: false,
-                        flipY: false
+                        isFromDb: true
                     }
                 })
-            } as any],
+            } as IStyleLayer],
             strokes: [],
         };
         await get().addCanvasItem(slideId, newItem);
     },
 
     updateSlideVariable: async (slideId, name, value) => {
-        await get().takeSnapshot(slideId);
         const { selectedPresentationId, selectedPresentation } = get();
         if (!selectedPresentationId) return;
+        await get().takeSnapshot(selectedPresentationId);
 
         let pres = selectedPresentation;
         if (!pres || pres.id !== selectedPresentationId) {
@@ -381,7 +376,7 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
 
         const newSlides = pres.slides.map(s => {
             if (s.id === slideId && s.type === 'video') {
-                const videoSlide = s as any;
+                const videoSlide = s as IVideoSlide;
                 return {
                     ...videoSlide,
                     videoSettings: {
@@ -401,23 +396,10 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
         if (!snapshot) return;
 
         const { selectedPresentationId } = get();
-        if (!selectedPresentationId) return;
+        if (!selectedPresentationId || snapshot.presentationId !== selectedPresentationId) return;
 
-        await db.presentationFiles.where('id').equals(selectedPresentationId).modify(pres => {
-            const slide = pres.slides.find(s => s.id === snapshot.slideId);
-            if (slide && slide.type === 'normal') {
-                slide.content = { ...slide.content, canvasItems: snapshot.canvasItems };
-                slide.backgroundOverride = snapshot.background;
-            }
-        });
-
-        const updatedPres = await db.presentationFiles.get(selectedPresentationId);
-        if (updatedPres) {
-            const updates: any = {};
-            if (get().activePresentationId === selectedPresentationId) updates.activePresentation = updatedPres;
-            if (get().selectedPresentationId === selectedPresentationId) updates.selectedPresentation = updatedPres;
-            set(updates);
-        }
+        // Restore the full slides array from the snapshot
+        await get().updatePresentationSlides(snapshot.presentationId, snapshot.slides);
     },
 
     redo: async () => {
@@ -426,44 +408,38 @@ export const createCanvasSlice: PresentationSliceCreator = (set, get) => ({
         if (!snapshot) return;
 
         const { selectedPresentationId } = get();
-        if (!selectedPresentationId) return;
+        if (!selectedPresentationId || snapshot.presentationId !== selectedPresentationId) return;
 
-        await db.presentationFiles.where('id').equals(selectedPresentationId).modify(pres => {
-            const slide = pres.slides.find(s => s.id === snapshot.slideId);
-            if (slide && slide.type === 'normal') {
-                slide.content = { ...slide.content, canvasItems: snapshot.canvasItems };
-                slide.backgroundOverride = snapshot.background;
-            }
-        });
-
-        const updatedPres = await db.presentationFiles.get(selectedPresentationId);
-        if (updatedPres) {
-            const updates: any = {};
-            if (get().activePresentationId === selectedPresentationId) updates.activePresentation = updatedPres;
-            if (get().selectedPresentationId === selectedPresentationId) updates.selectedPresentation = updatedPres;
-            set(updates);
-        }
+        // Restore the full slides array from the snapshot
+        await get().updatePresentationSlides(snapshot.presentationId, snapshot.slides);
     },
 
-    takeSnapshot: async (slideId) => {
+    /**
+     * Push a "before" snapshot of the given presentation's slides array.
+     * Must be called BEFORE any mutating action that should be undoable.
+     * @param presentationId - the presentation to snapshot
+     */
+    takeSnapshot: async (presentationId: string) => {
         const { useHistoryStore } = await import('@/core/store/historyStore');
-        const { selectedPresentationId, selectedPresentation } = get();
-        if (!selectedPresentationId) return;
+        const { activePresentationId, activePresentation, selectedPresentationId, selectedPresentation } = get();
 
-        let pres = selectedPresentation;
-        if (!pres || pres.id !== selectedPresentationId) {
-            const active = get().activePresentation;
-            if (active && active.id === selectedPresentationId) pres = active;
-            else pres = await db.presentationFiles.get(selectedPresentationId) || null;
+        let slides: ISlide[] | undefined;
+
+        // Prefer in-memory presentation to avoid a DB round-trip on hot path
+        if (activePresentationId === presentationId && activePresentation) {
+            slides = activePresentation.slides;
+        } else if (selectedPresentationId === presentationId && selectedPresentation) {
+            slides = selectedPresentation.slides;
+        } else {
+            const pres = await db.presentationFiles.get(presentationId);
+            slides = pres?.slides;
         }
 
-        const slide = pres?.slides?.find(s => s.id === slideId);
-        if (!slide || slide.type !== 'normal') return;
+        if (!slides) return;
 
         useHistoryStore.getState().pushSnapshot({
-            slideId,
-            canvasItems: structuredClone(slide.content?.canvasItems || []),
-            background: structuredClone(slide.backgroundOverride || [])
+            presentationId,
+            slides: structuredClone(slides),
         });
     },
 });

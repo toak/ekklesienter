@@ -19,7 +19,7 @@ interface ShortcutItemProps {
 
 const MouseIcon: React.FC<{ button: 'left' | 'right' | 'middle', double?: boolean }> = ({ button, double }) => (
     <div className="relative inline-flex items-center group/mouse">
-        <div className="w-5 h-7 border-2 border-white/20 rounded-lg flex flex-col overflow-hidden bg-stone-900/50 shadow-sm transition-colors group-hover/mouse:border-white/30">
+        <div className="w-5 h-7 border-2 border-white/20 rounded-xl flex flex-col overflow-hidden bg-stone-900/50 shadow-sm transition-colors group-hover/mouse:border-white/30">
             {/* Top row with 3 buttons */}
             <div className="h-3.5 flex border-b border-white/10">
                 <div className={cn(
@@ -49,22 +49,21 @@ const MouseIcon: React.FC<{ button: 'left' | 'right' | 'middle', double?: boolea
 );
 
 const Kbd: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    if (typeof children === 'string') {
-        if (children.toLowerCase().includes('click')) {
-            const isDouble = children.toLowerCase().includes('double');
-            const isRight = children.toLowerCase().includes('right');
-            const isMiddle = children.toLowerCase().includes('middle');
-            const button = isRight ? 'right' : isMiddle ? 'middle' : 'left';
-
-            return <MouseIcon button={button} double={isDouble} />;
-        }
+    let content = null;
+    if (typeof children === 'string' && children.toLowerCase().includes('click')) {
+        const isDouble = children.toLowerCase().includes('double');
+        const isRight = children.toLowerCase().includes('right');
+        const isMiddle = children.toLowerCase().includes('middle');
+        const button = isRight ? 'right' : isMiddle ? 'middle' : 'left';
+        content = <MouseIcon button={button} double={isDouble} />;
+    } else {
+        content = (
+            <kbd className="min-w-[24px] h-6 px-1.5 flex items-center justify-center bg-stone-900 border border-white/10 rounded-xl text-[10px] font-bold text-stone-300 shadow-sm group-hover:border-white/20 transition-colors">
+                {children}
+            </kbd>
+        );
     }
-
-    return (
-        <kbd className="min-w-[24px] h-6 px-1.5 flex items-center justify-center bg-stone-900 border border-white/10 rounded-md text-[10px] font-bold text-stone-300 shadow-sm group-hover:border-white/20 transition-colors">
-            {children}
-        </kbd>
-    );
+    return content;
 };
 
 const ShortcutItem: React.FC<ShortcutItemProps> = ({ label, keys, description }) => {
@@ -114,9 +113,9 @@ const ShortcutItem: React.FC<ShortcutItemProps> = ({ label, keys, description })
     );
 };
 
-const CategoryHeader: React.FC<{ title: string; icon: any }> = ({ title, icon: Icon }) => (
+const CategoryHeader: React.FC<{ title: string; icon: React.ElementType }> = ({ title, icon: Icon }) => (
     <div className="flex items-center gap-3 px-3 mb-2 mt-6 first:mt-0">
-        <div className="p-2 rounded-lg bg-accent/10 border border-accent/20">
+        <div className="p-2 rounded-xl bg-accent/10 border border-accent/20">
             <Icon className="w-4 h-4 text-accent" />
         </div>
         <h3 className="text-xs font-black text-stone-500 uppercase tracking-[0.2em]">{title}</h3>

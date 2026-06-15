@@ -176,7 +176,7 @@ const PresentationImportModal: React.FC = () => {
                                 </p>
                                 <div className="w-1 h-1 rounded-full bg-stone-700" />
                                 <p className="text-[10px] text-accent font-bold uppercase tracking-widest">
-                                    {slides.length} {t('slides', 'Slides')}
+                                    {t('slides_count', { count: slides.length, defaultValue: '{{count}} Slides' })}
                                 </p>
                             </div>
                         </div>
@@ -259,7 +259,7 @@ const PresentationImportModal: React.FC = () => {
                                 </span>
                                 <div className="w-px h-3 bg-white/10" />
                                 <span className="text-[9px] font-bold text-stone-600 uppercase tracking-widest">
-                                    {slides.length} {t('slide_units', 'Units')}
+                                    {t('slide_units_count', { count: slides.length, defaultValue: '{{count}} Units' })}
                                 </span>
                             </div>
                         </div>
@@ -386,7 +386,7 @@ const PresentationImportModal: React.FC = () => {
                             </span>
                             <div className="flex items-center gap-3">
                                 <p className="text-xl font-black text-accent tracking-tighter">
-                                    {selectedSlideIds.length} {t('selected_short', 'Selected')}
+                                    {t('selected_count', { count: selectedSlideIds.length, defaultValue: '{{count}} Selected' })}
                                 </p>
                                 <div className="w-1.5 h-1.5 rounded-full bg-stone-700" />
                                 <p className="text-xs font-bold text-stone-500 uppercase tracking-widest">

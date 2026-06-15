@@ -5,7 +5,7 @@ import { BibleData, Translation, Verse, Book } from '@/core/types';
  * Service for managing Bible translations and data.
  * Centralizes all IndexedDB operations for verses, books, and translations.
  */
-export const BibleService = {
+export const bibleService = {
     /**
      * Retrieves all installed translations.
      */
@@ -92,3 +92,7 @@ export const BibleService = {
         await db.verses.update(verseId, { text: newText });
     }
 };
+
+/** @deprecated Use bibleService instead. */
+export const BibleService = bibleService;
+

@@ -5,9 +5,10 @@ import { db } from '@/core/db';
 import { IMediaItem, MediaType } from '@/core/types';
 import { cn } from '@/core/utils/cn';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
+import { useShallow } from 'zustand/react/shallow';
 import { getLocalResourceUrl } from '@/core/hooks/useMediaUrl';
 import { toast } from '@/core/utils/toast';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 
 // Hooks
 import { useMediaPoolData } from '../../hooks/useMediaPoolData';
@@ -25,7 +26,7 @@ import { MediaPoolContextMenu, ContextMenuState } from './MediaPoolContextMenu';
  */
 export const MediaPoolPanel: React.FC = () => {
     const { t } = useTranslation();
-    const { openModal } = useModalStore();
+    const { openModal } = useModalStore(useShallow(s => ({ openModal: s.openModal })));
     
     // State
     const [filter, setFilter] = useState<MediaType | 'all'>('all');

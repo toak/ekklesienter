@@ -6,31 +6,32 @@ import {
 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { useTranslation } from 'react-i18next';
+import { Translation, Book, Verse } from '@/core/types/bible';
 
 interface IBibleBrowserProps {
-    onSelect: (verse: any | any[]) => void;
-    onQuery: (type: string, payload: any) => Promise<any[]>;
+    onSelect: (verse: Verse | Verse[]) => void;
+    onQuery: (type: string, payload: Record<string, unknown>) => Promise<unknown[]>;
 }
 
 export const BibleBrowser: React.FC<IBibleBrowserProps> = ({ onSelect, onQuery }) => {
     const { t } = useTranslation();
     // Navigation Data
-    const [translations, setTranslations] = useState<any[]>([]);
-    const [books, setBooks] = useState<any[]>([]);
+    const [translations, setTranslations] = useState<Translation[]>([]);
+    const [books, setBooks] = useState<Book[]>([]);
     const [chapters, setChapters] = useState<number[]>([]);
-    const [verses, setVerses] = useState<any[]>([]);
-    const [parallelVerses, setParallelVerses] = useState<Record<number, any>>({});
+    const [verses, setVerses] = useState<Verse[]>([]);
+    const [parallelVerses, setParallelVerses] = useState<Record<number, Verse>>({});
     
     // Selection state
-    const [selectedTranslation, setSelectedTranslation] = useState<any>(null);
-    const [secondTranslation, setSecondTranslation] = useState<any>(null);
-    const [selectedBook, setSelectedBook] = useState<any>(null);
+    const [selectedTranslation, setSelectedTranslation] = useState<Translation | null>(null);
+    const [secondTranslation, setSecondTranslation] = useState<Translation | null>(null);
+    const [selectedBook, setSelectedBook] = useState<Book | null>(null);
     const [selectedChapter, setSelectedChapter] = useState<number | null>(null);
     
     // UI state
     const [loading, setLoading] = useState(false);
     const [isSelectMode, setIsSelectMode] = useState(false);
-    const [selectedVerseItems, setSelectedVerseItems] = useState<any[]>([]);
+    const [selectedVerseItems, setSelectedVerseItems] = useState<Verse[]>([]);
     const [isParallelMode, setIsParallelMode] = useState(false);
     const [isSelectingParallel, setIsSelectingParallel] = useState(false);
 
@@ -51,12 +52,17 @@ export const BibleBrowser: React.FC<IBibleBrowserProps> = ({ onSelect, onQuery }
 
     const loadTranslations = async () => {
         setLoading(true);
-        const results = await onQuery('GET_TRANSLATIONS', {});
-        setTranslations(results);
-        setLoading(false);
+        try {
+            const results = await onQuery('GET_TRANSLATIONS', {});
+            setTranslations(results as Translation[]);
+        } catch (err) {
+            console.error('Failed to load translations:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSelectTranslation = async (trans: any) => {
+    const handleSelectTranslation = async (trans: Translation) => {
         if (isSelectingParallel) {
             setSecondTranslation(trans);
             setIsSelectingParallel(false);
@@ -67,47 +73,57 @@ export const BibleBrowser: React.FC<IBibleBrowserProps> = ({ onSelect, onQuery }
         }
 
         setLoading(true);
-        setSelectedTranslation(trans);
-        const results = await onQuery('GET_BOOKS', { translationId: trans.id });
-        setBooks(results);
-        setLoading(false);
+        try {
+            setSelectedTranslation(trans);
+            const results = await onQuery('GET_BOOKS', { translationId: trans.id });
+            setBooks(results as Book[]);
+        } catch (err) {
+            console.error('Failed to load books:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleSelectBook = (book: any) => {
+    const handleSelectBook = (book: Book) => {
         setSelectedBook(book);
-        const chapCount = book.chaptersCount || 50;
+        const chapCount = book.chapters?.length || (book as unknown as Record<string, unknown>).chaptersCount as number || 50;
         setChapters(Array.from({ length: chapCount }, (_, i) => i + 1));
     };
 
-    const handleSelectChapter = async (chap: number, overridenParallel?: any) => {
+    const handleSelectChapter = async (chap: number, overridenParallel?: Translation) => {
+        if (!selectedTranslation || !selectedBook) return;
         setLoading(true);
         setSelectedChapter(chap);
         
-        // Fetch primary verses
-        const results = await onQuery('GET_VERSES', { 
-            translationId: selectedTranslation.id,
-            bookId: selectedBook.bookId,
-            chapter: chap
-        });
-        setVerses(results);
-
-        // Fetch parallel verses if mode is active
-        const parallelTarget = overridenParallel || secondTranslation;
-        if ((isParallelMode || overridenParallel) && parallelTarget) {
-            const pResults = await onQuery('GET_VERSES', {
-                translationId: parallelTarget.id,
+        try {
+            // Fetch primary verses
+            const results = await onQuery('GET_VERSES', { 
+                translationId: selectedTranslation.id,
                 bookId: selectedBook.bookId,
                 chapter: chap
             });
-            const pMap: Record<number, any> = {};
-            pResults.forEach(v => { pMap[v.verseNumber] = v; });
-            setParallelVerses(pMap);
-        }
+            setVerses(results as Verse[]);
 
-        setLoading(false);
+            // Fetch parallel verses if mode is active
+            const parallelTarget = overridenParallel || secondTranslation;
+            if ((isParallelMode || overridenParallel) && parallelTarget) {
+                const pResults = await onQuery('GET_VERSES', {
+                    translationId: parallelTarget.id,
+                    bookId: selectedBook.bookId,
+                    chapter: chap
+                });
+                const pMap: Record<number, Verse> = {};
+                (pResults as Verse[]).forEach(v => { pMap[v.verseNumber] = v; });
+                setParallelVerses(pMap);
+            }
+        } catch (err) {
+            console.error('Failed to load chapter verses:', err);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const toggleVerse = (verse: any) => {
+    const toggleVerse = (verse: Verse) => {
         if (!isSelectMode) {
             onSelect(verse);
             return;
@@ -279,7 +295,7 @@ export const BibleBrowser: React.FC<IBibleBrowserProps> = ({ onSelect, onQuery }
                                 </div>
                                 <div className="text-left">
                                     <span className="font-bold text-xl text-stone-100 uppercase tracking-tight">{b.name}</span>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-600 mt-1">{b.chaptersCount} {t('remote.chapters')}</p>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-stone-600 mt-1">{t('remote.chapters_count', { count: b.chapters?.length || (b as unknown as Record<string, unknown>).chaptersCount as number || 0, defaultValue: '{{count}} Chapters' })}</p>
                                 </div>
                             </div>
                             <ChevronRight size={20} className="text-stone-700" />

@@ -85,6 +85,7 @@ describe('usePresentationStore', () => {
     };
     const mockPresentation = {
       id: 'master-1',
+      serviceId: 'service-1',
       slides: [{ id: 'slide-1' }],
     };
 

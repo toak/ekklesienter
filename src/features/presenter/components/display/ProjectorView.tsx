@@ -12,7 +12,7 @@ import { ILogo } from '@/core/types';
 import { useLogoUrl } from '@/core/hooks/useLogoUrl';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
 import { PresenterService } from '../../services/presenterService';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { useAudioSync } from '@/app/hooks/useAudioSync';
 import { usePresentationStore } from '../../store/presentationStore';
 

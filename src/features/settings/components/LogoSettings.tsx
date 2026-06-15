@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { PRELOADED_LOGOS } from '@/core/data/logoData';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { CreateGroupDialog } from './logo/CreateGroupDialog';
 import { LogoCard } from './logo/LogoCard';
 import { LogoGrid } from './logo/LogoGrid';
@@ -129,7 +129,7 @@ const LogoSettings: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => toggleCollapse(group.id)}
-                                className="p-1 hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                                className="p-1 hover:bg-white/5 rounded-xl transition-colors cursor-pointer"
                                 aria-label={isCollapsed ? 'Expand' : 'Collapse'}
                             >
                                 {isCollapsed
@@ -142,7 +142,7 @@ const LogoSettings: React.FC = () => {
                                 {group.name}
                             </h3>
                             <span className="text-[10px] text-stone-600 font-mono shrink-0">
-                                {group.logos.length} {t('common:items')}
+                                {t('common:items_count', { count: group.logos.length, defaultValue: '{{count}} items' })}
                             </span>
 
                             {/* Group actions */}
@@ -151,7 +151,7 @@ const LogoSettings: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleSelectFile(group.id)}
-                                    className="p-1.5 hover:bg-white/5 text-stone-600 hover:text-accent rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 hover:bg-white/5 text-stone-600 hover:text-accent rounded-xl transition-colors cursor-pointer"
                                     aria-label="Add logo to group"
                                 >
                                     <Plus className="w-3.5 h-3.5" />
@@ -163,7 +163,7 @@ const LogoSettings: React.FC = () => {
                                         type="button"
                                         onClick={() => handleRefreshFolder(group)}
                                         disabled={isImporting}
-                                        className="p-1.5 hover:bg-white/5 text-stone-600 hover:text-accent rounded-lg transition-colors disabled:opacity-30 cursor-pointer"
+                                        className="p-1.5 hover:bg-white/5 text-stone-600 hover:text-accent rounded-xl transition-colors disabled:opacity-30 cursor-pointer"
                                         aria-label="Refresh from folder"
                                     >
                                         <RefreshCw className={cn("w-3.5 h-3.5", isImporting && "animate-spin")} />
@@ -174,7 +174,7 @@ const LogoSettings: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleImportFolder(group.id)}
-                                    className="p-1.5 hover:bg-white/5 text-stone-600 hover:text-accent rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 hover:bg-white/5 text-stone-600 hover:text-accent rounded-xl transition-colors cursor-pointer"
                                     aria-label="Import folder to group"
                                 >
                                     <FolderOpen className="w-3.5 h-3.5" />
@@ -184,7 +184,7 @@ const LogoSettings: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => removeLogoGroup(group.id)}
-                                    className="p-1.5 hover:bg-red-500/10 text-stone-600 hover:text-red-500 rounded-lg transition-colors cursor-pointer"
+                                    className="p-1.5 hover:bg-red-500/10 text-stone-600 hover:text-red-500 rounded-xl transition-colors cursor-pointer"
                                     aria-label="Delete group"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />

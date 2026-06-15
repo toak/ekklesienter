@@ -9,7 +9,7 @@ import { X, Music, Search, Plus, Import } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { IMediaItem, IAudioScope, ISlide } from '@/core/types';
 import { findOverlappingScopes } from '../../utils/timelineUtils';
-import { IpcService } from '@/core/services/IpcService';
+import { IpcService } from '@/core/services/ipcService';
 import { MediaPersistenceService } from '../../services/MediaPersistenceService';
 
 const AudioPickerModal: React.FC = () => {

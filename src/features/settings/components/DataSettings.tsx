@@ -3,17 +3,30 @@ import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/core/db';
 import { useBibleStore } from '@/features/bible-browser/store/bibleStore';
+import { useShallow } from 'zustand/react/shallow';
 import BibleManager from './BibleManager';
-import { AlertCircle, Database, Trash2, Info, Layers } from 'lucide-react';
+import { AlertCircle, Database, Trash2, Info, Layers, Cpu } from 'lucide-react';
 import { cn } from '@/core/utils/cn';
 import { useModalStore, ModalType } from '@/core/store/modalStore';
 import DropdownSelector from '@/shared/ui/DropdownSelector';
 
 const DataSettings: React.FC = () => {
     const { t } = useTranslation();
-    const { openModal } = useModalStore();
-    const { secondTranslationId, setSecondTranslation } = useBibleStore();
+    const openModal = useModalStore(state => state.openModal);
+    const { secondTranslationId, setSecondTranslation } = useBibleStore(useShallow(state => ({
+        secondTranslationId: state.secondTranslationId,
+        setSecondTranslation: state.setSecondTranslation
+    })));
     const translations = useLiveQuery(() => db.translations.toArray()) || [];
+
+    const reindexProgress = useLiveQuery(
+        () => db.settings.get('reindex_progress').then(s => s?.value as { indexed: number; total: number } | undefined),
+        []
+    );
+
+    const progressPercent = reindexProgress
+        ? Math.round((reindexProgress.indexed / reindexProgress.total) * 100)
+        : 0;
 
     const handleReset = async () => {
         openModal(ModalType.CONFIRM, {
@@ -31,6 +44,34 @@ const DataSettings: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+            {/* Verse Indexing Progress Banner */}
+            {reindexProgress && (
+                <div className="bg-accent/5 border border-accent/20 rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                        <div className="p-1.5 bg-accent/15 rounded-xl shrink-0">
+                            <Cpu className="w-4 h-4 text-accent animate-pulse" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-accent">
+                                {t('indexing_verses', 'Indexing verses for search…')}
+                            </p>
+                            <p className="text-[10px] text-stone-500 font-medium mt-0.5">
+                                {reindexProgress.indexed.toLocaleString()} / {reindexProgress.total.toLocaleString()} {t('verses_processed', { count: reindexProgress.total, defaultValue: 'verses processed' })}
+                            </p>
+                        </div>
+                        <span className="text-xs font-black text-accent tabular-nums shrink-0">
+                            {progressPercent}%
+                        </span>
+                    </div>
+                    <div className="h-1.5 bg-stone-800 rounded-full overflow-hidden">
+                        <div
+                            className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
+                            style={{ width: `${progressPercent}%` }}
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* Main Data Section */}
             <div className="bg-stone-900/40 border border-white/5 rounded-3xl p-6 relative overflow-hidden group">

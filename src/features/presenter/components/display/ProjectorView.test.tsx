@@ -11,12 +11,6 @@ vi.stubGlobal('electron', {
   },
 });
 
-// Mock i18next
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-  }),
-}));
 
 // Mock DB and Dexie hooks
 vi.mock('@/core/db', () => ({

@@ -10,7 +10,7 @@ import { cn } from '@/core/utils/cn';
 
 const GeneralSettings: React.FC = () => {
     const { t, i18n } = useTranslation();
-    const { openModal } = useModalStore();
+    const openModal = useModalStore(state => state.openModal);
     const [themeAccent, setThemeAccent] = useAtom(themeAccentAtom);
     const [devMode, setDevMode] = useAtom(devModeAtom);
     const [isDevAuthenticated, setIsDevAuthenticated] = useAtom(isDevAuthenticatedAtom);
